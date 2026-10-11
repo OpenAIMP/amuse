@@ -106,6 +106,43 @@ What the system never does: place orders, predict direction, or promise
 profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
 — cash is a position.
 
+## Why and how to use it
+
+**Why.** You want a rules-based way to find defined-risk options income
+without staring at screens or trading on gut feel. The system does the heavy
+analytical work on schedule — screening hundreds of names, pricing structures
+with honest fills, and telling you in plain English what passed and what
+didn't — so your job narrows to judgment: selection, sizing, confirmation.
+
+**How, day to day.**
+
+1. Morning: open the archive homepage, read the latest daily report. The
+   readout gives you the regime and the top structures in one pass.
+2. Shortlist where the two tables agree: a high-regime-score name carrying a
+   high-return-on-risk structure.
+3. Apply the 1–2% sizing rule to the reported max loss, check the event
+   flags, confirm buying power — then it's your call.
+4. Monthly: read the PMCC report for longer-horizon positions; log every
+   decision in the Trading Workbook.
+
+**Questions it answers.**
+
+- Which names have a regime that supports selling premium?
+- What defined-risk structures are priced right now — credit, max loss,
+  breakeven?
+- What's moving abnormally this morning?
+- Which LEAPS pairs are worth holding for months?
+- What changed since yesterday?
+- Why did *nothing* qualify today?
+
+**Questions it doesn't answer.**
+
+- Will this trade make money? Probabilities are market-implied, not forecasts.
+- How many contracts? No sizing calculator yet (roadmap).
+- When do I exit? No exit rules yet (roadmap).
+- Is my book within risk limits? No heat tracker yet (roadmap).
+- What will the market do tomorrow? Nothing here predicts — ever.
+
 ## Screeners
 
 | File | What it does | In scheduled flows |
