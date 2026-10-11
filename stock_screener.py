@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import math
+import statistics
 import subprocess
 import sys
 from datetime import datetime
@@ -35,6 +36,19 @@ VOL_RATIO_MIN = 0.9          # 20d avg volume / 60d avg volume
 MAX_OFF_HIGH_PCT = 25.0      # must be within 25% below 52-week high
 MIN_BARS = 200               # need a full SMA200 of history
 PERIOD = "YEAR"
+
+# ---- indicator-pack configuration (design choices, printed in every report) --
+BB_PERIOD, BB_MULT = 20, 2.0          # Bollinger: 20-period SMA +/- 2 sample stdev
+BB_PCTB_MIN, BB_PCTB_MAX = 0.0, 1.0   # %B gate: price must be inside the bands
+SQUEEZE_LOOKBACK = 125                # squeeze = bandwidth at N-day minimum
+MIN_BARS_SQUEEZE = 130                # else squeeze is unknown (ranking only)
+REQUIRE_ABOVE_ANCHORED_VWAP = True    # gate: close must hold anchored VWAP
+REJECT_DOWNTREND = True               # gate: reject downtrend pivot structure
+PIVOT_N = 5                           # fractal pivot: extreme of n bars each side
+SWING_LOOKBACK_BARS = 126             # ~6 months for the reference swing
+INTRADAY_PERIOD = "DAY"
+INTRADAY_AGG = "FIFTEEN_MINUTES"
+FIB_LEVELS = (0.382, 0.50, 0.618)
 
 RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
@@ -125,9 +139,215 @@ def atr14_pct(bars, price):
     return atr / price * 100.0
 
 
+# ---------------- indicator pack: Bollinger / VWAP / pivots ----------------
+
+def bollinger(closes):
+    """Return dict with pct_b, bandwidth_pct, squeeze (or None fields).
+
+    squeeze is True when current bandwidth is the 125-day minimum; it needs
+    MIN_BARS_SQUEEZE bars, otherwise squeeze is None (unknown, never a gate).
+    """
+    out = {"pct_b": None, "bandwidth_pct": None, "squeeze": None,
+           "upper": None, "middle": None, "lower": None}
+    if len(closes) < BB_PERIOD:
+        return out
+    window = closes[-BB_PERIOD:]
+    mid = statistics.fmean(window)
+    sd = statistics.stdev(window)  # sample stdev
+    upper, lower = mid + BB_MULT * sd, mid - BB_MULT * sd
+    out.update({"upper": upper, "middle": mid, "lower": lower})
+    width = upper - lower
+    if width > 0 and math.isfinite(width):
+        close = closes[-1]
+        out["pct_b"] = (close - lower) / width
+        out["bandwidth_pct"] = width / mid * 100.0 if mid > 0 else None
+    if len(closes) >= MIN_BARS_SQUEEZE and out["bandwidth_pct"] is not None:
+        bws = []
+        for i in range(len(closes) - SQUEEZE_LOOKBACK, len(closes)):
+            w = closes[i - BB_PERIOD + 1:i + 1]
+            m = statistics.fmean(w)
+            s = statistics.stdev(w)
+            bw = (4.0 * s) / m * 100.0 if m > 0 else None
+            bws.append(bw)
+        if all(b is not None and math.isfinite(b) for b in bws):
+            out["squeeze"] = (out["bandwidth_pct"] == min(bws))
+    return out
+
+
+def intraday_bars_for(symbol):
+    """Return (bars, expected_bars) for the DAY session, or raise McpError.
+
+    bars: list of (date, open, high, low, close, volume), validated.
+    """
+    p = mcp_call("get_price_history",
+                 {"symbol": symbol, "account_id": ACCT,
+                  "period": INTRADAY_PERIOD, "aggregation": INTRADAY_AGG,
+                  "trading_session_toggle": "REGULAR_HOURS"})
+    if not isinstance(p, dict):
+        raise McpError(f"get_price_history intraday: bad payload for {symbol}")
+    rm = p.get("regularMarket", {})
+    expected = rm.get("expectedBars")
+    bars = []
+    for b in rm.get("bars", []):
+        try:
+            ts = b["timestamp"]
+            o, h, l, c = (float(b["open"]), float(b["high"]),
+                          float(b["low"]), float(b["close"]))
+            v = float(b["volume"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not all(math.isfinite(x) for x in (o, h, l, c, v)):
+            continue
+        if o <= 0 or h <= 0 or l <= 0 or c <= 0 or v < 0:
+            continue
+        try:
+            day = datetime.fromisoformat(ts).date()
+        except ValueError:
+            continue
+        bars.append((day, o, h, l, c, v))
+    return bars, expected
+
+
+def session_vwap(symbol):
+    """Return dict with session VWAP info, or all-None on any problem.
+
+    Uses the last COMPLETED regular session: if the newest bars belong to an
+    in-progress today, they are dropped in favour of the prior session.
+    Never raises for data problems (caller treats unknown as a flag).
+    """
+    out = {"vwap": None, "dist_pct": None, "session": None, "note": "unknown"}
+    try:
+        bars, expected = intraday_bars_for(symbol)
+    except McpError:
+        return out
+    if not bars:
+        return out
+    by_day = {}
+    for b in bars:
+        by_day.setdefault(b[0], []).append(b)
+    days = sorted(by_day)
+    use = days[-1]
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    if use == today:
+        exp = expected if isinstance(expected, (int, float)) and expected > 0 else 26
+        if len(by_day[use]) < 0.9 * exp:
+            if len(days) < 2:
+                return out  # only an in-progress session exists
+            use = days[-2]
+            out["note"] = "prior session (today in progress)"
+        else:
+            out["note"] = "complete"
+    else:
+        out["note"] = "complete"
+    num = den = 0.0
+    for (_d, o, h, l, c, v) in by_day[use]:
+        tp = (h + l + c) / 3.0
+        num += tp * v
+        den += v
+    if den <= 0:
+        return out
+    vwap = num / den
+    try:
+        last_close = by_day[use][-1][4]
+        dist = (last_close / vwap - 1) * 100.0
+    except (IndexError, ZeroDivisionError):
+        return out
+    if not (math.isfinite(vwap) and math.isfinite(dist) and vwap > 0):
+        return out
+    out.update({"vwap": vwap, "dist_pct": dist, "session": use.isoformat()})
+    return out
+
+
+def anchored_vwap(bars):
+    """VWAP anchored at the 52-week-low bar. Returns (vwap, dist_pct) or Nones."""
+    n = min(252, len(bars))
+    if n < 2:
+        return None, None
+    window = bars[-n:]
+    anchor = min(range(n), key=lambda i: window[i][2])  # lowest low
+    num = den = 0.0
+    for (c, h, l, v) in window[anchor:]:
+        tp = (h + l + c) / 3.0
+        num += tp * v
+        den += v
+    if den <= 0:
+        return None, None
+    vwap = num / den
+    close = bars[-1][0]
+    if not (math.isfinite(vwap) and vwap > 0):
+        return None, None
+    return vwap, (close / vwap - 1) * 100.0
+
+
+def find_pivots(bars):
+    """Fractal pivots: bar i is a swing high if high[i] strictly exceeds the
+    PIVOT_N bars on each side (swing low analogously). Returns two lists of
+    (index, price), oldest first."""
+    highs, lows = [], []
+    n = PIVOT_N
+    for i in range(n, len(bars) - n):
+        h, l = bars[i][1], bars[i][2]
+        if all(h > bars[j][1] for j in range(i - n, i + n + 1) if j != i):
+            highs.append((i, h))
+        if all(l < bars[j][2] for j in range(i - n, i + n + 1) if j != i):
+            lows.append((i, l))
+    return highs, lows
+
+
+def market_structure(bars):
+    """Pivot/Fib structure. Returns dict; trend None when indeterminable."""
+    out = {"trend": None, "ref_high": None, "ref_low": None,
+           "fib_levels": {}, "nearest_fib": None, "nearest_fib_dist_pct": None}
+    highs, lows = find_pivots(bars)
+    # trend from the last 3 swing highs/lows
+    if len(highs) >= 3 and len(lows) >= 3:
+        h3 = [p for _, p in highs[-3:]]
+        l3 = [p for _, p in lows[-3:]]
+        hh = h3[0] < h3[1] < h3[2]
+        hl = l3[0] < l3[1] < l3[2]
+        lh = h3[0] > h3[1] > h3[2]
+        ll = l3[0] > l3[1] > l3[2]
+        if hh and hl:
+            out["trend"] = "UP"
+        elif lh and ll:
+            out["trend"] = "DN"
+        else:
+            out["trend"] = "RNG"
+    # reference swing: highest high / lowest low of the last ~6 months
+    cut = len(bars) - SWING_LOOKBACK_BARS
+    rh = [p for p in highs if p[0] >= cut]
+    rl = [p for p in lows if p[0] >= cut]
+    if not rh or not rl:
+        return out
+    hi_idx, hi_px = max(rh, key=lambda p: p[1])
+    lo_idx, lo_px = min(rl, key=lambda p: p[1])
+    if hi_px <= lo_px:
+        return out
+    out["ref_high"], out["ref_low"] = round(hi_px, 2), round(lo_px, 2)
+    rng = hi_px - lo_px
+    if hi_idx > lo_idx:  # upswing: retracements measured down from the high
+        levels = {f: hi_px - f * rng for f in FIB_LEVELS}
+    else:                # downswing: retracements measured up from the low
+        levels = {f: lo_px + f * rng for f in FIB_LEVELS}
+    out["fib_levels"] = {f"{f * 100:.1f}%": round(px, 2)
+                         for f, px in levels.items()}
+    close = bars[-1][0]
+    name, px = min(levels.items(), key=lambda kv: abs(close - kv[1]))
+    if px > 0 and math.isfinite(px):
+        out["nearest_fib"] = f"{name * 100:.1f}%"
+        out["nearest_fib_dist_pct"] = round((close / px - 1) * 100.0, 1)
+    return out
+
+
 def evaluate(sym, bars):
-    """Return (accepted, metrics, reasons). Reasons use stable categories."""
+    """Return (accepted, metrics, reasons). Reasons use stable categories.
+
+    Indicator-pack gates: %B inside bands, close above anchored VWAP,
+    no downtrend pivot structure. Any indicator that cannot be computed is
+    a flag in metrics['flags'], never a rejection.
+    """
     reasons = []
+    flags = []
     if len(bars) < MIN_BARS:
         return False, {}, ["insufficient history"]
     closes = [b[0] for b in bars]
@@ -157,15 +377,57 @@ def evaluate(sym, bars):
     if off_hi < -MAX_OFF_HIGH_PCT:
         reasons.append("too far below 52w high")
 
+    # ---- indicator pack ----
+    bb = bollinger(closes)
+    if bb["pct_b"] is None:
+        flags.append("bollinger unknown")
+    elif not (BB_PCTB_MIN <= bb["pct_b"] <= BB_PCTB_MAX):
+        reasons.append("pctB outside bands")
+
+    avwap, avwap_dist = anchored_vwap(bars)
+    if avwap is None:
+        flags.append("anchored vwap unknown")
+    elif REQUIRE_ABOVE_ANCHORED_VWAP and avwap_dist < 0:
+        reasons.append("below anchored VWAP")
+
+    sess = session_vwap(sym)
+    if sess["vwap"] is None:
+        flags.append("session vwap unknown")
+
+    struct = market_structure(bars)
+    if struct["trend"] is None:
+        flags.append("trend structure unknown")
+    elif REJECT_DOWNTREND and struct["trend"] == "DN":
+        reasons.append("downtrend structure")
+
     def ret(n):
         return (price / closes[-n - 1] - 1) * 100 if len(closes) > n else 0.0
 
+    r2 = lambda x: round(x, 2) if x is not None else None
+    r1 = lambda x: round(x, 1) if x is not None else None
+    indicators = {
+        "bollinger": {
+            "pct_b": r2(bb["pct_b"]),
+            "bandwidth_pct": r1(bb["bandwidth_pct"]),
+            "squeeze": bb["squeeze"],
+        },
+        "vwap": {
+            "session_vwap": r2(sess["vwap"]),
+            "session_dist_pct": r1(sess["dist_pct"]),
+            "session": sess["session"],
+            "anchored_vwap": r2(avwap),
+            "anchored_dist_pct": r1(avwap_dist),
+        },
+        "structure": struct,
+    }
     metrics = {
         "price": round(price, 2), "rsi14": round(rsi, 1),
         "vs_sma50_pct": round(vs50, 1), "vs_sma200_pct": round(vs200, 1),
         "atr_pct": round(atrp, 2), "vol_ratio": round(vratio, 2),
         "off_52w_high_pct": round(off_hi, 1),
         "ret_1m_pct": round(ret(21), 1), "ret_3m_pct": round(ret(63), 1),
+        "indicators": indicators,
+        "flags": flags,
     }
     return (not reasons), metrics, reasons
 
@@ -183,6 +445,31 @@ def composite(m):
         s_rsi = max(0.0, 10.0 - (rsi - 65) * 0.5)
     s_vol = min(10.0, max(0.0, m["vol_ratio"] * 6.67))
     return round(s50 + s_rsi + s_vol, 1)
+
+
+def signal_score(m):
+    """0-10 indicator-pack score: squeeze +3, %B in [0.5,0.9] +2,
+    anchored-VWAP distance 0-3% above +2 (else +1 if known), uptrend +3."""
+    s = 0.0
+    detail = {}
+    ind = m.get("indicators", {})
+    bb = ind.get("bollinger", {})
+    if bb.get("squeeze"):
+        s += 3.0
+        detail["squeeze"] = 3.0
+    pb = bb.get("pct_b")
+    if pb is not None and 0.5 <= pb <= 0.9:
+        s += 2.0
+        detail["pct_b_sweet_spot"] = 2.0
+    av = ind.get("vwap", {}).get("anchored_dist_pct")
+    if av is not None and av >= 0:
+        pts = 2.0 if av <= 3.0 else 1.0
+        s += pts
+        detail["anchored_vwap"] = pts
+    if ind.get("structure", {}).get("trend") == "UP":
+        s += 3.0
+        detail["uptrend"] = 3.0
+    return round(s, 1), detail
 
 
 def main():
@@ -204,45 +491,87 @@ def main():
           f"vol20/60 >= {VOL_RATIO_MIN}, "
           f"within {MAX_OFF_HIGH_PCT:.0f}% of 52w high, "
           f"daily bars ({PERIOD}).")
+    print(f"Indicator pack: BB {BB_PERIOD}x{BB_MULT} %B in "
+          f"[{BB_PCTB_MIN:.1f},{BB_PCTB_MAX:.1f}], squeeze = {SQUEEZE_LOOKBACK}d "
+          f"bandwidth min (ranking only); anchored-VWAP gate="
+          f"{'yes' if REQUIRE_ABOVE_ANCHORED_VWAP else 'no'}; "
+          f"downtrend reject={'yes' if REJECT_DOWNTREND else 'no'}; "
+          f"score 0-40 = base 0-30 + signals 0-10.")
 
     passing, rejected = [], {}
     for sym in names:
         try:
             bars = bars_for(sym)
         except McpError as e:
-            rejected[sym] = [f"data error: {e}"]
+            rejected[sym] = {"reasons": [f"data error: {e}"], "indicators": None}
             continue
         except Exception as e:  # never let one ticker kill the run
-            rejected[sym] = [f"unexpected error: {type(e).__name__}"]
+            rejected[sym] = {"reasons": [f"unexpected error: {type(e).__name__}"],
+                             "indicators": None}
             continue
         try:
             ok, metrics, reasons = evaluate(sym, bars)
         except Exception as e:
-            rejected[sym] = [f"evaluation error: {type(e).__name__}"]
+            rejected[sym] = {"reasons": [f"evaluation error: {type(e).__name__}"],
+                             "indicators": None}
             continue
         if ok:
-            metrics["score"] = composite(metrics)
+            base = composite(metrics)
+            sig, detail = signal_score(metrics)
+            metrics["score"] = round(base + sig, 1)
+            metrics["score_breakdown"] = {"base": base, "signals": sig,
+                                          "detail": detail}
             metrics["symbol"] = sym
             passing.append(metrics)
         else:
-            rejected[sym] = reasons
+            rejected[sym] = {"reasons": reasons,
+                             "indicators": metrics.get("indicators")}
 
     passing.sort(key=lambda m: -m["score"])
+
+    def fmt_ind(m):
+        ind = m["indicators"]
+        bb, vw, st = ind["bollinger"], ind["vwap"], ind["structure"]
+        pctb = f"{bb['pct_b']:.2f}" if bb["pct_b"] is not None else " n/a"
+        bw = f"{bb['bandwidth_pct']:.1f}" if bb["bandwidth_pct"] is not None else " n/a"
+        sqz = "*" if bb["squeeze"] else " "
+        av = f"{vw['anchored_dist_pct']:+.1f}" if vw["anchored_dist_pct"] is not None else "  n/a"
+        tr = {"UP": "UP", "DN": "DN", "RNG": "RNG"}.get(st["trend"], " ?")
+        return pctb, bw, sqz, av, tr
+
     print(f"\n{'sym':<6}{'price':>9}{'RSI14':>7}{'vs50d%':>8}{'vs200d%':>9}"
-          f"{'ATR%':>7}{'vol':>6}{'offHi%':>8}{'1m%':>7}{'3m%':>7}{'score':>7}")
+          f"{'ATR%':>7}{'vol':>6}{'offHi%':>8}{'1m%':>7}{'3m%':>7}"
+          f"{'%B':>6}{'BWk%':>6}{'SQZ':>4}{'aVWP%':>7}{'TRND':>5}{'score':>16}")
     for m in passing:
+        pctb, bw, sqz, av, tr = fmt_ind(m)
+        bd = m["score_breakdown"]
         print(f"{m['symbol']:<6}{m['price']:>9.2f}{m['rsi14']:>7.1f}"
               f"{m['vs_sma50_pct']:>8.1f}{m['vs_sma200_pct']:>9.1f}"
               f"{m['atr_pct']:>7.2f}{m['vol_ratio']:>6.2f}"
               f"{m['off_52w_high_pct']:>8.1f}{m['ret_1m_pct']:>7.1f}"
-              f"{m['ret_3m_pct']:>7.1f}{m['score']:>7.1f}")
+              f"{m['ret_3m_pct']:>7.1f}{pctb:>6}{bw:>6}{sqz:>4}{av:>7}{tr:>5}"
+              f"{m['score']:>7.1f} ({bd['base']:.1f}+{bd['signals']:.1f})")
     if not passing:
         print("(no names passed all gates)")
     print("\nRejections:")
     if rejected:
         for sym in names:
             if sym in rejected:
-                print(f"  {sym}: {'; '.join(rejected[sym])}")
+                r = rejected[sym]
+                fl = ""
+                ind = r.get("indicators")
+                if ind:
+                    flgs = []
+                    bb, vw, st = ind["bollinger"], ind["vwap"], ind["structure"]
+                    if bb["squeeze"]:
+                        flgs.append("squeezing")
+                    if vw["anchored_dist_pct"] is not None:
+                        flgs.append(f"aVWP {vw['anchored_dist_pct']:+.1f}%")
+                    if st["trend"]:
+                        flgs.append(f"trend {st['trend']}")
+                    if flgs:
+                        fl = " [" + ", ".join(flgs) + "]"
+                print(f"  {sym}: {'; '.join(r['reasons'])}{fl}")
     else:
         print("  none -- every name passed")
 
@@ -257,7 +586,13 @@ def main():
                            "atr_pct_range": [ATR_PCT_MIN, ATR_PCT_MAX],
                            "vol_ratio_min": VOL_RATIO_MIN,
                            "max_off_high_pct": MAX_OFF_HIGH_PCT,
-                           "period": PERIOD},
+                           "period": PERIOD,
+                           "bollinger": {"period": BB_PERIOD, "mult": BB_MULT,
+                                          "pct_b_range": [BB_PCTB_MIN, BB_PCTB_MAX],
+                                          "squeeze_lookback": SQUEEZE_LOOKBACK},
+                           "require_above_anchored_vwap": REQUIRE_ABOVE_ANCHORED_VWAP,
+                           "reject_downtrend": REJECT_DOWNTREND,
+                           "score": "0-40 = base 0-30 + signals 0-10"},
                        "passing": passing,
                        "rejected": rejected}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
