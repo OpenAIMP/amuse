@@ -93,7 +93,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase || true
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update day-trade screen"
+          # Fold in concurrent pushes (doc edits, other jobs). If the hub
+          # conflicts, keep the remote copy — it is re-rendered from all
+          # reports right below, so nothing is lost.
+          git pull --rebase --strategy-option=theirs
+          python3 render_hub.py
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
           git push
