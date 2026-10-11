@@ -454,6 +454,13 @@ What a portfolio manager would add, in order:
 **Before real money**
 - **Backtester** — validate the indicator pack, delta gates, and RoR ranking
   on history; none of it has been tested yet.
+- **Adopt FOSS libraries for the research layer** — the screeners stay
+  stdlib-only (transparency is the point), but do not reinvent: evaluate
+  **Optopsy** or **LEAN** for the backtester, **py_vollib**/**mibian**
+  (**QuantLib** as reference) for independent pricing/Greeks/IV, **arch**
+  for volatility estimation (IV-vs-HV), **quantstats**/**empyrical** for
+  performance attribution, **OpenBB** if data needs outgrow the MCP.
+  Greeks/IV currently come from the broker with no independent check.
 - **Vol-valuation layer** — IV Rank/percentile, IV-vs-HV, skew, term structure
   per underlying; a Vol regime step between Regime and Timing so the system
   stops being a permanent premium seller (rich → sell, cheap → buy premium
