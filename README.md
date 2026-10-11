@@ -134,29 +134,32 @@ the dashboard shows its results. Notes:
 
 ## Dashboard
 
-`docs/index.html` is a stable **hub page** — it never gets overwritten with
-report data. Each workflow renders its own dated report page and the hub links
-them:
+`docs/index.html` is the **report archive homepage** — every report every
+workflow ever produced, grouped by workflow (Daily screen / Pre-market
+day-trade / Monthly PMCC), then by universe, newest first. Nothing is pruned.
 
 ```
-docs/index.html                        ← hub: latest cards + archive, rebuilt every run
-docs/reports/daily-2026-10-13.html     ← daily-watch.yml output (+ .meta.json sidecar)
-docs/reports/daytrade-2026-10-13.html  ← daytrade-screen.yml output
-docs/reports/pmcc-2026-10.html         ← monthly-screen.yml output
+docs/index.html                              ← archive homepage, rebuilt every run
+docs/reports/daily-nasdaq100-2026-10-11.html ← one dated report (+ .meta.json sidecar)
+docs/reports/daily-watchlist-2026-10-11.html
+docs/reports/daytrade-sp500-2026-10-13.html
+docs/reports/pmcc-watchlist-2026-10.html
 ```
 
 The data pipeline inside each workflow run is:
 
 ```
-Public.com API → screener scripts → reports/*.json → render_report.py → docs/reports/<id>.html → render_hub.py → docs/index.html → Pages
-    (live)            (in Actions)       (artifacts)        (dated page)              (hub)              (served)
+Public.com API → screeners → reports/*.json → render_report.py → docs/reports/<type>-<source>-<date>.html → render_hub.py → docs/index.html → Pages
+    (live)          (in Actions)     (artifacts)      (dated page + provenance)              (archive)          (served)
 ```
 
-- `render_report.py --report-id <id>` renders one dated report page plus a
-  tiny `.meta.json` sidecar (title, one-line blurb, stat counts).
-- `render_hub.py` reads all sidecars and rebuilds the hub: "Latest reports"
-  cards per workflow plus collapsible archives. Old reports are pruned (30
-  daily, 30 day-trade, 12 monthly).
+- `render_report.py --report-id <type>-<source>-<date> --source <key> --source-detail "<n> names"`
+  renders one dated report plus a tiny `.meta.json` sidecar (title, one-line
+  blurb, stat counts, source). Each report carries a provenance banner, e.g.
+  "Source: Nasdaq-100 · 101 names · Run 2026-10-11" — the workflow derives the
+  source from its `universe`/`names` inputs, defaulting to `watchlist`.
+- `render_hub.py` reads all sidecars and rebuilds the archive: grouped entries
+  with source chips, blurbs, and stat chips.
 - Publish steps do `git pull --rebase` before pushing, so the three workflows
   never clobber each other's commits.
 
