@@ -143,39 +143,36 @@ report's footer timestamp is the freshness check.
 ```bash
 export PUBLIC_MCP_CLI="$PWD/bin/public-mcp"
 export PUBLIC_API_KEY="your-key"          # or point PUBLIC_MCP_CLI at a vault-backed CLI
-python3 stock_screener.py --universe nasdaq100
-python3 spread_screener.py --names T,VZ,XOM
-python3 scan_loop.py --screener stock_screener.py --universes sp100,nasdaq100
-python3 daytrade_screen.py --limit 20
-```
-
-### Producing reports locally
-
-The same pipeline the workflows run — screen to JSON, render the dated
-report, rebuild the archive homepage:
-
-```bash
 cd ~/workspace/options-lab
+
+# 1. Screen → JSON (--names overrides --universe)
 python3 stock_screener.py --names T,VZ,XOM --json-out /tmp/stock.json
 python3 spread_screener.py --names T,VZ,XOM --json-out /tmp/spreads.json
+
+# 2. Render the dated report
 python3 render_report.py --stock /tmp/stock.json --spreads /tmp/spreads.json \
-  --report-id daily-watchlist-2026-10-11 --source watchlist --source-detail "20 names"
+  --report-id daily-custom-2026-10-11 --source custom --source-detail "3 names"
+
+# 3. Rebuild the archive, then open repo/docs/index.html in a browser
 python3 render_hub.py
 ```
 
-Then open `repo/docs/index.html` in a browser — the archive lists the report,
-click through to read it. (`render_report.py` writes to `repo/docs/` locally
-and `./docs/` in CI automatically; all links are relative, so it works from
-`file://` and from Pages identically.)
-
-Other report kinds:
+Variations — other universes, other report kinds:
 
 ```bash
+python3 stock_screener.py --universe nasdaq100 --json-out /tmp/stock.json
+python3 scan_loop.py --screener stock_screener.py --universes sp100,nasdaq100
+python3 daytrade_screen.py --limit 20 --json-out /tmp/dt.json
 python3 render_report.py --daytrade /tmp/dt.json \
   --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
+python3 pmcc_quality.py --names T,VZ,XOM --json-out /tmp/pmcc.json
 python3 render_report.py --pmcc /tmp/pmcc.json \
-  --report-id pmcc-watchlist-2026-10 --source watchlist --source-detail "20 names"
+  --report-id pmcc-custom-2026-10 --source custom --source-detail "3 names"
 ```
+
+`render_report.py` writes to `repo/docs/` locally and `./docs/` in CI; all
+links are relative, so the pages work from `file://` and from Pages
+identically.
 
 Sunday caveat: the stock screen works any day, but the spread screen needs
 live option quotes — on weekends market makers pull quotes and the liquidity
