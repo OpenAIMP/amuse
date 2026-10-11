@@ -77,6 +77,42 @@ and Fibs capture the objective machinery underneath it.
 Unknown data is always a flag, never a rejection. Rejections carry stable
 reason categories and are all printed — nothing is silently dropped.
 
+## How the pieces fit together
+
+Every run follows the same pipeline — screeners produce JSON, renderers turn
+JSON into pages:
+
+```
+                         ┌─ stock_screener.py ──┐
+watchlist.txt ──┬─ daily ┤  spread_screener.py ─┼─→ reports/*.json ─┬─→ render_report.py --report-id daily-<date>
+(universe opt)  │        └─ pmcc_watch.py ──────┘                    │         ↓
+                │                                                   └─→ render_hub.py ─→ docs/index.html (hub)
+                ├─ pre-market: daytrade_screen.py → reports/*.json ─┬─→ render_report.py --report-id daytrade-<date>
+                │                                                   └─→ render_hub.py ─→ docs/index.html (hub)
+                └─ monthly: pmcc_quality.py ────→ reports/*.json ─┬─→ render_report.py --report-id pmcc-<yyyy-mm>
+                                                                   └─→ render_hub.py ─→ docs/index.html (hub)
+```
+
+Shared pieces: `universes.py` (frozen index lists imported by every screener;
+`--names` overrides `--universe`), `scan_loop.py` (runs any screener across
+several universes and merges the leaderboards).
+
+Which workflow runs what:
+
+| Workflow | Scripts it runs, in order | Publishes |
+|---|---|---|
+| `daily-watch.yml` | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report --report-id daily-<date>` → `render_hub` | `docs/reports/daily-<date>.html` |
+| `daytrade-screen.yml` | `daytrade_screen` → `render_report --daytrade --report-id daytrade-<date>` → `render_hub` | `docs/reports/daytrade-<date>.html` |
+| `monthly-screen.yml` | `pmcc_quality` → `render_report --pmcc --report-id pmcc-<yyyy-mm>` → `render_hub` | `docs/reports/pmcc-<yyyy-mm>.html` |
+
+The same pipeline runs locally: screen to JSON, render the report, open it —
+
+```bash
+python3 spread_screener.py --names XOM --json-out /tmp/sp.json
+python3 render_report.py --spreads /tmp/sp.json --report-id daily-test
+python3 render_hub.py   # only needed for the hub page
+```
+
 ## Universes
 
 `universes.py` holds frozen constituent lists (2026-10-11, from Wikipedia):
