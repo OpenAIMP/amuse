@@ -11,18 +11,30 @@ all agree.
 Screen → Regime → Timing → Strikes → Size → Preflight
 ```
 
-| Stage | Question it answers | What answers it |
+| Stage | Question it answers | Where it lives in the code |
 |---|---|---|
-| **Screen** | Which names are worth looking at? | The screeners, over `watchlist.txt` or an index universe |
-| **Regime** | Bullish, bearish, or neutral — which strategy family? | Trend structure (HH/HL), SMA50/200, anchored VWAP |
-| **Timing** | Is *now* a good entry, or wait? | %B, RSI14, Bollinger squeeze |
-| **Strikes** | Where does the structure go? | Fib retracements, swing pivots — short strikes sit behind real structure |
-| **Size** | How much can this lose? | 1–2% max loss per trade, total heat under 40% |
-| **Preflight** | Anything that kills the trade? | Buying power, earnings/events, fees — then human confirmation |
+| **Screen** | Which names are worth looking at? | `stock_screener.py`, `spread_screener.py`, `daytrade_screen.py`, `pmcc_quality.py` — run over `watchlist.txt` or `--universe` |
+| **Regime** | Bullish, bearish, or neutral — which strategy family? | Trend-structure, SMA50/200, and anchored-VWAP gates in `stock_screener.py`; the readout's regime census |
+| **Timing** | Is *now* a good entry, or wait? | `%B`, RSI14, and squeeze gates in `stock_screener.py`; gap, relative volume, and developing VWAP in `daytrade_screen.py` |
+| **Strikes** | Where does the structure go? | Fib/pivot levels reported by `stock_screener.py`; delta-based short-strike selection in `spread_screener.py` (0.10–0.20Δ) and `pmcc_quality.py` (0.15–0.35Δ) |
+| **Size** | How much can this lose? | Every structure reports max loss (`spread_screener.py`, `pmcc_quality.py`); you apply the 1–2% rule |
+| **Preflight** | Anything that kills the trade? | Earnings/event gates fail closed in the screeners; buying power, fees, and your confirmation are human |
 
 No stage overrules another. A perfect regime with %B at 1.0 waits at timing.
 A great setup with earnings inside the window dies at preflight. Probabilities
 come from option delta (market-implied), never from indicators.
+
+### How the scheduled flows walk the loop
+
+| Flow | Loop coverage |
+|---|---|
+| `daily-watch` | The full loop through Strikes: `stock_screener` qualifies names on regime + timing, `spread_screener` prices bull puts / condors / lizards with strikes, credits, and max loss. |
+| `daytrade-screen` | Screen → Timing on an intraday clock: the gap/vol/VWAP scan replaces the slower regime read with a bias label (gap-and-go / fade risk). |
+| `monthly-screen` | Screen → Regime → Strikes for LEAPS: `pmcc_quality` re-ranks 0.80–0.95Δ longs × 0.15–0.35Δ short calls as evaluated pairs. |
+
+Size and Preflight are human stages in every flow: the code hands you max
+loss and event flags; you apply the 1–2% rule, check buying power and fees,
+and confirm.
 
 ## How this helps make money
 
