@@ -202,6 +202,39 @@ python3 scan_loop.py --screener stock_screener.py --universes sp100,nasdaq100
 python3 daytrade_screen.py --limit 20
 ```
 
+### Producing reports locally
+
+The same pipeline the workflows run — screen to JSON, render the dated
+report, rebuild the archive homepage:
+
+```bash
+cd ~/workspace/options-lab
+python3 stock_screener.py --names T,VZ,XOM --json-out /tmp/stock.json
+python3 spread_screener.py --names T,VZ,XOM --json-out /tmp/spreads.json
+python3 render_report.py --stock /tmp/stock.json --spreads /tmp/spreads.json \
+  --report-id daily-watchlist-2026-10-11 --source watchlist --source-detail "20 names"
+python3 render_hub.py
+```
+
+Then open `repo/docs/index.html` in a browser — the archive lists the report,
+click through to read it. (`render_report.py` writes to `repo/docs/` locally
+and `./docs/` in CI automatically; all links are relative, so it works from
+`file://` and from Pages identically.)
+
+Other report kinds:
+
+```bash
+python3 render_report.py --daytrade /tmp/dt.json \
+  --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
+python3 render_report.py --pmcc /tmp/pmcc.json \
+  --report-id pmcc-watchlist-2026-10 --source watchlist --source-detail "20 names"
+```
+
+Sunday caveat: the stock screen works any day, but the spread screen needs
+live option quotes — on weekends market makers pull quotes and the liquidity
+gate rejects everything, so the spread tables come up empty. Weekday runs get
+the full tables.
+
 ## Key conventions
 
 - Debits/credits estimated conservatively: **long ask − short bid**, never midpoints.
