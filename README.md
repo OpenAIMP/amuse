@@ -61,3 +61,4 @@ a vault-authenticated CLI (the default path is the local dev machine's).
 - `premium_to_debit_30d` is a screening ratio, not an expected return.
 - Contracts assumed standard 100-share deliverables (not validated).
 - **These scripts screen and monitor only. They never place orders.**
+
