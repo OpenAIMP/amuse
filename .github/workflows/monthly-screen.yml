@@ -6,6 +6,11 @@ on:
     # 9:35am ET on the 3rd (13:35 UTC; drifts an hour with DST)
     - cron: "35 13 3 * *"
   workflow_dispatch:
+    inputs:
+      names:
+        description: "Comma-separated watchlist override (blank = use watchlist.txt)"
+        required: false
+        default: ""
 
 jobs:
   screen:
@@ -26,7 +31,11 @@ jobs:
           chmod +x bin/public-mcp
           mkdir -p reports
           STAMP=$(date +%F)
-          WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+          if [ -n "${{ inputs.names }}" ]; then
+            WATCHLIST="${{ inputs.names }}"
+          else
+            WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+          fi
           python3 pmcc_quality.py --names "$WATCHLIST" --json-out reports/pmcc-quality-$STAMP.json | tee reports/pmcc-quality-$STAMP.txt
 
       - name: Upload run outputs
