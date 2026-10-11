@@ -6,15 +6,20 @@ Legacy hub mode (unchanged):
         --spreads reports/spread-screen.json --pmcc reports/pmcc.json \
         --out docs/index.html
 
-Report mode (dated, non-overwriting):
-    python3 render_report.py --stock ... --spreads ... --report-id daily-2026-10-13
-    python3 render_report.py --daytrade reports/daytrade.json --report-id daytrade-2026-10-13
-    python3 render_report.py --pmcc reports/pmcc.json --report-id pmcc-2026-10
+Report mode (dated, non-overwriting, archived forever):
+    python3 render_report.py --stock ... --spreads ... \
+        --report-id daily-nasdaq100-2026-10-11 --source nasdaq100 --source-detail "101 names"
+    python3 render_report.py --daytrade reports/daytrade.json \
+        --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
+    python3 render_report.py --pmcc reports/pmcc.json \
+        --report-id pmcc-watchlist-2026-10 --source watchlist --source-detail "20 names"
 
-With --report-id, the page goes to docs/reports/<id>.html (unless --out
-overrides), a <id>.meta.json sidecar is written beside it, and the page
-gets a "back to hub" link. Use render_hub.py to rebuild docs/index.html
-from the sidecars.
+Report ids are <type>-<source>-<date>; --source is authoritative when both
+the flag and the id carry it. With --report-id, the page goes to
+docs/reports/<id>.html (unless --out overrides), a <id>.meta.json sidecar
+is written beside it (including source/source_detail), and the page gets a
+"back to hub" link plus a provenance banner. Use render_hub.py to rebuild
+docs/index.html (the archive homepage) from the sidecars.
 
 All inputs are optional; a missing input renders its section as "no data yet"
 in legacy mode and is skipped in report mode. Output is self-contained HTML
@@ -454,6 +459,21 @@ REPORT_TITLES = {
     "pmcc": "Options Lab — PMCC Screen",
 }
 
+SOURCE_LABELS = {
+    "nasdaq100": "Nasdaq-100",
+    "sp500": "S&P 500",
+    "sp100": "S&P 100",
+    "dow30": "Dow 30",
+    "watchlist": "Watchlist",
+    "custom": "Custom",
+}
+
+
+def source_label(key):
+    if not key:
+        return ""
+    return SOURCE_LABELS.get(key, str(key).replace("_", " ").title())
+
 
 def resolve_docs_dir():
     """Find the docs/ dir both locally (./repo/docs) and in CI (./docs)."""
@@ -465,8 +485,20 @@ def resolve_docs_dir():
 
 
 def parse_report_id(rid):
-    rtype, _, rdate = (rid or "").partition("-")
-    return rtype or "report", rdate
+    """daily-nasdaq100-2026-10-11 -> ("daily", "nasdaq100", "2026-10-11").
+
+    Old two-segment ids (daily-2026-10-11, pmcc-2026-10) yield source=None;
+    disambiguated by checking whether the middle segment is a known source
+    key or the remainder looks like a date.
+    """
+    parts = (rid or "").split("-", 2)
+    rtype = parts[0] or "report"
+    if len(parts) < 3:
+        return rtype, None, parts[1] if len(parts) > 1 else ""
+    cand, rest = parts[1], parts[2]
+    if cand in SOURCE_LABELS or re.fullmatch(r"\d{4}(-\d{2}){1,2}", rest or ""):
+        return rtype, cand, rest
+    return rtype, None, f"{cand}-{rest}"
 
 
 def sorted_passing(stock):
@@ -538,9 +570,11 @@ def build_stats(rtype, stock, spreads, pmcc, daytrade):
     }
 
 
-def write_meta_sidecar(html_path, rid, rtype, rdate, title, blurb, stats):
+def write_meta_sidecar(html_path, rid, rtype, rdate, title, blurb, stats,
+                       source=None, source_detail=None):
     meta = {"id": rid, "type": rtype, "date": rdate, "title": title,
-            "blurb": blurb, "stats": stats}
+            "blurb": blurb, "stats": stats,
+            "source": source, "source_detail": source_detail}
     meta_path = os.path.splitext(html_path)[0] + ".meta.json"
     with open(meta_path, "w") as f:
         json.dump(meta, f, indent=1)
@@ -551,6 +585,8 @@ BACKLINK_CSS = """
 .backlink{margin:0 0 14px;font-size:.9rem}
 .backlink a{color:var(--blue);text-decoration:none}
 .backlink a:hover{text-decoration:underline}
+.prov{font-size:.9rem;color:var(--dim);margin:6px 0 0}
+.prov b{color:var(--text)}
 """
 
 CSS = """
@@ -618,7 +654,7 @@ PAGE = """<!DOCTYPE html>
 {backlink}
 <header>
 <h1>{title}</h1>
-<p class="sub">Run date: {asof}</p>
+{provline}
 <p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2>{flow}</section>
@@ -641,7 +677,11 @@ def main():
     ap.add_argument("--pmcc", default=None)
     ap.add_argument("--daytrade", default=None)
     ap.add_argument("--report-id", default=None,
-                    help="e.g. daily-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
+                    help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
+    ap.add_argument("--source", default=None,
+                    help="report source key: watchlist|nasdaq100|sp100|sp500|dow30|custom (authoritative over --report-id)")
+    ap.add_argument("--source-detail", default=None,
+                    help='e.g. "101 names"')
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -655,7 +695,9 @@ def main():
 
     if report_mode:
         rid = args.report_id
-        rtype, rdate = parse_report_id(rid)
+        rtype, id_source, rdate = parse_report_id(rid)
+        source = args.source or id_source
+        source_detail = args.source_detail
         title = REPORT_TITLES.get(rtype, "Options Lab — Screen")
         out = args.out or os.path.join(docs_dir, "reports", rid + ".html")
         hub = os.path.join(docs_dir, "index.html")
@@ -668,9 +710,19 @@ def main():
         out = args.out or "docs/index.html"
         backlink = ""
         css = CSS
+        source = source_detail = None
 
     asof = (stock or {}).get("asof") or (spreads or {}).get("asof") \
         or (pmcc or {}).get("asof") or (daytrade or {}).get("run") or "unknown"
+
+    if source:
+        bits = [f"Source: <b>{esc(source_label(source))}</b>"]
+        if source_detail:
+            bits.append(esc(source_detail))
+        bits.append(f"Run {esc(asof)}")
+        provline = f'<p class="prov">{" · ".join(bits)}</p>'
+    else:
+        provline = f'<p class="sub">Run date: {esc(asof)}</p>'
 
     stock_html = stock_section(stock) if (stock or not report_mode) else ""
     spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
@@ -681,7 +733,7 @@ def main():
         css=css,
         title=esc(title),
         backlink=backlink,
-        asof=esc(asof),
+        provline=provline,
         flow=workflow_strip(),
         stock=stock_html,
         spreads=spreads_html,
@@ -700,7 +752,8 @@ def main():
         blurb = build_blurb(rtype, stock, spreads, pmcc, daytrade)
         stats = build_stats(rtype, stock, spreads, pmcc, daytrade)
         write_meta_sidecar(out, rid, rtype, rdate,
-                           f"{title} · {rdate}", blurb, stats)
+                           f"{title} · {rdate}", blurb, stats,
+                           source=source, source_detail=source_detail)
 
 
 if __name__ == "__main__":
