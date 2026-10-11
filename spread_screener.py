@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Options spread screener: bull put spreads + iron condors + Jade Lizards
+Options spread screener: bull put spreads + iron condors + asymmetric iron condors
 (defined-risk variant).
 
 Two stages (same discipline as pmcc_quality.py v3):
@@ -42,7 +42,7 @@ MAX_SPREAD_PCT = 0.25         # reject contracts whose bid/ask spread > 25% of m
 MIN_LIQUIDITY = 10            # OI or volume floor per leg
 MAX_SPREAD_LOSS = 1000        # max loss gate per spread ($)
 MAX_FRICTION = 3.0            # combined leg spreads / net credit: reject above
-CALL_DISTANCE_MIN = 0.08     # lizard skew: call-wing short strike >= 8% above spot
+CALL_DISTANCE_MIN = 0.08     # asym condor skew: call-wing short strike >= 8% above spot
 GREEKS_BATCH = 40             # implementation setting, not a verified service limit
 REJECT_EARNINGS = True        # earnings inside the spread window rejects it
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
@@ -323,26 +323,25 @@ def evaluate_condor(spot, put_wing, call_wing, width):
     }
 
 
-def evaluate_lizard(spot, put_wing, call_wing, width):
-    """Combine an accepted put wing and call wing into a defined-risk Jade
-    Lizard. Same expiration required.
+def evaluate_asym_condor(spot, put_wing, call_wing, width):
+    """Combine an accepted put wing and call wing into an asymmetric iron
+    condor. Same expiration required.
 
-    What was implemented and how it differs from the classic: the canonical
-    Jade Lizard (TastyTrade) pairs a SHORT PUT with a SHORT CALL SPREAD --
-    the call spread sits far out-of-the-money and is sized so the net credit
-    exceeds the call spread width, which is what removes upside risk; the
-    premium engine is the put side. The classic's short put is NAKED, which
-    violates this system's spreads-only rule, so we implement the
-    defined-risk variant: a standard bull put spread (short 0.10-0.20 delta
-    put, long put one width below) PLUS a bear call spread (short 0.10-0.20
-    delta call, long call one width above). The lizard character comes from
-    the skew gate: the call wing must sit at least CALL_DISTANCE_MIN above
-    spot -- farther OTM than a symmetric iron condor's call wing, the
-    "bullish regime, accept a small upside tail for more credit" posture.
-    Because both wings are spreads, max loss is capped on both sides (the
-    classic keeps uncapped downside via the naked put); we do NOT inherit
-    the classic's credit-exceeds-call-width property, so upside risk exists
-    but is defined: max loss is the worse wing's (width - total credit).
+    Naming note (Feedback-01): this was previously called a "defined-risk
+    Jade Lizard". That name is wrong. A canonical Jade Lizard (TastyTrade)
+    pairs a SHORT PUT with a SHORT CALL SPREAD -- its short put is naked,
+    which violates this system's spreads-only rule, and its "no upside
+    risk" property requires total credit to exceed the call-spread width.
+    What we implement here is a bull put spread (short 0.10-0.20 delta put,
+    long put one width below) PLUS a bear call spread (short 0.10-0.20 delta
+    call, long call one width above). With the usual non-overlapping strike
+    ordering and a common expiration, that is an iron-condor-type structure;
+    the asymmetry comes from the skew gate -- the call wing must sit at
+    least CALL_DISTANCE_MIN above spot, farther OTM than a symmetric
+    condor's call wing ("bullish regime, accept a small upside tail for
+    more credit" posture). Because both wings are spreads, max loss is
+    capped on both sides: the worse wing's (width - total credit). Exact
+    legs are stored on every candidate; the label is only a label.
     """
     reasons = []
     if put_wing["expiration"] != call_wing["expiration"]:
@@ -360,11 +359,11 @@ def evaluate_lizard(spot, put_wing, call_wing, width):
     call_wing_loss = (call_wing["width"] - total_credit) * 100
     max_loss = max(put_wing_loss, call_wing_loss)
     if max_loss > MAX_SPREAD_LOSS:
-        reasons.append("lizard max loss over limit")
+        reasons.append("asym condor max loss over limit")
     friction = ((put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"])
                 / total_credit)
     if friction > MAX_FRICTION:
-        reasons.append("lizard friction over limit")
+        reasons.append("asym condor friction over limit")
     if reasons:
         return {"accepted": False, "reasons": reasons,
                 "diagnostics": {"max_loss": round(max_loss, 0)}}
@@ -372,7 +371,7 @@ def evaluate_lizard(spot, put_wing, call_wing, width):
     breakeven_call = call_wing["short_strike"] + total_credit
     return {
         "accepted": True,
-        "kind": "jade_lizard",
+        "kind": "asym_condor",
         "expiration": put_wing["expiration"],
         "dte": put_wing["dte"],
         "put_short_strike": put_wing["short_strike"],
@@ -393,7 +392,7 @@ def evaluate_lizard(spot, put_wing, call_wing, width):
     }
 
 
-def narrate_spreads(bull_puts, condors, jade_lizards, rej_all):
+def narrate_spreads(bull_puts, condors, asym_condors, rej_all):
     """Plain-English readout. Every claim comes from computed values.
 
     Returns a list of lines; top 3 opportunities per strategy, or the
@@ -445,9 +444,9 @@ def narrate_spreads(bull_puts, condors, jade_lizards, rej_all):
         else:
             lines.append("No iron condors qualified.")
 
-    if jade_lizards:
-        lines.append("Top Jade Lizards:")
-        for r in jade_lizards[:3]:
+    if asym_condors:
+        lines.append("Top asymmetric iron condors:")
+        for r in asym_condors[:3]:
             put_below = (1 - r["put_short_strike"] / r["spot"]) * 100
             call_above = (r["call_short_strike"] / r["spot"] - 1) * 100
             lines.append(
@@ -458,12 +457,12 @@ def narrate_spreads(bull_puts, condors, jade_lizards, rej_all):
                 f"put wing {put_below:.0f}% below spot, call wing "
                 f"{call_above:.0f}% above spot; {ev_text(r)}.")
     else:
-        top = top_rejections(rej_all.get("jade_lizard", {}))
+        top = top_rejections(rej_all.get("asym_condor", {}))
         if top:
-            lines.append("No Jade Lizards qualified — gates hit hardest: "
+            lines.append("No asymmetric iron condors qualified — gates hit hardest: "
                          + ", ".join(f"{k} x{v}" for k, v in top) + ".")
         else:
-            lines.append("No Jade Lizards qualified.")
+            lines.append("No asymmetric iron condors qualified.")
     return lines
 
 
@@ -510,7 +509,7 @@ def main():
           f"width {'$' + repr(width_arg) if width_arg else 'auto (price-scaled 1-5)'}, max spread {MAX_SPREAD_PCT:.0%} of mid, "
           f"liquidity >= {MIN_LIQUIDITY} OI/volume per leg, "
           f"max loss ${MAX_SPREAD_LOSS}/spread, max friction {MAX_FRICTION}x, "
-          f"lizard call distance >= {CALL_DISTANCE_MIN:.0%} above spot, "
+          f"asym condor call distance >= {CALL_DISTANCE_MIN:.0%} above spot, "
           f"earnings-in-window={'REJECT' if REJECT_EARNINGS else 'flag'}, "
           f"unknown-earnings={'REJECT' if REQUIRE_EARNINGS_DATE else 'flag'}, "
           f"credit = short bid - long ask (conservative). "
@@ -538,10 +537,10 @@ def main():
                 qwalk(v)
     qwalk(q)
 
-    bull_puts, condors, jade_lizards = [], [], []
+    bull_puts, condors, asym_condors = [], [], []
     stock_notes = {}
     rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
-               "jade_lizard": {}}
+               "asym_condor": {}}
     for sym in names:
         spot = spot_map.get(sym)
         if spot is None or not math.isfinite(spot) or spot <= 0:
@@ -627,7 +626,7 @@ def main():
                 for c in cc.values():
                     calls_by_strike[(c["expiration"], c["strike"])] = c
 
-            bp_rej, bc_rej, ic_rej, jl_rej = {}, {}, {}, {}
+            bp_rej, bc_rej, ic_rej, ac_rej = {}, {}, {}, {}
             bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
             bp_accepted, bc_accepted = [], []
 
@@ -687,32 +686,32 @@ def main():
                     r.update({"stock": sym, "spot": spot, "events": flags})
                     ic_accepted.append(r)
 
-            # Jade Lizards (defined-risk): accepted put wing + accepted call
-            # wing with the call wing skewed far OTM (lizard character).
-            jl_accepted = []
+            # asymmetric iron condors (defined-risk): accepted put wing + accepted call
+            # wing with the call wing skewed far OTM (asym condor character).
+            ac_accepted = []
             for pw in bp_accepted:
                 for cw in bc_accepted:
                     if pw["expiration"] != cw["expiration"]:
                         continue
                     flags, event_reasons = spread_events(
                         sym, pw["expiration"], events)
-                    r = evaluate_lizard(spot, pw, cw, width)
+                    r = evaluate_asym_condor(spot, pw, cw, width)
                     reasons = r.get("reasons", []) + event_reasons
                     if reasons:
                         jl_n_rej += 1
                         for reason in reasons:
-                            jl_rej[reason] = jl_rej.get(reason, 0) + 1
+                            ac_rej[reason] = ac_rej.get(reason, 0) + 1
                         continue
                     r.update({"stock": sym, "spot": spot, "events": flags})
-                    jl_accepted.append(r)
+                    ac_accepted.append(r)
 
             bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-            jl_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+            ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             bull_puts.extend(bp_accepted[:3])
             condors.extend(ic_accepted[:3])
-            jade_lizards.extend(jl_accepted[:3])
+            asym_condors.extend(ac_accepted[:3])
 
             notes.append(f"bull puts: {len(bp_accepted)} accepted, "
                          f"{bp_n_rej} rejected")
@@ -726,12 +725,12 @@ def main():
                          f"{ic_n_rej} rejected")
             for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
                 notes.append(f"  condor rejections: {reason} x{cnt}")
-            notes.append(f"jade lizards: {len(jl_accepted)} accepted, "
+            notes.append(f"asym condors: {len(ac_accepted)} accepted, "
                          f"{jl_n_rej} rejected")
-            for reason, cnt in sorted(jl_rej.items(), key=lambda kv: (-kv[1], kv[0])):
-                notes.append(f"  lizard rejections: {reason} x{cnt}")
+            for reason, cnt in sorted(ac_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+                notes.append(f"  asym condor rejections: {reason} x{cnt}")
             for src, key in ((bp_rej, "bull_put"), (bc_rej, "bear_call"),
-                             (ic_rej, "iron_condor"), (jl_rej, "jade_lizard")):
+                             (ic_rej, "iron_condor"), (ac_rej, "asym_condor")):
                 for k, v in src.items():
                     rej_all[key][k] = rej_all[key].get(k, 0) + v
             stock_notes[sym] = notes
@@ -740,7 +739,7 @@ def main():
 
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-    jade_lizards.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    asym_condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
 
     print("\n=== BULL PUT SPREADS (ranked by return on risk) ===")
     print(f"{'sym':<5}{'exp':<12}{'strikes':<10}{'DTE':>4}{'Δsh':>6}"
@@ -767,11 +766,11 @@ def main():
               f"{r['breakeven_put']:>9.2f}{r['breakeven_call']:>9.2f}"
               f"{r['return_on_risk']*100:>7.1f}{ev}")
 
-    print("\n=== JADE LIZARDS (ranked by return on risk) ===")
+    print("\n=== ASYMMETRIC IRON CONDORS (ranked by return on risk) ===")
     print(f"{'sym':<5}{'exp':<12}{'put wing':<11}{'call wing':<11}{'DTE':>4}"
           f"{'credit$':>9}{'maxloss$':>10}{'be_put':>9}{'be_call':>9}"
           f"{'up%':>6}{'RoR%':>7}")
-    for r in jade_lizards[:24]:
+    for r in asym_condors[:24]:
         ev = " !! " + "; ".join(r["events"]) if r["events"] else ""
         print(f"{r['stock']:<5}{r['expiration']:<12}"
               f"{r['put_short_strike']:.0f}/{r['put_long_strike']:.0f}P{'':<3}"
@@ -792,14 +791,14 @@ def main():
     print("\n=== READOUT ===")
     readout = []
     try:
-        readout = narrate_spreads(bull_puts, condors, jade_lizards, rej_all)
+        readout = narrate_spreads(bull_puts, condors, asym_condors, rej_all)
         for line in readout:
             print(line)
     except Exception:
         print("readout unavailable")
 
     if args.json_out:
-        best = {"bull_puts": {}, "iron_condors": {}, "jade_lizards": {}}
+        best = {"bull_puts": {}, "iron_condors": {}, "asym_condors": {}}
         for r in bull_puts:
             if r["stock"] not in best["bull_puts"]:
                 best["bull_puts"][r["stock"]] = {
@@ -825,9 +824,9 @@ def main():
                     "return_on_risk": round(r["return_on_risk"], 4),
                     "events": r["events"],
                 }
-        for r in jade_lizards:
-            if r["stock"] not in best["jade_lizards"]:
-                best["jade_lizards"][r["stock"]] = {
+        for r in asym_condors:
+            if r["stock"] not in best["asym_condors"]:
+                best["asym_condors"][r["stock"]] = {
                     "expiration": r["expiration"],
                     "put_wing": [r["put_short_strike"], r["put_long_strike"]],
                     "call_wing": [r["call_short_strike"], r["call_long_strike"]],
