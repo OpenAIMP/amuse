@@ -60,6 +60,18 @@ reason categories and are all printed — nothing is silently dropped.
 accepts `--universe <key>`; `--names` overrides it. Dotted symbols are kept
 verbatim (`BRK.B` resolves; `BRK-B` does not).
 
+On a manual workflow run, the `universe` input screens that whole index and
+the dashboard shows its results. Notes:
+
+- Each run **overwrites** `docs/index.html` — the dashboard always reflects the
+  most recent run. A manual Nasdaq-100 run replaces the watchlist view until
+  the next scheduled run restores it.
+- The PMCC watch ignores the universe and stays on the watchlist — LEAPS
+  chains over 500 names isn't practical.
+- Weight: the stock screener handles `sp500` in ~20 min, but the spread
+  screener pulls full chains + Greeks per name (an hour-plus on 500 names).
+  `sp100`/`nasdaq100` are the sweet spot for options.
+
 ## Dashboard
 
 `docs/index.html` is a static snapshot, regenerated fresh on every run — the
