@@ -119,6 +119,7 @@ profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
 | `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. | all three |
 | `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. | manual only |
 | `semis.py` | Semiconductor momentum screen (early study, superseded). | retired |
+| `pmcc.py`, `pmcc_value.py`, `pmcc_etf.py` | Early one-off PMCC pricers and studies (superseded by `pmcc_quality.py`). | retired |
 
 `scan_loop.py` stays manual: the daily workflow's `universe` input covers the
 scheduled case, and a full multi-universe sweep in CI would be hours of API
@@ -288,8 +289,14 @@ report's footer timestamp is the freshness check.
 ## Companion documents
 
 The [Trading System](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N)
-Google Drive folder holds everything around the code: the Trading Playbook
-(living document), the Trading System Flow slide deck, and run reports.
+Google Drive folder holds everything around the code:
+
+| Folder | Contents |
+|---|---|
+| Docs | Trading Playbook (living document; the `.docx` is the working copy), Trading System Flow slide deck, plus the original method notes: `options-book-playbook.md`, `pmcc-screening-method.md`, `broker-connectivity.md`, `starter-allocation-framework.md` |
+| Sheets | Trading Workbook — the trade journal / tracker / watchlist |
+| Reports | Archived screener run outputs (also kept as 90-day workflow artifacts) |
+| Code | Options Lab - PMCC Screener (early scripts + notes) |
 
 ## Setup
 
