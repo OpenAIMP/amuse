@@ -19,11 +19,16 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: write
+
 jobs:
   daytrade:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - uses: actions/setup-python@v5
         with:
@@ -51,3 +56,33 @@ jobs:
           name: daytrade-screen-${{ github.run_id }}
           path: reports/
           retention-days: 90
+
+      - name: Render day-trade report
+        if: always()
+        run: |
+          mkdir -p docs/reports
+          STAMP=$(date +%F)
+          if [ -n "${{ inputs.names }}" ]; then
+            SRC="custom"
+            DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          elif [ -n "${{ inputs.limit }}" ]; then
+            SRC="custom"
+            DETAIL="first ${{ inputs.limit }} of S&P 500"
+          else
+            SRC="sp500"
+            DETAIL="503 names"
+          fi
+          python3 render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
+            --report-id daytrade-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
+          python3 render_hub.py
+          ls docs/index.html
+
+      - name: Publish dashboard to GitHub Pages
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase || true
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: update day-trade screen"
+          git push
