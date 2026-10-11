@@ -285,6 +285,12 @@ Enable Pages under Settings → Pages → Deploy from branch → `main` → `/do
 `.nojekyll` is present so it's served as plain static HTML, no Jekyll. Each
 report's footer timestamp is the freshness check.
 
+## Companion documents
+
+The [Trading System](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N)
+Google Drive folder holds everything around the code: the Trading Playbook
+(living document), the Trading System Flow slide deck, and run reports.
+
 ## Setup
 
 1. Repository secret `PUBLIC_API_KEY` (Settings → Secrets and variables →
