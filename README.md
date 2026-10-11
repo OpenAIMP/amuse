@@ -62,10 +62,19 @@ verbatim (`BRK.B` resolves; `BRK-B` does not).
 
 ## Dashboard
 
-Every daily run regenerates `docs/index.html` via `render_report.py` — workflow
-strip, ranked tables, readout narrative, spread opportunities. Served by GitHub
-Pages (Settings → Pages → Deploy from branch → `main` → `/docs`); `.nojekyll`
-is present so it's served as plain static HTML.
+`docs/index.html` is a static snapshot, regenerated fresh on every run — the
+page itself fetches nothing. The data pipeline inside each workflow run is:
+
+```
+Public.com API → screener scripts → reports/*.json → render_report.py → docs/index.html → Pages
+    (live)            (in Actions)       (artifacts)        (in Actions)        (committed)    (served)
+```
+
+**Which workflow produces it:** `daily-watch.yml`. Its last two steps run
+`render_report.py` on the run's JSON outputs and commit the result to `docs/`,
+so the page always shows that morning's data (check the footer timestamp for
+freshness). Enable it under Settings → Pages → Deploy from branch → `main` →
+`/docs`; `.nojekyll` is present so it's served as plain static HTML, no Jekyll.
 
 ## What runs here
 
