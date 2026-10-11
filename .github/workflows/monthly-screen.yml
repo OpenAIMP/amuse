@@ -2,9 +2,15 @@ name: Monthly PMCC screen
 
 # Full pair-quality re-rank on the 3rd of each month, with JSON + report artifacts.
 on:
-  schedule:
-    # 9:35am ET on the 3rd (13:35 UTC; drifts an hour with DST)
-    - cron: "35 13 3 * *"
+  # Scheduled runs are owned by master.yml (which calls this workflow on the 3rd).
+  # Manual runs use workflow_dispatch below.
+  workflow_call:
+    inputs:
+      names:
+        description: "Comma-separated watchlist override (blank = use watchlist.txt)"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       names:
