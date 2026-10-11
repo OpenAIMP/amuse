@@ -12,11 +12,16 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: write
+
 jobs:
   screen:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - uses: actions/setup-python@v5
         with:
@@ -45,3 +50,30 @@ jobs:
           name: monthly-screen-${{ github.run_id }}
           path: reports/
           retention-days: 90
+
+      - name: Render PMCC report
+        if: always()
+        run: |
+          mkdir -p docs/reports
+          STAMP=$(date +%F)
+          if [ -n "${{ inputs.names }}" ]; then
+            SRC="custom"
+            DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          else
+            SRC="watchlist"
+            DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
+          fi
+          python3 render_report.py --pmcc reports/pmcc-quality-$STAMP.json \
+            --report-id pmcc-$SRC-$(date +%Y-%m) --source "$SRC" --source-detail "$DETAIL"
+          python3 render_hub.py
+          ls docs/index.html
+
+      - name: Publish dashboard to GitHub Pages
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase || true
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: update monthly PMCC screen"
+          git push
