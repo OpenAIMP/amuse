@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Render screener JSON outputs into a single-file HTML dashboard.
+"""Render screener JSON outputs into single-file HTML pages.
 
-Usage:
+Legacy hub mode (unchanged):
     python3 render_report.py --stock reports/stock-screen.json \
         --spreads reports/spread-screen.json --pmcc reports/pmcc.json \
         --out docs/index.html
 
+Report mode (dated, non-overwriting):
+    python3 render_report.py --stock ... --spreads ... --report-id daily-2026-10-13
+    python3 render_report.py --daytrade reports/daytrade.json --report-id daytrade-2026-10-13
+    python3 render_report.py --pmcc reports/pmcc.json --report-id pmcc-2026-10
+
+With --report-id, the page goes to docs/reports/<id>.html (unless --out
+overrides), a <id>.meta.json sidecar is written beside it, and the page
+gets a "back to hub" link. Use render_hub.py to rebuild docs/index.html
+from the sidecars.
+
 All inputs are optional; a missing input renders its section as "no data yet"
-instead of failing. Output is one self-contained HTML file (all CSS inline,
-no external assets, no JavaScript) suitable for GitHub Pages.
+in legacy mode and is skipped in report mode. Output is self-contained HTML
+(all CSS inline, no external assets, no JavaScript) suitable for GitHub Pages.
 """
 from __future__ import annotations
 
@@ -228,7 +238,19 @@ def spread_tables(data):
         + "</tbody></table></div>"
     )
     # readout lines not tied to a symbol still get shown
+    jl_rows, jl_syms = jade_lizard_rows(data, asof, readout)
+    if jl_rows:
+        out.append("<h3>Jade Lizards <span class='dim'>(defined-risk: put spread + far-OTM call wing, ranked by return on risk)</span></h3>")
+        out.append(
+            '<div class="tbl-wrap"><table><thead><tr>'
+            "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
+            "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>Up% dist</th><th>RoR</th><th>Events</th>"
+            "</tr></thead><tbody>"
+            + "".join(jl_rows)
+            + "</tbody></table></div>"
+        )
     used = {why_for(sym, readout) for sym, _ in list(bps) + list(ics)}
+    used |= {why_for(sym, readout) for sym in jl_syms}
     rest = [l for l in readout if isinstance(l, str) and l not in used and l.strip()]
     if rest:
         lines = "".join(f"<li>{esc(l)}</li>" for l in rest)
@@ -294,7 +316,242 @@ def section(title, body):
     return f'<section class="card"><h2>{esc(title)}</h2>{body}</section>'
 
 
-# ---------------------------------------------------------------- page
+def bias_badge(bias):
+    b = (bias or "").lower()
+    if "gap-and-go" in b:
+        cls = "good"
+    elif "fade" in b:
+        cls = "warn"
+    else:
+        cls = ""
+    return f'<span class="badge {cls}">{esc(bias) or "—"}</span>'
+
+
+def daytrade_section(data, report_mode=False):
+    if not data:
+        if report_mode:
+            return ""
+        return section("Day-trade screen", '<p class="empty">No data yet — run the day-trade screener.</p>')
+    cands = sorted(data.get("candidates") or [],
+                   key=lambda c: -((c.get("conviction") or 0)
+                                   if isinstance(c.get("conviction"), (int, float)) else -1))
+    rows = []
+    for c in cands:
+        rows.append(
+            "<tr>"
+            f"<td class='sym'>{esc(c.get('symbol'))}</td>"
+            f"<td class='num'>{num(c.get('price'), 2)}</td>"
+            f"<td class='num'>{num(c.get('gap_pct'), 2, '%')}</td>"
+            f"<td class='num'>{num(c.get('rel_vol'), 1)}×</td>"
+            f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
+            f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
+            f"<td>{bias_badge(c.get('bias'))}</td>"
+            "</tr>"
+        )
+    table = (
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th>"
+        "<th>VWAP dist</th><th>ATR%</th><th>Bias</th>"
+        "</tr></thead><tbody>"
+        + ("".join(rows) if rows else
+           '<tr><td colspan="7" class="empty">No gap candidates — quiet pre-market.</td></tr>')
+        + "</tbody></table></div>"
+    )
+    ro = data.get("readout") or []
+    readout = ""
+    if ro:
+        lines = "".join(f"<li>{esc(l)}</li>" for l in ro if isinstance(l, str))
+        readout = f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>'
+    settings = data.get("settings") or {}
+    fine = (
+        '<p class="fine">Ranked by conviction = |gap| × relative volume. '
+        f"Gates: gap ≥ {esc(settings.get('gap_min_pct', 2))}%, "
+        f"rel vol ≥ {esc(settings.get('rel_vol_min', 1.5))}×, "
+        f"price ≥ ${esc(settings.get('price_min', 10))}, "
+        f"ATR% {esc(settings.get('atr_pct_min', 1))}–{esc(settings.get('atr_pct_max', 8))}. "
+        "Technical-only — check headlines before trading any candidate. "
+        "Bias is not a prediction.</p>"
+    )
+    return section("Day-trade screen", table + readout + fine)
+
+
+def wing_str(wing, suffix):
+    """[38, 37] + 'P' -> '38/37P'; passes through an already-formatted string."""
+    if isinstance(wing, str):
+        return wing
+    if isinstance(wing, (list, tuple)) and len(wing) >= 2:
+        return f"{num(wing[0], 0)}/{num(wing[1], 0)}{suffix}"
+    return "—"
+
+
+def norm_lizard(r, stock=None):
+    """Normalize a jade-lizard record across JSON shapes.
+
+    New shape (list of records): stock, expiration, put_strikes "38/37P",
+    call_strikes "46/47C", dte, credit, max_loss, downside_breakeven,
+    upside_breakeven, upside_distance_pct, return_on_risk, events.
+    Old shape (dict keyed by symbol): put_wing/call_wing lists, credit_total,
+    max_loss_total, breakeven_put/breakeven_call.
+    """
+    r = r or {}
+    return {
+        "stock": r.get("stock") or stock,
+        "expiration": r.get("expiration"),
+        "put_strikes": r.get("put_strikes") or wing_str(r.get("put_wing"), "P"),
+        "call_strikes": r.get("call_strikes") or wing_str(r.get("call_wing"), "C"),
+        "dte": r.get("dte"),
+        "credit": r.get("credit", r.get("credit_total")),
+        "max_loss": r.get("max_loss", r.get("max_loss_total")),
+        "downside_breakeven": r.get("downside_breakeven", r.get("breakeven_put")),
+        "upside_breakeven": r.get("upside_breakeven", r.get("breakeven_call")),
+        "upside_distance_pct": r.get("upside_distance_pct"),
+        "return_on_risk": r.get("return_on_risk"),
+        "events": r.get("events"),
+        "why_key": r.get("stock") or stock,
+    }
+
+
+def jade_lizard_rows(data, asof, readout):
+    """(rows, symbols) for the Jade Lizard table; ([], []) when none present."""
+    res = (data or {}).get("results") or {}
+    raw = res.get("jade_lizards") or []
+    if isinstance(raw, dict):
+        lizards = [norm_lizard(r, stock=sym) for sym, r in raw.items()]
+    else:
+        lizards = [norm_lizard(r) for r in raw]
+    lizards.sort(key=lambda r: -((r.get("return_on_risk") or -1)
+                                 if isinstance(r.get("return_on_risk"), (int, float)) else -1))
+    rows = []
+    for r in lizards:
+        dte = r.get("dte")
+        if dte is None:
+            dte = dte_between(asof, r.get("expiration"))
+        why = why_for(r.get("why_key"), readout)
+        rows.append(
+            "<tr>"
+            f"<td class='sym'>{esc(r.get('stock'))}</td>"
+            f"<td class='num'>{esc(r.get('expiration'))}</td>"
+            f"<td class='num'>{esc(r.get('put_strikes'))}</td>"
+            f"<td class='num'>{esc(r.get('call_strikes'))}</td>"
+            f"<td class='num'>{dte if dte is not None else '—'}</td>"
+            f"<td class='num'>{money(r.get('credit'))}</td>"
+            f"<td class='num'>{money(r.get('max_loss'))}</td>"
+            f"<td class='num'>{num(r.get('downside_breakeven'), 2)} / {num(r.get('upside_breakeven'), 2)}</td>"
+            f"<td class='num'>{pct(r.get('upside_distance_pct'))}</td>"
+            f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td>{events_cell(r.get('events'))}</td>"
+            "</tr>"
+            + (f"<tr class='whyrow'><td colspan='11'>{esc(why)}</td></tr>" if why else "")
+        )
+    return rows, [r.get("why_key") for r in lizards if r.get("why_key")]
+
+
+# ---------------------------------------------------------------- report mode
+
+REPORT_TITLES = {
+    "daily": "Options Lab — Daily Screen",
+    "daytrade": "Options Lab — Day-Trade Screen",
+    "pmcc": "Options Lab — PMCC Screen",
+}
+
+
+def resolve_docs_dir():
+    """Find the docs/ dir both locally (./repo/docs) and in CI (./docs)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for cand in (os.path.join(here, "repo", "docs"), os.path.join(here, "docs")):
+        if os.path.isdir(cand):
+            return cand
+    return os.path.join(here, "repo", "docs")
+
+
+def parse_report_id(rid):
+    rtype, _, rdate = (rid or "").partition("-")
+    return rtype or "report", rdate
+
+
+def sorted_passing(stock):
+    return sorted((stock or {}).get("passing", []),
+                  key=lambda p: -(p.get("score") if isinstance(p.get("score"), (int, float)) else -1))
+
+
+def plural(n, word):
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
+def spread_bits(spreads):
+    res = (spreads or {}).get("results") or {}
+    bits = []
+    n = len(res.get("bull_puts") or {})
+    if n:
+        bits.append(plural(n, "bull put"))
+    n = len(res.get("iron_condors") or {})
+    if n:
+        bits.append(plural(n, "condor"))
+    n = len(res.get("jade_lizards") or {})
+    if n:
+        bits.append(plural(n, "lizard"))
+    return bits
+
+
+def build_blurb(rtype, stock, spreads, pmcc, daytrade):
+    if rtype == "daytrade":
+        cands = (daytrade or {}).get("candidates") or []
+        if not cands:
+            return "No qualifiers — quiet screen"
+        gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
+        return f"{plural(len(cands), 'gap candidate')}, {gg} with gap-and-go bias"
+    if rtype == "pmcc":
+        n = len((pmcc or {}).get("pairs") or {})
+        return plural(n, "qualifying pair") if n else "No qualifiers — baseline"
+    # daily and anything else
+    parts = []
+    passing = sorted_passing(stock)
+    if passing:
+        lead = passing[0]
+        try:
+            parts.append(f"{lead.get('symbol')} {float(lead.get('score')):.1f} leads")
+        except (TypeError, ValueError):
+            parts.append(f"{lead.get('symbol')} leads")
+    bits = spread_bits(spreads)
+    if bits:
+        parts.append(", ".join(bits))
+    if not parts:
+        return "No qualifiers — quiet screen"
+    return "; ".join(parts)
+
+
+def build_stats(rtype, stock, spreads, pmcc, daytrade):
+    if rtype == "daytrade":
+        cands = (daytrade or {}).get("candidates") or []
+        gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
+        return {"candidates": len(cands), "gap_and_go": gg,
+                "screened": (daytrade or {}).get("universe")}
+    if rtype == "pmcc":
+        return {"pairs": len((pmcc or {}).get("pairs") or {})}
+    res = (spreads or {}).get("results") or {}
+    return {
+        "stocks": len((stock or {}).get("passing") or []),
+        "bull_puts": len(res.get("bull_puts") or {}),
+        "iron_condors": len(res.get("iron_condors") or {}),
+        "jade_lizards": len(res.get("jade_lizards") or {}),
+        "pmcc_pairs": len((pmcc or {}).get("pairs") or {}),
+    }
+
+
+def write_meta_sidecar(html_path, rid, rtype, rdate, title, blurb, stats):
+    meta = {"id": rid, "type": rtype, "date": rdate, "title": title,
+            "blurb": blurb, "stats": stats}
+    meta_path = os.path.splitext(html_path)[0] + ".meta.json"
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=1)
+    print(f"wrote {meta_path}")
+    return meta_path
+
+BACKLINK_CSS = """
+.backlink{margin:0 0 14px;font-size:.9rem}
+.backlink a{color:var(--blue);text-decoration:none}
+.backlink a:hover{text-decoration:underline}
+"""
 
 CSS = """
 :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
@@ -353,19 +610,21 @@ PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Options Lab — Daily Screen</title>
+<title>{title}</title>
 <style>{css}</style>
 </head>
 <body>
 <div class="wrap">
+{backlink}
 <header>
-<h1>Options Lab — Daily Screen</h1>
+<h1>{title}</h1>
 <p class="sub">Run date: {asof}</p>
 <p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2>{flow}</section>
 {stock}
 {spreads}
+{daytrade}
 {pmcc}
 {rejections}
 <footer>Generated {now} · screeners never place orders.</footer>
@@ -380,31 +639,68 @@ def main():
     ap.add_argument("--stock", default=None)
     ap.add_argument("--spreads", default=None)
     ap.add_argument("--pmcc", default=None)
-    ap.add_argument("--out", default="docs/index.html")
+    ap.add_argument("--daytrade", default=None)
+    ap.add_argument("--report-id", default=None,
+                    help="e.g. daily-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
+
+    report_mode = bool(args.report_id)
+    docs_dir = resolve_docs_dir()
 
     stock = load_json(args.stock)
     spreads = load_json(args.spreads)
     pmcc = load_json(args.pmcc)
+    daytrade = load_json(args.daytrade)
+
+    if report_mode:
+        rid = args.report_id
+        rtype, rdate = parse_report_id(rid)
+        title = REPORT_TITLES.get(rtype, "Options Lab — Screen")
+        out = args.out or os.path.join(docs_dir, "reports", rid + ".html")
+        hub = os.path.join(docs_dir, "index.html")
+        back_href = esc(os.path.relpath(hub, start=os.path.dirname(os.path.abspath(out))))
+        backlink = f'<p class="backlink"><a href="{back_href}">← Back to hub</a></p>'
+        css = CSS + BACKLINK_CSS
+        rdate = rdate or str((stock or {}).get("asof") or (daytrade or {}).get("run") or "undated")
+    else:
+        title = "Options Lab — Daily Screen"
+        out = args.out or "docs/index.html"
+        backlink = ""
+        css = CSS
 
     asof = (stock or {}).get("asof") or (spreads or {}).get("asof") \
-        or (pmcc or {}).get("asof") or "unknown"
+        or (pmcc or {}).get("asof") or (daytrade or {}).get("run") or "unknown"
+
+    stock_html = stock_section(stock) if (stock or not report_mode) else ""
+    spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
+    pmcc_html = pmcc_section(pmcc) if (pmcc or not report_mode) else ""
+    daytrade_html = daytrade_section(daytrade, report_mode) if daytrade else ""
 
     page = PAGE.format(
-        css=CSS,
+        css=css,
+        title=esc(title),
+        backlink=backlink,
         asof=esc(asof),
         flow=workflow_strip(),
-        stock=stock_section(stock),
-        spreads=spread_tables(spreads),
-        pmcc=pmcc_section(pmcc),
+        stock=stock_html,
+        spreads=spreads_html,
+        daytrade=daytrade_html,
+        pmcc=pmcc_html,
         rejections=rejections_section(stock),
         now=esc(dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")),
     )
-    outdir = os.path.dirname(os.path.abspath(args.out))
+    outdir = os.path.dirname(os.path.abspath(out))
     os.makedirs(outdir, exist_ok=True)
-    with open(args.out, "w") as f:
+    with open(out, "w") as f:
         f.write(page)
-    print(f"wrote {args.out} ({os.path.getsize(args.out)} bytes)")
+    print(f"wrote {out} ({os.path.getsize(out)} bytes)")
+
+    if report_mode:
+        blurb = build_blurb(rtype, stock, spreads, pmcc, daytrade)
+        stats = build_stats(rtype, stock, spreads, pmcc, daytrade)
+        write_meta_sidecar(out, rid, rtype, rdate,
+                           f"{title} · {rdate}", blurb, stats)
 
 
 if __name__ == "__main__":
