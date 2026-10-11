@@ -1,0 +1,38 @@
+name: Monthly PMCC screen
+
+# Full pair-quality re-rank on the 3rd of each month, with JSON + report artifacts.
+on:
+  schedule:
+    # 9:35am ET on the 3rd (13:35 UTC; drifts an hour with DST)
+    - cron: "35 13 3 * *"
+  workflow_dispatch:
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: PMCC quality screen
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          chmod +x bin/public-mcp
+          mkdir -p reports
+          STAMP=$(date +%F)
+          WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+          python3 pmcc_quality.py --names "$WATCHLIST" --json-out reports/pmcc-quality-$STAMP.json | tee reports/pmcc-quality-$STAMP.txt
+
+      - name: Upload run outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: monthly-screen-${{ github.run_id }}
+          path: reports/
+          retention-days: 90
