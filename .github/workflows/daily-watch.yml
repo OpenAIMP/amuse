@@ -1,21 +1,20 @@
-name: Pre-market day-trade screen
+name: Daily screen watch
 
-# Scans the embedded S&P 500 universe for pre-market gap + volume candidates.
-# Designed to run ~9:00am ET on weekdays, before the open.
-# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
-# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+# Exception-based daily run over the shared watchlist (watchlist.txt):
+# technical stock screen, bull-put/iron-condor opportunities, PMCC watch.
+# Reports only material changes. Artifacts keep 90 days of run history.
 on:
   schedule:
-    # 9:00am ET on weekdays (13:00 UTC; drifts an hour with DST)
-    - cron: "0 13 * * 1-5"
+    # 9:35am ET on weekdays (13:35 UTC; drifts an hour with DST)
+    - cron: "35 13 * * 1-5"
   workflow_dispatch:
     inputs:
       names:
-        description: "Comma-separated watchlist override (blank = embedded S&P 500)"
+        description: "Comma-separated watchlist override (blank = use watchlist.txt)"
         required: false
         default: ""
-      limit:
-        description: "Cap universe size (for tests; blank = full universe)"
+      universe:
+        description: "Index universe override (blank = use watchlist.txt)"
         required: false
         default: ""
 
@@ -23,7 +22,7 @@ permissions:
   contents: write
 
 jobs:
-  daytrade:
+  watch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,46 +33,96 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Pre-market screen
+      - name: Restore prior watch state
+        uses: actions/cache/restore@v4
+        with:
+          path: state/
+          key: screen-state
+
+      - name: Load watchlist
+        run: |
+          if [ -n "${{ inputs.names }}" ]; then
+            echo "WATCHLIST=${{ inputs.names }}" >> $GITHUB_ENV
+            echo "UNIVERSE=" >> $GITHUB_ENV
+            echo "SRC=custom" >> $GITHUB_ENV
+          elif [ -n "${{ inputs.universe }}" ]; then
+            echo "UNIVERSE=${{ inputs.universe }}" >> $GITHUB_ENV
+            echo "WATCHLIST=" >> $GITHUB_ENV
+            echo "SRC=${{ inputs.universe }}" >> $GITHUB_ENV
+          else
+            echo "WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
+            echo "UNIVERSE=" >> $GITHUB_ENV
+            echo "SRC=watchlist" >> $GITHUB_ENV
+          fi
+          chmod +x bin/public-mcp
+          mkdir -p state reports
+
+      - name: Stock screener
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
-          chmod +x bin/public-mcp
-          mkdir -p reports
-          STAMP=$(date +%F)
-          ARGS=""
-          if [ -n "${{ inputs.names }}" ]; then ARGS="$ARGS --names ${{ inputs.names }}"; fi
-          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
-          python3 daytrade_screen.py $ARGS \
-            --json-out reports/daytrade-screen-$STAMP.json | tee reports/daytrade-screen-$STAMP.txt
+          if [ -n "$UNIVERSE" ]; then
+            python3 stock_screener.py --universe "$UNIVERSE" \
+              --json-out reports/stock-screen.json | tee reports/stock-screen.txt
+          else
+            python3 stock_screener.py --names "$WATCHLIST" \
+              --json-out reports/stock-screen.json | tee reports/stock-screen.txt
+          fi
+
+      - name: Spread screener (bull puts + iron condors)
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          if [ -n "$UNIVERSE" ]; then
+            python3 spread_screener.py --universe "$UNIVERSE" \
+              --json-out reports/spread-screen.json | tee reports/spread-screen.txt
+          else
+            python3 spread_screener.py --names "$WATCHLIST" \
+              --json-out reports/spread-screen.json | tee reports/spread-screen.txt
+          fi
+
+      - name: PMCC exception watch
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          python3 pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
+
+      - name: Save watch state
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: state/
+          key: screen-state-${{ github.run_id }}
 
       - name: Upload run outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: daytrade-screen-${{ github.run_id }}
+          name: daily-watch-${{ github.run_id }}
           path: reports/
           retention-days: 90
 
-      - name: Render day-trade report
+      - name: Render dashboard
         if: always()
         run: |
           mkdir -p docs/reports
           STAMP=$(date +%F)
-          if [ -n "${{ inputs.names }}" ]; then
-            SRC="custom"
-            DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
-          elif [ -n "${{ inputs.limit }}" ]; then
-            SRC="custom"
-            DETAIL="first ${{ inputs.limit }} of S&P 500"
+          if [ "$SRC" = "custom" ]; then
+            DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          elif [ "$SRC" = "watchlist" ]; then
+            DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           else
-            SRC="sp500"
-            DETAIL="503 names"
+            DETAIL="$(python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
           fi
-          python3 render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
-            --report-id daytrade-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
+          python3 render_report.py --stock reports/stock-screen.json \
+            --spreads reports/spread-screen.json \
+            --report-id daily-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
           python3 render_hub.py
           ls docs/index.html
 
@@ -84,5 +133,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase || true
           git add docs/
-          git diff --cached --quiet || git commit -m "dashboard: update day-trade screen"
+          git diff --cached --quiet || git commit -m "dashboard: update daily screen"
           git push
