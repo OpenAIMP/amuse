@@ -355,3 +355,29 @@ the full tables.
 - A full S&P 500 stock screen is ~1,000 API calls and takes ~20 minutes; the
   spread screener on 500 names takes an hour-plus — these are scheduled jobs,
   not interactive ones.
+
+## Roadmap
+
+What a portfolio manager would add, in order:
+
+**Before real money**
+- **Backtester** — validate the indicator pack, delta gates, and RoR ranking
+  on history; none of it has been tested yet.
+- **Catalyst calendar** — replace "earnings date unknown" flags with real
+  dates wired into the event gates.
+- **Sizing calculator** — account size + max loss in → contracts out,
+  enforcing the 1–2% rule before every trade.
+
+**Running the book**
+- **Heat/exposure tracker** — track open positions against the 30–40% heat
+  cap and sector correlation limits.
+- **Exit rules** — profit targets, rolling, assignment handling; entries
+  without exits is half a system.
+- **Journal + attribution** — which layer (regime read vs structure) made or
+  lost money, so the system learns.
+
+**Robustness**
+- **Regime filter on the spread screener** — tag or filter structures by the
+  name's regime score; that joint is manual today.
+- **Universe refresh** — the frozen constituent lists are dated 2026-10-11
+  and will stale on index reconstitutions.
