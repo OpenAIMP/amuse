@@ -50,17 +50,36 @@ profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
 
 ## Screeners
 
-| File | What it does |
-|---|---|
-| `stock_screener.py` | Technical screen with the indicator pack (below). Composite score 0–40 = base 0–30 + signals 0–10. Ends with a plain-English `READOUT` — the leader and why, rejections grouped by theme, regime census. |
-| `spread_screener.py` | Income-structure selector: bull put spreads, iron condors, and defined-risk Jade Lizards (bull put spread + far-OTM call wing for bullish regimes). 21–60 DTE, short 0.10–0.20Δ, conservative **short-bid minus long-ask** fills, width auto-scales to price (`min(5, max(1, round(spot/25)))`). Ranked by return-on-risk, with its own readout. |
-| `daytrade_screen.py` | Pre-market day-trading screen over the S&P 500: gap %, relative volume, developing VWAP distance, ATR range position. Bias stated as bias ("gap-and-go" / "fade risk"), never prediction. |
-| `pmcc_quality.py` | PMCC pair-quality: 0.80–0.95Δ LEAPS (270–800 DTE) × 0.15–0.35Δ short calls (21–60 DTE), evaluated as pairs with liquidity, friction, capital, and earnings gates. |
-| `pmcc_watch.py` | Daily exception monitor: diffs today's screen vs cached state, reports only new qualifiers, dropouts, or 1.5+ pt yield shifts. |
-| `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. |
-| `semis.py` | Semiconductor momentum screen (earlier study). |
-| `render_report.py` | Renders dated report pages (plus `.meta.json` sidecars) from screener JSONs. |
-| `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. |
+| File | What it does | In scheduled flows |
+|---|---|---|
+| `stock_screener.py` | Technical screen with the indicator pack (below). Composite score 0–40 = base 0–30 + signals 0–10. Ends with a plain-English `READOUT` — the leader and why, rejections grouped by theme, regime census. | `daily-watch` |
+| `spread_screener.py` | Income-structure selector: bull put spreads, iron condors, and defined-risk Jade Lizards (bull put spread + far-OTM call wing for bullish regimes). 21–60 DTE, short 0.10–0.20Δ, conservative **short-bid minus long-ask** fills, width auto-scales to price (`min(5, max(1, round(spot/25)))`). Ranked by return-on-risk, with its own readout. | `daily-watch` |
+| `daytrade_screen.py` | Pre-market day-trading screen over the S&P 500: gap %, relative volume, developing VWAP distance, ATR range position. Bias stated as bias ("gap-and-go" / "fade risk"), never prediction. | `daytrade-screen` |
+| `pmcc_quality.py` | PMCC pair-quality: 0.80–0.95Δ LEAPS (270–800 DTE) × 0.15–0.35Δ short calls (21–60 DTE), evaluated as pairs with liquidity, friction, capital, and earnings gates. | `monthly-screen` |
+| `pmcc_watch.py` | Daily exception monitor: diffs today's screen vs cached state, reports only new qualifiers, dropouts, or 1.5+ pt yield shifts. | `daily-watch` |
+| `render_report.py` | Renders dated report pages (plus `.meta.json` sidecars) from screener JSONs. | all three |
+| `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. | all three |
+| `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. | manual only |
+| `semis.py` | Semiconductor momentum screen (early study, superseded). | retired |
+
+`scan_loop.py` stays manual: the daily workflow's `universe` input covers the
+scheduled case, and a full multi-universe sweep in CI would be hours of API
+calls. `semis.py` is kept for reference only.
+
+### Stock screen vs day-trade screen
+
+| | Stock screen | Day-trade screen |
+|---|---|---|
+| **Question** | Where should I sell premium for the coming weeks? | What's moving abnormally *right now*? |
+| **Horizon** | Days to weeks (income structures) | Minutes to hours (intraday momentum) |
+| **Data** | Daily bars, a year of history | Intraday bars, today's developing session |
+| **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend structure | Gap % vs prior close, relative volume, developing VWAP distance, ATR range position |
+| **Output** | Ranked 0–40 with a readout narrative | Ranked by gap × volume, labeled gap-and-go or fade risk |
+
+The day-trade screen catches the morning's movers for same-day trades; the
+stock screen picks the names worth selling 30–60 day spreads on. They share
+nothing but the watchlist machinery — that's why they run as separate
+workflows.
 
 ## The indicator pack (`stock_screener.py`)
 
