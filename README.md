@@ -24,17 +24,25 @@ No stage overrules another. A perfect regime with %B at 1.0 waits at timing.
 A great setup with earnings inside the window dies at preflight. Probabilities
 come from option delta (market-implied), never from indicators.
 
-### How the scheduled flows walk the loop
+### Lineage: stage → workflow → file
 
-| Flow | Loop coverage |
-|---|---|
-| `daily-watch` | The full loop through Strikes: `stock_screener` qualifies names on regime + timing, `spread_screener` prices bull puts / condors / lizards with strikes, credits, and max loss. |
-| `daytrade-screen` | Screen → Timing on an intraday clock: the gap/vol/VWAP scan replaces the slower regime read with a bias label (gap-and-go / fade risk). |
-| `monthly-screen` | Screen → Regime → Strikes for LEAPS: `pmcc_quality` re-ranks 0.80–0.95Δ longs × 0.15–0.35Δ short calls as evaluated pairs. |
+One matrix for the whole system — which stages each workflow implements, and
+which files implement them. (`render_report.py` / `render_hub.py` are
+pipeline, not loop stages: they publish whatever the loop produced.)
 
-Size and Preflight are human stages in every flow: the code hands you max
-loss and event flags; you apply the 1–2% rule, check buying power and fees,
-and confirm.
+| Stage | `daily-watch` | `daytrade-screen` | `monthly-screen` |
+|---|---|---|---|
+| **Screen** | `stock_screener`, `spread_screener` | `daytrade_screen` | `pmcc_quality` |
+| **Regime** | `stock_screener` — trend / SMA / anchored-VWAP gates, regime census | bias label replaces the regime read | pair-universe selection in `pmcc_quality` |
+| **Timing** | `stock_screener` — %B / RSI14 / squeeze | `daytrade_screen` — gap / rel-vol / developing VWAP | — |
+| **Strikes** | `spread_screener` — 0.10–0.20Δ short strikes | — | `pmcc_quality` — 0.15–0.35Δ short calls |
+| **Size** | max loss per structure reported — you apply the 1–2% rule | — | max loss per pair reported — you apply the 1–2% rule |
+| **Preflight** | event gates fail closed — you confirm | — | event gates fail closed — you confirm |
+
+Read it two ways: down a column to see everything one workflow does;
+across a row to see every file and workflow that implements a stage. Size
+and Preflight are human stages in every flow — the code hands you max loss
+and event flags; you check buying power and fees, and confirm.
 
 ## How this helps make money
 
