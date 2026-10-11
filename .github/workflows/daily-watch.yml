@@ -44,12 +44,15 @@ jobs:
           if [ -n "${{ inputs.names }}" ]; then
             echo "WATCHLIST=${{ inputs.names }}" >> $GITHUB_ENV
             echo "UNIVERSE=" >> $GITHUB_ENV
+            echo "SRC=custom" >> $GITHUB_ENV
           elif [ -n "${{ inputs.universe }}" ]; then
             echo "UNIVERSE=${{ inputs.universe }}" >> $GITHUB_ENV
             echo "WATCHLIST=" >> $GITHUB_ENV
+            echo "SRC=${{ inputs.universe }}" >> $GITHUB_ENV
           else
             echo "WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
             echo "UNIVERSE=" >> $GITHUB_ENV
+            echo "SRC=watchlist" >> $GITHUB_ENV
           fi
           chmod +x bin/public-mcp
           mkdir -p state reports
@@ -108,15 +111,27 @@ jobs:
       - name: Render dashboard
         if: always()
         run: |
+          mkdir -p docs/reports
+          STAMP=$(date +%F)
+          if [ "$SRC" = "custom" ]; then
+            DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          elif [ "$SRC" = "watchlist" ]; then
+            DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
+          else
+            DETAIL="$(python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
+          fi
           python3 render_report.py --stock reports/stock-screen.json \
-            --spreads reports/spread-screen.json --out docs/index.html
-          ls -la docs/index.html
+            --spreads reports/spread-screen.json \
+            --report-id daily-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
+          python3 render_hub.py
+          ls docs/index.html
 
       - name: Publish dashboard to GitHub Pages
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html docs/.nojekyll
+          git pull --rebase || true
+          git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update daily screen"
           git push
