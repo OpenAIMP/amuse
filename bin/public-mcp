@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Call Public.com's hosted MCP server via streamable HTTP.
+
+Usage:
+    public-mcp tools                      # list available tools
+    public-mcp call <tool> [args-json]    # call one tool
+
+Auth: Bearer token from the PUBLIC_API_KEY environment variable.
+This is the GitHub-Actions-friendly twin of the local public-mcp CLI
+(which authenticates via the Secure Vault instead). The MCP protocol
+handling is identical; only the credential source differs.
+
+Set PUBLIC_MCP_CLI to this file's path so the screener scripts use it:
+    export PUBLIC_MCP_CLI="$PWD/bin/public-mcp"
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+URL = "https://mcp.public.com/mcp"
+
+_session_id: str | None = None
+_req_id = 0
+
+
+def _api_key() -> str:
+    key = os.environ.get("PUBLIC_API_KEY", "")
+    if not key:
+        raise SystemExit("PUBLIC_API_KEY is not set")
+    return key
+
+
+def _parse_body(content_type: str, raw: bytes) -> dict:
+    text = raw.decode("utf-8")
+    if "text/event-stream" in (content_type or ""):
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("data:"):
+                data = line[5:].strip()
+                if data and data != "[DONE]":
+                    try:
+                        return json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+        raise RuntimeError("no JSON data found in SSE response")
+    return json.loads(text)
+
+
+def _post(payload: dict) -> dict:
+    global _session_id
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(URL, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json, text/event-stream")
+    req.add_header("Authorization", f"Bearer {_api_key()}")
+    if _session_id:
+        req.add_header("Mcp-Session-Id", _session_id)
+    try:
+        resp = urllib.request.urlopen(req, timeout=60)
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:800]
+        raise RuntimeError(f"HTTP {e.code}: {detail}") from None
+    sid = resp.headers.get("Mcp-Session-Id")
+    if sid:
+        _session_id = sid
+    raw = resp.read()
+    if not raw.strip():
+        return {}
+    return _parse_body(resp.headers.get("Content-Type", ""), raw)
+
+
+def _rpc(method: str, params: dict | None = None) -> dict:
+    global _req_id
+    _req_id += 1
+    payload: dict = {"jsonrpc": "2.0", "id": _req_id, "method": method}
+    if params is not None:
+        payload["params"] = params
+    res = _post(payload)
+    if isinstance(res, dict) and "error" in res:
+        raise RuntimeError(f"MCP error: {json.dumps(res['error'])}")
+    return res.get("result", {}) if isinstance(res, dict) else {}
+
+
+def _notify(method: str) -> None:
+    body = json.dumps({"jsonrpc": "2.0", "method": method}).encode("utf-8")
+    req = urllib.request.Request(URL, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json, text/event-stream")
+    req.add_header("Authorization", f"Bearer {_api_key()}")
+    if _session_id:
+        req.add_header("Mcp-Session-Id", _session_id)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            resp.read()
+    except urllib.error.HTTPError:
+        pass  # notifications may return 202 with no body
+
+
+def _ensure_initialized() -> None:
+    _rpc(
+        "initialize",
+        {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "options-lab-actions", "version": "1.0"},
+        },
+    )
+    _notify("notifications/initialized")
+
+
+def main() -> None:
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print(__doc__)
+        return
+    _ensure_initialized()
+    cmd = sys.argv[1]
+    if cmd == "tools":
+        print(json.dumps(_rpc("tools/list"), indent=2))
+    elif cmd == "call":
+        if len(sys.argv) < 3:
+            raise SystemExit("usage: public-mcp call <tool> [args-json]")
+        args = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}
+        print(json.dumps(_rpc("tools/call", {"name": sys.argv[2], "arguments": args}), indent=2))
+    else:
+        raise SystemExit(f"unknown command: {cmd}")
+
+
+if __name__ == "__main__":
+    main()
