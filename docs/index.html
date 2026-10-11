@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Options Lab — Daily Screen</title>
+<title>Options Lab</title>
 <style>
 :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
 --green:#3fb950;--red:#f85149;--amber:#d29922;--blue:#58a6ff}
@@ -54,21 +54,37 @@ ul.rej{columns:2;column-gap:32px;font-size:.85rem}
 ul.rej li{margin:3px 0;break-inside:avoid}
 footer{color:var(--dim);font-size:.78rem;text-align:center;margin-top:8px}
 @media(max-width:640px){ul.rej{columns:1}body{padding:16px 10px}}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:0 0 18px}
+.repcard{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:16px}
+.repcard .k{font-size:.75rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.repcard h3{margin:0 0 6px;font-size:1.05rem}
+.repcard .blurb{font-size:.88rem;color:var(--text);margin:6px 0 10px}
+.repcard .empty{font-style:italic}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.chip{font-size:.75rem;background:#161b22;border:1px solid var(--border);border-radius:20px;
+padding:2px 10px;color:var(--dim);font-variant-numeric:tabular-nums}
+.btn{display:inline-block;background:#1f6feb;color:#fff;font-weight:600;font-size:.85rem;
+padding:8px 16px;border-radius:8px;text-decoration:none}
+.btn:hover{background:#388bfd}
+.arch{margin:0;padding-left:0;list-style:none}
+.arch li{margin:6px 0;font-size:.9rem}
+.arch .d{color:var(--dim);font-variant-numeric:tabular-nums;margin-right:8px}
+.arch a{color:var(--blue);text-decoration:none}
+.arch a:hover{text-decoration:underline}
+details + details{margin-top:10px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
-<h1>Options Lab — Daily Screen</h1>
-<p class="sub">Run date: 2026-10-11</p>
+<h1>Options Lab</h1>
 <p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2><div class="flow"><div class="flow-step"><div class="flow-name">1. Screen</div><div class="flow-desc">Find candidates across the watchlist or universe.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">2. Regime</div><div class="flow-desc">Trend structure + anchored VWAP pick the strategy family.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">3. Timing</div><div class="flow-desc">%B, RSI and squeeze confirm — or veto — the entry now.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">4. Strikes</div><div class="flow-desc">Fib levels and swing pivots place short strikes behind structure.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">5. Size</div><div class="flow-desc">1–2% max loss per trade; total heat under 40%.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">6. Preflight</div><div class="flow-desc">Buying power, events, fees — then your confirmation.</div></div></div></section>
-<section class="card"><h2>Stock screen</h2><div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Price</th><th>RSI14</th><th>%B</th><th>BW%</th><th>SQZ</th><th>aVWAP%</th><th>Trend</th><th>Score</th></tr></thead><tbody><tr><td class='sym'>NVDA</td><td class='num'>229.28</td><td class='num'>53.0</td><td class='num'>0.58</td><td class='num'>14.2</td><td class='sqz'></td><td class='num'>9.2%</td><td><span class="badge good">UP</span></td><td class='num'><b>31.4</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>DIS</td><td class='num'>108.05</td><td class='num'>59.3</td><td class='num'>0.90</td><td class='num'>7.2</td><td class='sqz'></td><td class='num'>6.1%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>29.1</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>PFE</td><td class='num'>28.28</td><td class='num'>55.8</td><td class='num'>0.66</td><td class='num'>6.2</td><td class='sqz'></td><td class='num'>7.4%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>29.1</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>GOOGL</td><td class='num'>351.66</td><td class='num'>56.4</td><td class='num'>0.81</td><td class='num'>5.3</td><td class='sqz'></td><td class='num'>7.3%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>28.6</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>KO</td><td class='num'>88.05</td><td class='num'>54.2</td><td class='num'>0.65</td><td class='num'>4.9</td><td class='sqz'></td><td class='num'>12.4%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>27.4</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>MRK</td><td class='num'>145.60</td><td class='num'>51.6</td><td class='num'>0.48</td><td class='num'>8.2</td><td class='sqz'></td><td class='num'>23.1%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>26.7</b><span class='dim'>/40</span></td></tr><tr><td class='sym'>XOM</td><td class='num'>168.94</td><td class='num'>64.2</td><td class='num'>0.96</td><td class='num'>7.2</td><td class='sqz'></td><td class='num'>16.8%</td><td><span class="badge warn">RNG</span></td><td class='num'><b>25.3</b><span class='dim'>/40</span></td></tr></tbody></table></div></section>
-<section class="card"><h2>Spread opportunities</h2><h3>Bull put spreads <span class='dim'>(ranked by return on risk)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Sym</th><th>Exp</th><th>Strikes</th><th>DTE</th><th>Credit</th><th>Max loss</th><th>Breakeven</th><th>RoR</th><th>Events</th></tr></thead><tbody><tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr></tbody></table></div><h3>Iron condors <span class='dim'>(ranked by return on risk)</span></h3><div class="tbl-wrap"><table><thead><tr><th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th><th>Credit</th><th>Max loss</th><th>Breakevens</th><th>RoR</th><th>Events</th></tr></thead><tbody><tr><td colspan="10" class="empty">No qualifying condors.</td></tr></tbody></table></div><p class="fine">Return on risk = credit ÷ max loss: a screening ratio, not an expected return. Credits use conservative short-bid minus long-ask fills.</p></section>
-<section class="card"><h2>PMCC watch</h2><p class="empty">No data yet — run the PMCC screen.</p></section>
-<section class="card"><h2>Rejections</h2><details><summary>Stock screen rejections (13 names, 30 reason hits)</summary><ul class='rej'><li><span class='dim'>7×</span> below 50-day SMA</li><li><span class='dim'>5×</span> below 200-day SMA</li><li><span class='dim'>5×</span> pctB outside bands</li><li><span class='dim'>4×</span> below anchored VWAP</li><li><span class='dim'>3×</span> volume trend weak</li><li><span class='dim'>2×</span> price out of range</li><li><span class='dim'>2×</span> too far below 52w high</li><li><span class='dim'>2×</span> rsi out of range</li></ul></details><p class="fine">Spread and PMCC rejection detail lives in the console reports (run artifacts).</p></section>
-<footer>Generated 2026-10-11 14:43 UTC · screeners never place orders.</footer>
+<section class="card"><h2>Latest reports</h2><div class="cards"><div class="repcard"><div class="k">Daily screen</div><p class="blurb empty">No runs yet.</p></div><div class="repcard"><div class="k">Day-trade screen</div><p class="blurb empty">No runs yet.</p></div><div class="repcard"><div class="k">PMCC screen</div><p class="blurb empty">No runs yet.</p></div></div></section>
+
+<footer>Hub regenerated 2026-10-11 14:54 UTC · screeners never place orders.</footer>
 </div>
 </body>
 </html>
