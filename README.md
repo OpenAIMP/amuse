@@ -98,19 +98,35 @@ the dashboard shows its results. Notes:
 
 ## Dashboard
 
-`docs/index.html` is a static snapshot, regenerated fresh on every run — the
-page itself fetches nothing. The data pipeline inside each workflow run is:
+`docs/index.html` is a stable **hub page** — it never gets overwritten with
+report data. Each workflow renders its own dated report page and the hub links
+them:
 
 ```
-Public.com API → screener scripts → reports/*.json → render_report.py → docs/index.html → Pages
-    (live)            (in Actions)       (artifacts)        (in Actions)        (committed)    (served)
+docs/index.html                        ← hub: latest cards + archive, rebuilt every run
+docs/reports/daily-2026-10-13.html     ← daily-watch.yml output (+ .meta.json sidecar)
+docs/reports/daytrade-2026-10-13.html  ← daytrade-screen.yml output
+docs/reports/pmcc-2026-10.html         ← monthly-screen.yml output
 ```
 
-**Which workflow produces it:** `daily-watch.yml`. Its last two steps run
-`render_report.py` on the run's JSON outputs and commit the result to `docs/`,
-so the page always shows that morning's data (check the footer timestamp for
-freshness). Enable it under Settings → Pages → Deploy from branch → `main` →
-`/docs`; `.nojekyll` is present so it's served as plain static HTML, no Jekyll.
+The data pipeline inside each workflow run is:
+
+```
+Public.com API → screener scripts → reports/*.json → render_report.py → docs/reports/<id>.html → render_hub.py → docs/index.html → Pages
+    (live)            (in Actions)       (artifacts)        (dated page)              (hub)              (served)
+```
+
+- `render_report.py --report-id <id>` renders one dated report page plus a
+  tiny `.meta.json` sidecar (title, one-line blurb, stat counts).
+- `render_hub.py` reads all sidecars and rebuilds the hub: "Latest reports"
+  cards per workflow plus collapsible archives. Old reports are pruned (30
+  daily, 30 day-trade, 12 monthly).
+- Publish steps do `git pull --rebase` before pushing, so the three workflows
+  never clobber each other's commits.
+
+Enable under Settings → Pages → Deploy from branch → `main` → `/docs`;
+`.nojekyll` is present so it's served as plain static HTML, no Jekyll. Each
+report's footer timestamp is the freshness check.
 
 ## What runs here
 
