@@ -1,0 +1,2 @@
+# No third-party dependencies — stdlib only (urllib, json, subprocess, statistics).
+# Python 3.10+ recommended (datetime.UTC).
