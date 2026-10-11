@@ -116,9 +116,16 @@ a provenance banner — e.g. "Source: Nasdaq-100 · 101 names · Run 2026-10-11"
 
 | Workflow | Schedule | Scripts it runs, in order | Publishes |
 |---|---|---|---|
-| `daily-watch.yml` | Weekdays 9:35am ET | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
-| `daytrade-screen.yml` | Weekdays 9:00am ET | `daytrade_screen` → `render_report` → `render_hub` | `docs/reports/daytrade-<source>-<date>.html` |
-| `monthly-screen.yml` | 3rd of each month, 9:35am ET | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
+| `master.yml` | Weekdays 9:45am ET | Calls `daytrade-screen` → `daily-watch` → `monthly-screen` (on the 3rd) | (via the called workflows) |
+| `daily-watch.yml` | Called by `master.yml`; manual via Actions tab | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
+| `daytrade-screen.yml` | Called by `master.yml`; manual via Actions tab | `daytrade_screen` → `render_report` → `render_hub` | `docs/reports/daytrade-<source>-<date>.html` |
+| `monthly-screen.yml` | Called by `master.yml` on the 3rd; manual via Actions tab | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
+
+`master.yml` calls the other three as reusable workflows (`workflow_call`) —
+no logic is duplicated. Inputs (`names`, `universe`, `limit`) flow through
+from the master run, and `secrets: inherit` passes the API key. The individual
+workflows keep no schedules of their own, so nothing runs twice; their
+`workflow_dispatch` triggers remain for one-off manual runs.
 
 `daily-watch.yml` accepts `names` and `universe` inputs on manual runs;
 `daytrade-screen.yml` accepts `names` and `limit`; `monthly-screen.yml`
