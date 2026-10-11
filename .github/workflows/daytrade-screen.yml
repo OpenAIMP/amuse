@@ -93,6 +93,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # bin/public-mcp is chmod +x'd every run, flipping the mode of a
+          # tracked file (API pushes land as 100644). Discard the flip so it
+          # never blocks the rebase below.
+          git checkout -- bin/public-mcp 2>/dev/null || true
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update day-trade screen"
           # Fold in concurrent pushes (doc edits, other jobs). If the hub
