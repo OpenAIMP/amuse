@@ -101,7 +101,9 @@ stock screen picks the names worth selling 30–60 day spreads on. They share
 nothing but the watchlist machinery — that's why they run as separate
 workflows.
 
-## The indicator pack (`stock_screener.py`)
+## Signal packs
+
+### Stock screener (`stock_screener.py`) — swing regime and timing
 
 | Indicator | Role | Key reads |
 |---|---|---|
@@ -114,8 +116,41 @@ workflows.
 Deliberately **not** automated: Elliott Wave counting — too subjective; pivots
 and Fibs capture the objective machinery underneath it.
 
-Unknown data is always a flag, never a rejection. Rejections carry stable
-reason categories and are all printed — nothing is silently dropped.
+### Day-trade screener (`daytrade_screen.py`) — intraday momentum
+
+| Signal | Role | Gate / read |
+|---|---|---|
+| Gap % vs prior close | Screen | |gap| ≥ 2% |
+| Relative volume (20-day avg) | Screen | ≥ 1.5× |
+| Developing session VWAP | Timing / bias | Above → gap-and-go bias; below → fade risk (mirrored for gap-downs) |
+| ATR14 % | Screen | 1–8% — too quiet or too wild both rejected |
+| ATR-implied range position | Timing | Where price sits inside today's expected range |
+| Price | Screen | ≥ $10 |
+
+Ranked by |gap| × relative volume. No news/catalyst feed — gaps are
+technical-only.
+
+### Structure pricers (`spread_screener.py`, `pmcc_quality.py`) — defined-risk gates
+
+| Gate | `spread_screener.py` | `pmcc_quality.py` |
+|---|---|---|
+| Short-leg delta | 0.10–0.20 | 0.15–0.35 (short calls) |
+| Long leg | One width beyond the short strike (width auto-scales with price) | 0.80–0.95Δ LEAPS |
+| DTE | 21–60 | 21–60 short / 270–800 long |
+| Fills | Conservative: short bid − long ask | Conservative: long ask − short bid |
+| Bid/ask spread | ≤ 25% of mid per leg | ≤ 25% of mid per leg |
+| Liquidity | OI or volume ≥ 10 per leg | OI/vol ≥ 25 long leg, ≥ 10 short leg |
+| Capital at risk | Max loss ≤ $1,000 per structure | ≤ $10,000 per pair |
+| Friction | Combined leg spreads ÷ credit ≤ 3.0 | (Long spread + short spread) ÷ short bid ≤ 3.0 |
+| Earnings | Inside the window → reject (unknown date = flag) | Inside the short window → reject |
+
+Jade Lizard adds one skew gate: the call wing must sit ≥ 8% above spot —
+farther OTM than a symmetric condor's, the "bullish regime" posture. Spreads
+rank by return-on-risk; PMCC pairs rank by 30-day premium-to-debit.
+
+Across all screeners: unknown data is a flag, never a rejection. Rejections
+carry stable reason categories and are all printed — nothing is silently
+dropped.
 
 ## Universes and the watchlist
 
