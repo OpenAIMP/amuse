@@ -59,7 +59,8 @@ profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
 | `pmcc_watch.py` | Daily exception monitor: diffs today's screen vs cached state, reports only new qualifiers, dropouts, or 1.5+ pt yield shifts. |
 | `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. |
 | `semis.py` | Semiconductor momentum screen (earlier study). |
-| `render_report.py` | Turns screener JSONs into the static HTML dashboard served by GitHub Pages. |
+| `render_report.py` | Renders dated report pages (plus `.meta.json` sidecars) from screener JSONs. |
+| `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. |
 
 ## The indicator pack (`stock_screener.py`)
 
@@ -77,111 +78,57 @@ and Fibs capture the objective machinery underneath it.
 Unknown data is always a flag, never a rejection. Rejections carry stable
 reason categories and are all printed — nothing is silently dropped.
 
-## How the pieces fit together
+## Universes and the watchlist
 
-Every run follows the same pipeline — screeners produce JSON, renderers turn
-JSON into pages:
-
-```
-                         ┌─ stock_screener.py ──┐
-watchlist.txt ──┬─ daily ┤  spread_screener.py ─┼─→ reports/*.json ─┬─→ render_report.py --report-id daily-<date>
-(universe opt)  │        └─ pmcc_watch.py ──────┘                    │         ↓
-                │                                                   └─→ render_hub.py ─→ docs/index.html (hub)
-                ├─ pre-market: daytrade_screen.py → reports/*.json ─┬─→ render_report.py --report-id daytrade-<date>
-                │                                                   └─→ render_hub.py ─→ docs/index.html (hub)
-                └─ monthly: pmcc_quality.py ────→ reports/*.json ─┬─→ render_report.py --report-id pmcc-<yyyy-mm>
-                                                                   └─→ render_hub.py ─→ docs/index.html (hub)
-```
-
-Shared pieces: `universes.py` (frozen index lists imported by every screener;
-`--names` overrides `--universe`), `scan_loop.py` (runs any screener across
-several universes and merges the leaderboards).
-
-Which workflow runs what:
-
-| Workflow | Scripts it runs, in order | Publishes |
-|---|---|---|
-| `daily-watch.yml` | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report --report-id daily-<date>` → `render_hub` | `docs/reports/daily-<date>.html` |
-| `daytrade-screen.yml` | `daytrade_screen` → `render_report --daytrade --report-id daytrade-<date>` → `render_hub` | `docs/reports/daytrade-<date>.html` |
-| `monthly-screen.yml` | `pmcc_quality` → `render_report --pmcc --report-id pmcc-<yyyy-mm>` → `render_hub` | `docs/reports/pmcc-<yyyy-mm>.html` |
-
-The same pipeline runs locally: screen to JSON, render the report, open it —
-
-```bash
-python3 spread_screener.py --names XOM --json-out /tmp/sp.json
-python3 render_report.py --spreads /tmp/sp.json --report-id daily-test
-python3 render_hub.py   # only needed for the hub page
-```
-
-## Universes
+`watchlist.txt` is the default shared watchlist — one symbol per line. Edit it,
+commit, and the next scheduled run picks it up.
 
 `universes.py` holds frozen constituent lists (2026-10-11, from Wikipedia):
 `sp500` (503), `sp100` (101), `nasdaq100` (101), `dow30` (30). Every screener
 accepts `--universe <key>`; `--names` overrides it. Dotted symbols are kept
 verbatim (`BRK.B` resolves; `BRK-B` does not).
 
-On a manual workflow run, the `universe` input screens that whole index and
-the dashboard shows its results. Notes:
+Notes for manual runs:
 
-- Each run **overwrites** `docs/index.html` — the dashboard always reflects the
-  most recent run. A manual Nasdaq-100 run replaces the watchlist view until
-  the next scheduled run restores it.
+- Only `daily-watch.yml` has a `universe` input. The report records which
+  source produced it (`daily-nasdaq100-2026-10-11`, banner on the page), so
+  runs are never ambiguous.
 - The PMCC watch ignores the universe and stays on the watchlist — LEAPS
   chains over 500 names isn't practical.
 - Weight: the stock screener handles `sp500` in ~20 min, but the spread
   screener pulls full chains + Greeks per name (an hour-plus on 500 names).
   `sp100`/`nasdaq100` are the sweet spot for options.
 
-## Dashboard
+## Pipeline and dashboard
 
-`docs/index.html` is the **report archive homepage** — every report every
-workflow ever produced, grouped by workflow (Daily screen / Pre-market
-day-trade / Monthly PMCC), then by universe, newest first. Nothing is pruned.
-
-```
-docs/index.html                              ← archive homepage, rebuilt every run
-docs/reports/daily-nasdaq100-2026-10-11.html ← one dated report (+ .meta.json sidecar)
-docs/reports/daily-watchlist-2026-10-11.html
-docs/reports/daytrade-sp500-2026-10-13.html
-docs/reports/pmcc-watchlist-2026-10.html
-```
-
-The data pipeline inside each workflow run is:
+Every run follows the same pipeline — screeners produce JSON, renderers turn
+JSON into pages, and nothing is ever pruned:
 
 ```
 Public.com API → screeners → reports/*.json → render_report.py → docs/reports/<type>-<source>-<date>.html → render_hub.py → docs/index.html → Pages
-    (live)          (in Actions)     (artifacts)      (dated page + provenance)              (archive)          (served)
+    (live)          (in Actions)     (artifacts)      (dated page + provenance)                   (archive)          (served)
 ```
 
-- `render_report.py --report-id <type>-<source>-<date> --source <key> --source-detail "<n> names"`
-  renders one dated report plus a tiny `.meta.json` sidecar (title, one-line
-  blurb, stat counts, source). Each report carries a provenance banner, e.g.
-  "Source: Nasdaq-100 · 101 names · Run 2026-10-11" — the workflow derives the
-  source from its `universe`/`names` inputs, defaulting to `watchlist`.
-- `render_hub.py` reads all sidecars and rebuilds the archive: grouped entries
-  with source chips, blurbs, and stat chips.
-- Publish steps do `git pull --rebase` before pushing, so the three workflows
-  never clobber each other's commits.
+`docs/index.html` is the **report archive homepage**: every report every
+workflow ever produced, grouped by workflow (Daily screen / Pre-market
+day-trade / Monthly PMCC), then by universe, newest first. Each report carries
+a provenance banner — e.g. "Source: Nasdaq-100 · 101 names · Run 2026-10-11".
 
-Enable under Settings → Pages → Deploy from branch → `main` → `/docs`;
+| Workflow | Schedule | Scripts it runs, in order | Publishes |
+|---|---|---|---|
+| `daily-watch.yml` | Weekdays 9:35am ET | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
+| `daytrade-screen.yml` | Weekdays 9:00am ET | `daytrade_screen` → `render_report` → `render_hub` | `docs/reports/daytrade-<source>-<date>.html` |
+| `monthly-screen.yml` | 3rd of each month, 9:35am ET | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
+
+`daily-watch.yml` accepts `names` and `universe` inputs on manual runs;
+`daytrade-screen.yml` accepts `names` and `limit`; `monthly-screen.yml`
+accepts `names`. Run outputs are kept as workflow artifacts for 90 days.
+Publish steps do `git pull --rebase` before pushing, so the three workflows
+never clobber each other's commits.
+
+Enable Pages under Settings → Pages → Deploy from branch → `main` → `/docs`;
 `.nojekyll` is present so it's served as plain static HTML, no Jekyll. Each
 report's footer timestamp is the freshness check.
-
-## What runs here
-
-| Workflow | Schedule | What it does |
-|---|---|---|
-| `daily-watch.yml` | Weekdays 9:35am ET | Stock screen + spread screen + PMCC exception watch; renders + publishes dashboard |
-| `daytrade-screen.yml` | Weekdays 9:00am ET | Pre-market S&P 500 gap/volume/VWAP scan |
-| `monthly-screen.yml` | 3rd of each month, 9:35am ET | Full PMCC pair-quality re-rank |
-
-All three accept `names` and `universe` inputs on manual runs. Run outputs are
-kept as workflow artifacts for 90 days.
-
-## The watchlist
-
-`watchlist.txt` is the default shared watchlist — one symbol per line. Edit it,
-commit, and the next scheduled run picks it up.
 
 ## Setup
 
@@ -247,5 +194,6 @@ the full tables.
 - The MCP has no fundamentals (no P/E, market cap, earnings dates) and no
   news/catalyst feed — gaps are technical-only; earnings come from outside data.
 - Request/response API, not streaming: scheduled scans, not tick-level real-time.
-- A full S&P 500 screen is ~1,000 API calls and takes ~20 minutes — it's a
-  scheduled job, not an interactive one.
+- A full S&P 500 stock screen is ~1,000 API calls and takes ~20 minutes; the
+  spread screener on 500 names takes an hour-plus — these are scheduled jobs,
+  not interactive ones.
