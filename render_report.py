@@ -243,19 +243,19 @@ def spread_tables(data):
         + "</tbody></table></div>"
     )
     # readout lines not tied to a symbol still get shown
-    jl_rows, jl_syms = jade_lizard_rows(data, asof, readout)
-    if jl_rows:
-        out.append("<h3>Jade Lizards <span class='dim'>(defined-risk: put spread + far-OTM call wing, ranked by return on risk)</span></h3>")
+    ac_rows, ac_syms = asym_condor_rows(data, asof, readout)
+    if ac_rows:
+        out.append("<h3>Asymmetric iron condors <span class='dim'>(defined-risk: put spread + far-OTM call wing, ranked by return on risk)</span></h3>")
         out.append(
             '<div class="tbl-wrap"><table><thead><tr>'
             "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
             "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>Up% dist</th><th>RoR</th><th>Events</th>"
             "</tr></thead><tbody>"
-            + "".join(jl_rows)
+            + "".join(ac_rows)
             + "</tbody></table></div>"
         )
     used = {why_for(sym, readout) for sym, _ in list(bps) + list(ics)}
-    used |= {why_for(sym, readout) for sym in jl_syms}
+    used |= {why_for(sym, readout) for sym in ac_syms}
     rest = [l for l in readout if isinstance(l, str) and l not in used and l.strip()]
     if rest:
         lines = "".join(f"<li>{esc(l)}</li>" for l in rest)
@@ -389,8 +389,8 @@ def wing_str(wing, suffix):
     return "—"
 
 
-def norm_lizard(r, stock=None):
-    """Normalize a jade-lizard record across JSON shapes.
+def norm_asym_condor(r, stock=None):
+    """Normalize a asym condor record across JSON shapes.
 
     New shape (list of records): stock, expiration, put_strikes "38/37P",
     call_strikes "46/47C", dte, credit, max_loss, downside_breakeven,
@@ -416,18 +416,19 @@ def norm_lizard(r, stock=None):
     }
 
 
-def jade_lizard_rows(data, asof, readout):
-    """(rows, symbols) for the Jade Lizard table; ([], []) when none present."""
+def asym_condor_rows(data, asof, readout):
+    """(rows, symbols) for the Asymmetric iron condor table; ([], []) when none present."""
     res = (data or {}).get("results") or {}
-    raw = res.get("jade_lizards") or []
+    # Backward compat: JSONs generated before the rename used "jade_lizards".
+    raw = res.get("asym_condors") or res.get("jade_lizards") or []
     if isinstance(raw, dict):
-        lizards = [norm_lizard(r, stock=sym) for sym, r in raw.items()]
+        ac_list = [norm_asym_condor(r, stock=sym) for sym, r in raw.items()]
     else:
-        lizards = [norm_lizard(r) for r in raw]
-    lizards.sort(key=lambda r: -((r.get("return_on_risk") or -1)
+        ac_list = [norm_asym_condor(r) for r in raw]
+    ac_list.sort(key=lambda r: -((r.get("return_on_risk") or -1)
                                  if isinstance(r.get("return_on_risk"), (int, float)) else -1))
     rows = []
-    for r in lizards:
+    for r in ac_list:
         dte = r.get("dte")
         if dte is None:
             dte = dte_between(asof, r.get("expiration"))
@@ -448,7 +449,7 @@ def jade_lizard_rows(data, asof, readout):
             "</tr>"
             + (f"<tr class='whyrow'><td colspan='11'>{esc(why)}</td></tr>" if why else "")
         )
-    return rows, [r.get("why_key") for r in lizards if r.get("why_key")]
+    return rows, [r.get("why_key") for r in ac_list if r.get("why_key")]
 
 
 # ---------------------------------------------------------------- report mode
@@ -519,9 +520,9 @@ def spread_bits(spreads):
     n = len(res.get("iron_condors") or {})
     if n:
         bits.append(plural(n, "condor"))
-    n = len(res.get("jade_lizards") or {})
+    n = len(res.get("asym_condors") or {})
     if n:
-        bits.append(plural(n, "lizard"))
+        bits.append(plural(n, "asym condor"))
     return bits
 
 
@@ -565,7 +566,7 @@ def build_stats(rtype, stock, spreads, pmcc, daytrade):
         "stocks": len((stock or {}).get("passing") or []),
         "bull_puts": len(res.get("bull_puts") or {}),
         "iron_condors": len(res.get("iron_condors") or {}),
-        "jade_lizards": len(res.get("jade_lizards") or {}),
+        "asym_condors": len(res.get("asym_condors") or {}),
         "pmcc_pairs": len((pmcc or {}).get("pairs") or {}),
     }
 
