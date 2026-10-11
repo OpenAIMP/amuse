@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Options spread screener: bull put spreads + iron condors.
+Options spread screener: bull put spreads + iron condors + Jade Lizards
+(defined-risk variant).
 
 Two stages (same discipline as pmcc_quality.py v3):
   1. GATE: reject bad quotes, illiquid contracts, incompatible legs, and event
@@ -41,6 +42,7 @@ MAX_SPREAD_PCT = 0.25         # reject contracts whose bid/ask spread > 25% of m
 MIN_LIQUIDITY = 10            # OI or volume floor per leg
 MAX_SPREAD_LOSS = 1000        # max loss gate per spread ($)
 MAX_FRICTION = 3.0            # combined leg spreads / net credit: reject above
+CALL_DISTANCE_MIN = 0.08     # lizard skew: call-wing short strike >= 8% above spot
 GREEKS_BATCH = 40             # implementation setting, not a verified service limit
 REJECT_EARNINGS = True        # earnings inside the spread window rejects it
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
@@ -321,16 +323,175 @@ def evaluate_condor(spot, put_wing, call_wing, width):
     }
 
 
+def evaluate_lizard(spot, put_wing, call_wing, width):
+    """Combine an accepted put wing and call wing into a defined-risk Jade
+    Lizard. Same expiration required.
+
+    What was implemented and how it differs from the classic: the canonical
+    Jade Lizard (TastyTrade) pairs a SHORT PUT with a SHORT CALL SPREAD --
+    the call spread sits far out-of-the-money and is sized so the net credit
+    exceeds the call spread width, which is what removes upside risk; the
+    premium engine is the put side. The classic's short put is NAKED, which
+    violates this system's spreads-only rule, so we implement the
+    defined-risk variant: a standard bull put spread (short 0.10-0.20 delta
+    put, long put one width below) PLUS a bear call spread (short 0.10-0.20
+    delta call, long call one width above). The lizard character comes from
+    the skew gate: the call wing must sit at least CALL_DISTANCE_MIN above
+    spot -- farther OTM than a symmetric iron condor's call wing, the
+    "bullish regime, accept a small upside tail for more credit" posture.
+    Because both wings are spreads, max loss is capped on both sides (the
+    classic keeps uncapped downside via the naked put); we do NOT inherit
+    the classic's credit-exceeds-call-width property, so upside risk exists
+    but is defined: max loss is the worse wing's (width - total credit).
+    """
+    reasons = []
+    if put_wing["expiration"] != call_wing["expiration"]:
+        reasons.append("wings on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    if not (put_wing["short_strike"] < call_wing["short_strike"]):
+        reasons.append("wings overlap or inverted")
+    if call_wing["short_strike"] < spot * (1 + CALL_DISTANCE_MIN):
+        reasons.append("call wing too close")
+    total_credit = put_wing["credit_per_share"] + call_wing["credit_per_share"]
+    # Defined-risk: both wings can't lose at once, so max loss is the worse
+    # wing's (width - total credit). Wings share `width` here; written in the
+    # general two-wing form for honesty.
+    put_wing_loss = (put_wing["width"] - total_credit) * 100
+    call_wing_loss = (call_wing["width"] - total_credit) * 100
+    max_loss = max(put_wing_loss, call_wing_loss)
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("lizard max loss over limit")
+    friction = ((put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"])
+                / total_credit)
+    if friction > MAX_FRICTION:
+        reasons.append("lizard friction over limit")
+    if reasons:
+        return {"accepted": False, "reasons": reasons,
+                "diagnostics": {"max_loss": round(max_loss, 0)}}
+    breakeven_put = put_wing["short_strike"] - total_credit
+    breakeven_call = call_wing["short_strike"] + total_credit
+    return {
+        "accepted": True,
+        "kind": "jade_lizard",
+        "expiration": put_wing["expiration"],
+        "dte": put_wing["dte"],
+        "put_short_strike": put_wing["short_strike"],
+        "put_long_strike": put_wing["long_strike"],
+        "call_short_strike": call_wing["short_strike"],
+        "call_long_strike": call_wing["long_strike"],
+        "put_wing_credit": put_wing["credit_total"],
+        "call_wing_credit": call_wing["credit_total"],
+        "credit_total": total_credit * 100,
+        "max_loss_total": max_loss,
+        "breakeven_put": breakeven_put,
+        "breakeven_call": breakeven_call,
+        "upside_distance_pct": (breakeven_call / spot - 1) * 100,
+        "return_on_risk": total_credit / (width - total_credit),
+        "friction": friction,
+        "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
+        "width": width,
+    }
+
+
+def narrate_spreads(bull_puts, condors, jade_lizards, rej_all):
+    """Plain-English readout. Every claim comes from computed values.
+
+    Returns a list of lines; top 3 opportunities per strategy, or the
+    hardest-hit gates when nothing qualified.
+    """
+    lines = []
+
+    def ev_text(r):
+        ev = r.get("events") or []
+        return "; ".join(ev) if ev else "no event flags"
+
+    def top_rejections(d, n=3):
+        return sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))[:n]
+
+    if bull_puts:
+        lines.append("Top bull put spreads:")
+        for r in bull_puts[:3]:
+            below = (1 - r["short_strike"] / r["spot"]) * 100
+            lines.append(
+                f"- {r['stock']} {r['expiration']} "
+                f"{r['short_strike']:.0f}/{r['long_strike']:.0f}P: "
+                f"RoR {r['return_on_risk']*100:.1f}% at {r['dte']} DTE, "
+                f"short strike {below:.0f}% below spot; {ev_text(r)}.")
+    else:
+        top = top_rejections(rej_all.get("bull_put", {}))
+        if top:
+            lines.append("No bull put spreads qualified — gates hit hardest: "
+                         + ", ".join(f"{k} x{v}" for k, v in top) + ".")
+        else:
+            lines.append("No bull put spreads qualified.")
+
+    if condors:
+        lines.append("Top iron condors:")
+        for r in condors[:3]:
+            put_below = (1 - r["put_short_strike"] / r["spot"]) * 100
+            call_above = (r["call_short_strike"] / r["spot"] - 1) * 100
+            lines.append(
+                f"- {r['stock']} {r['expiration']} "
+                f"{r['put_short_strike']:.0f}/{r['put_long_strike']:.0f}P x "
+                f"{r['call_short_strike']:.0f}/{r['call_long_strike']:.0f}C: "
+                f"RoR {r['return_on_risk']*100:.1f}% at {r['dte']} DTE, "
+                f"wings {put_below:.0f}% below / {call_above:.0f}% above "
+                f"spot; {ev_text(r)}.")
+    else:
+        top = top_rejections(rej_all.get("iron_condor", {}))
+        if top:
+            lines.append("No iron condors qualified — gates hit hardest: "
+                         + ", ".join(f"{k} x{v}" for k, v in top) + ".")
+        else:
+            lines.append("No iron condors qualified.")
+
+    if jade_lizards:
+        lines.append("Top Jade Lizards:")
+        for r in jade_lizards[:3]:
+            put_below = (1 - r["put_short_strike"] / r["spot"]) * 100
+            call_above = (r["call_short_strike"] / r["spot"] - 1) * 100
+            lines.append(
+                f"- {r['stock']} {r['expiration']} "
+                f"{r['put_short_strike']:.0f}/{r['put_long_strike']:.0f}P + "
+                f"{r['call_short_strike']:.0f}/{r['call_long_strike']:.0f}C: "
+                f"RoR {r['return_on_risk']*100:.1f}% at {r['dte']} DTE, "
+                f"put wing {put_below:.0f}% below spot, call wing "
+                f"{call_above:.0f}% above spot; {ev_text(r)}.")
+    else:
+        top = top_rejections(rej_all.get("jade_lizard", {}))
+        if top:
+            lines.append("No Jade Lizards qualified — gates hit hardest: "
+                         + ", ".join(f"{k} x{v}" for k, v in top) + ".")
+        else:
+            lines.append("No Jade Lizards qualified.")
+    return lines
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--names", default=None)
+    ap.add_argument("--universe", default=None,
+                        help="index universe from universes.py: sp500, sp100, nasdaq100, dow30 (--names wins)")
     ap.add_argument("--events", default=None)
     ap.add_argument("--width", type=float, default=None,
                         help="strike width in dollars; default auto-scales to price: "
                              "min(5, max(1, round(spot/25)))")
     args = ap.parse_args()
-    names = args.names.split(",") if args.names else NAMES
+    if args.names:
+        names = args.names.split(",")
+        universe_tag = "custom"
+    elif args.universe:
+        from universes import UNIVERSES
+        key = args.universe.strip().lower()
+        if key not in UNIVERSES:
+            raise SystemExit(f"unknown universe {key!r}; choose from {sorted(UNIVERSES)}")
+        names = list(UNIVERSES[key])
+        universe_tag = key
+    else:
+        names = NAMES
+        universe_tag = "default"
+    print(f"Universe: {universe_tag} ({len(names)} names)")
     width_arg = args.width
     events_file = args.events or EVENTS_FILE
 
@@ -349,6 +510,7 @@ def main():
           f"width {'$' + repr(width_arg) if width_arg else 'auto (price-scaled 1-5)'}, max spread {MAX_SPREAD_PCT:.0%} of mid, "
           f"liquidity >= {MIN_LIQUIDITY} OI/volume per leg, "
           f"max loss ${MAX_SPREAD_LOSS}/spread, max friction {MAX_FRICTION}x, "
+          f"lizard call distance >= {CALL_DISTANCE_MIN:.0%} above spot, "
           f"earnings-in-window={'REJECT' if REJECT_EARNINGS else 'flag'}, "
           f"unknown-earnings={'REJECT' if REQUIRE_EARNINGS_DATE else 'flag'}, "
           f"credit = short bid - long ask (conservative). "
@@ -376,8 +538,10 @@ def main():
                 qwalk(v)
     qwalk(q)
 
-    bull_puts, condors = [], []
+    bull_puts, condors, jade_lizards = [], [], []
     stock_notes = {}
+    rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
+               "jade_lizard": {}}
     for sym in names:
         spot = spot_map.get(sym)
         if spot is None or not math.isfinite(spot) or spot <= 0:
@@ -463,8 +627,8 @@ def main():
                 for c in cc.values():
                     calls_by_strike[(c["expiration"], c["strike"])] = c
 
-            bp_rej, bc_rej, ic_rej = {}, {}, {}
-            bp_n_rej = bc_n_rej = ic_n_rej = 0
+            bp_rej, bc_rej, ic_rej, jl_rej = {}, {}, {}, {}
+            bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
             bp_accepted, bc_accepted = [], []
 
             for s in short_puts:
@@ -523,11 +687,32 @@ def main():
                     r.update({"stock": sym, "spot": spot, "events": flags})
                     ic_accepted.append(r)
 
+            # Jade Lizards (defined-risk): accepted put wing + accepted call
+            # wing with the call wing skewed far OTM (lizard character).
+            jl_accepted = []
+            for pw in bp_accepted:
+                for cw in bc_accepted:
+                    if pw["expiration"] != cw["expiration"]:
+                        continue
+                    flags, event_reasons = spread_events(
+                        sym, pw["expiration"], events)
+                    r = evaluate_lizard(spot, pw, cw, width)
+                    reasons = r.get("reasons", []) + event_reasons
+                    if reasons:
+                        jl_n_rej += 1
+                        for reason in reasons:
+                            jl_rej[reason] = jl_rej.get(reason, 0) + 1
+                        continue
+                    r.update({"stock": sym, "spot": spot, "events": flags})
+                    jl_accepted.append(r)
+
             bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+            jl_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             bull_puts.extend(bp_accepted[:3])
             condors.extend(ic_accepted[:3])
+            jade_lizards.extend(jl_accepted[:3])
 
             notes.append(f"bull puts: {len(bp_accepted)} accepted, "
                          f"{bp_n_rej} rejected")
@@ -541,12 +726,21 @@ def main():
                          f"{ic_n_rej} rejected")
             for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
                 notes.append(f"  condor rejections: {reason} x{cnt}")
+            notes.append(f"jade lizards: {len(jl_accepted)} accepted, "
+                         f"{jl_n_rej} rejected")
+            for reason, cnt in sorted(jl_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+                notes.append(f"  lizard rejections: {reason} x{cnt}")
+            for src, key in ((bp_rej, "bull_put"), (bc_rej, "bear_call"),
+                             (ic_rej, "iron_condor"), (jl_rej, "jade_lizard")):
+                for k, v in src.items():
+                    rej_all[key][k] = rej_all[key].get(k, 0) + v
             stock_notes[sym] = notes
         except McpError as e:
             stock_notes[sym] = [f"MCP error: {e}"]
 
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    jade_lizards.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
 
     print("\n=== BULL PUT SPREADS (ranked by return on risk) ===")
     print(f"{'sym':<5}{'exp':<12}{'strikes':<10}{'DTE':>4}{'Δsh':>6}"
@@ -573,6 +767,21 @@ def main():
               f"{r['breakeven_put']:>9.2f}{r['breakeven_call']:>9.2f}"
               f"{r['return_on_risk']*100:>7.1f}{ev}")
 
+    print("\n=== JADE LIZARDS (ranked by return on risk) ===")
+    print(f"{'sym':<5}{'exp':<12}{'put wing':<11}{'call wing':<11}{'DTE':>4}"
+          f"{'credit$':>9}{'maxloss$':>10}{'be_put':>9}{'be_call':>9}"
+          f"{'up%':>6}{'RoR%':>7}")
+    for r in jade_lizards[:24]:
+        ev = " !! " + "; ".join(r["events"]) if r["events"] else ""
+        print(f"{r['stock']:<5}{r['expiration']:<12}"
+              f"{r['put_short_strike']:.0f}/{r['put_long_strike']:.0f}P{'':<3}"
+              f"{r['call_short_strike']:.0f}/{r['call_long_strike']:.0f}C{'':<2}"
+              f"{r['dte']:>4}"
+              f"{r['credit_total']:>9.0f}{r['max_loss_total']:>10.0f}"
+              f"{r['breakeven_put']:>9.2f}{r['breakeven_call']:>9.2f}"
+              f"{r['upside_distance_pct']:>6.1f}"
+              f"{r['return_on_risk']*100:>7.1f}{ev}")
+
     print("\n* return on risk = credit / max loss: a screening ratio, not an "
           "expected return. Credits use conservative short-bid minus long-ask fills.")
     print("\nRejection notes:")
@@ -580,8 +789,17 @@ def main():
         for n in stock_notes.get(sym, ["no data"]):
             print(f"  {sym}: {n}")
 
+    print("\n=== READOUT ===")
+    readout = []
+    try:
+        readout = narrate_spreads(bull_puts, condors, jade_lizards, rej_all)
+        for line in readout:
+            print(line)
+    except Exception:
+        print("readout unavailable")
+
     if args.json_out:
-        best = {"bull_puts": {}, "iron_condors": {}}
+        best = {"bull_puts": {}, "iron_condors": {}, "jade_lizards": {}}
         for r in bull_puts:
             if r["stock"] not in best["bull_puts"]:
                 best["bull_puts"][r["stock"]] = {
@@ -607,8 +825,23 @@ def main():
                     "return_on_risk": round(r["return_on_risk"], 4),
                     "events": r["events"],
                 }
+        for r in jade_lizards:
+            if r["stock"] not in best["jade_lizards"]:
+                best["jade_lizards"][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "put_wing": [r["put_short_strike"], r["put_long_strike"]],
+                    "call_wing": [r["call_short_strike"], r["call_long_strike"]],
+                    "credit_total": round(r["credit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "breakeven_put": round(r["breakeven_put"], 2),
+                    "breakeven_call": round(r["breakeven_call"], 2),
+                    "upside_distance_pct": round(r["upside_distance_pct"], 1),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "events": r["events"],
+                }
         with open(args.json_out, "w") as f:
-            json.dump({"asof": RUN_DATE.isoformat(), "results": best}, f, indent=1)
+            json.dump({"asof": RUN_DATE.isoformat(), "results": best,
+                       "readout": readout}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
 
 
