@@ -455,11 +455,19 @@ What a portfolio manager would add, in order:
 - **Backtester** — validate the indicator pack, delta gates, and RoR ranking
   on history; none of it has been tested yet.
 - **Adopt FOSS libraries for the research layer** — the screeners stay
-  stdlib-only (transparency is the point), but do not reinvent: evaluate
-  **Optopsy** or **LEAN** for the backtester, **py_vollib**/**mibian**
-  (**QuantLib** as reference) for independent pricing/Greeks/IV, **arch**
-  for volatility estimation (IV-vs-HV), **quantstats**/**empyrical** for
-  performance attribution, **OpenBB** if data needs outgrow the MCP.
+  stdlib-only (transparency is the point), but do not reinvent the parts
+  that are hard to get right:
+  - **Backtesting** doesn't exist yet. Don't build it — evaluate **Optopsy**
+    (options-specific, delta-selected strategies) or **LEAN** (full
+    event-driven engine), per the feedback doc.
+  - **Pricing/Greeks/IV solvers** — when you need your own (e.g. historical
+    vol analysis), use **py_vollib** or **mibian**, not hand-rolled
+    Black-Scholes. The reference standard is **QuantLib**.
+  - **Volatility estimation** (for the IV-vs-HV layer) — the **arch**
+    package (GARCH etc.).
+  - **Performance attribution** (for the journal layer) — **quantstats** /
+    **empyrical** (Sharpe, drawdowns, tear sheets).
+  - **Data** — **OpenBB** if you outgrow single-provider MCP data.
   Greeks/IV currently come from the broker with no independent check.
 - **Vol-valuation layer** — IV Rank/percentile, IV-vs-HV, skew, term structure
   per underlying; a Vol regime step between Regime and Timing so the system
