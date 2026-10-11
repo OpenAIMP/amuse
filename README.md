@@ -20,16 +20,40 @@ Screen → Regime → Timing → Strikes → Size → Preflight
 | **Size** | How much can this lose? | 1–2% max loss per trade, total heat under 40% |
 | **Preflight** | Anything that kills the trade? | Buying power, earnings/events, fees — then human confirmation |
 
-No stage overrules another. A perfect regime with %B at 1.1 waits at timing.
+No stage overrules another. A perfect regime with %B at 1.0 waits at timing.
 A great setup with earnings inside the window dies at preflight. Probabilities
 come from option delta (market-implied), never from indicators.
+
+## How this helps make money
+
+The screeners don't generate profit — they enforce the process that does.
+Premium-selling P&L is arithmetic: `win rate × average credit − loss rate ×
+average loss`. The system attacks both sides:
+
+- **Fewer losers.** The regime filter keeps you from selling puts into
+  downtrends; the %B gate keeps you from chasing extended names; the event
+  gate keeps earnings from detonating a short-premium position. Most retail
+  options losses are unforced errors — the screeners veto them before sizing
+  is even discussed.
+- **Bigger, safer credits.** Conservative fills (short bid minus long ask, never
+  midpoints) mean the credits you see are collectible. Strike placement behind
+  Fib/pivot structure means the market has to break something real before your
+  short strike is threatened. Defined risk on every structure means no single
+  trade can breach the 1–2% rule.
+- **Repetition.** The edge compounds by running daily: weekday screens, the
+  PMCC exception watch, the pre-market scan. Small high-probability credits,
+  collected consistently, logged in the journal, reviewed monthly.
+
+What the system never does: place orders, predict direction, or promise
+profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
+— cash is a position.
 
 ## Screeners
 
 | File | What it does |
 |---|---|
 | `stock_screener.py` | Technical screen with the indicator pack (below). Composite score 0–40 = base 0–30 + signals 0–10. Ends with a plain-English `READOUT` — the leader and why, rejections grouped by theme, regime census. |
-| `spread_screener.py` | Bull put spreads + iron condors: 21–60 DTE, short 0.10–0.20Δ, conservative **short-bid minus long-ask** fills, width auto-scales to price (`min(5, max(1, round(spot/25)))`). Ranked by return-on-risk, with its own readout. |
+| `spread_screener.py` | Income-structure selector: bull put spreads, iron condors, and defined-risk Jade Lizards (bull put spread + far-OTM call wing for bullish regimes). 21–60 DTE, short 0.10–0.20Δ, conservative **short-bid minus long-ask** fills, width auto-scales to price (`min(5, max(1, round(spot/25)))`). Ranked by return-on-risk, with its own readout. |
 | `daytrade_screen.py` | Pre-market day-trading screen over the S&P 500: gap %, relative volume, developing VWAP distance, ATR range position. Bias stated as bias ("gap-and-go" / "fade risk"), never prediction. |
 | `pmcc_quality.py` | PMCC pair-quality: 0.80–0.95Δ LEAPS (270–800 DTE) × 0.15–0.35Δ short calls (21–60 DTE), evaluated as pairs with liquidity, friction, capital, and earnings gates. |
 | `pmcc_watch.py` | Daily exception monitor: diffs today's screen vs cached state, reports only new qualifiers, dropouts, or 1.5+ pt yield shifts. |
