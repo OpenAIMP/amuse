@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Options Lab</title>
+<title>Options Lab — Report Archive</title>
 <style>
 :root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
 --green:#3fb950;--red:#f85149;--amber:#d29922;--blue:#58a6ff}
@@ -55,36 +55,31 @@ ul.rej li{margin:3px 0;break-inside:avoid}
 footer{color:var(--dim);font-size:.78rem;text-align:center;margin-top:8px}
 @media(max-width:640px){ul.rej{columns:1}body{padding:16px 10px}}
 
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:0 0 18px}
-.repcard{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:16px}
-.repcard .k{font-size:.75rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.repcard h3{margin:0 0 6px;font-size:1.05rem}
-.repcard .blurb{font-size:.88rem;color:var(--text);margin:6px 0 10px}
-.repcard .empty{font-style:italic}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.src-chip{font-size:.72rem;font-weight:700;background:rgba(88,166,255,.15);color:var(--blue);
+border-radius:20px;padding:2px 10px;white-space:nowrap}
+.repitem{background:#0d1117;border:1px solid var(--border);border-radius:8px;
+padding:12px 14px;margin:10px 0}
+.repitem-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.repitem-top .d{color:var(--dim);font-variant-numeric:tabular-nums;font-size:.85rem}
+.repitem-top a{color:var(--blue);text-decoration:none;font-size:.85rem;margin-left:auto}
+.repitem-top a:hover{text-decoration:underline}
+.repitem-blurb{font-size:.9rem;margin:6px 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
 .chip{font-size:.75rem;background:#161b22;border:1px solid var(--border);border-radius:20px;
 padding:2px 10px;color:var(--dim);font-variant-numeric:tabular-nums}
-.btn{display:inline-block;background:#1f6feb;color:#fff;font-weight:600;font-size:.85rem;
-padding:8px 16px;border-radius:8px;text-decoration:none}
-.btn:hover{background:#388bfd}
-.arch{margin:0;padding-left:0;list-style:none}
-.arch li{margin:6px 0;font-size:.9rem}
-.arch .d{color:var(--dim);font-variant-numeric:tabular-nums;margin-right:8px}
-.arch a{color:var(--blue);text-decoration:none}
-.arch a:hover{text-decoration:underline}
-details + details{margin-top:10px}
+.srcgroup{margin:14px 0 4px}
+.srcgroup > h3{margin:14px 0 4px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
-<h1>Options Lab</h1>
-<p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
+<h1>Options Lab — Report Archive</h1>
+<p class="sub">Every screen, archived. All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2><div class="flow"><div class="flow-step"><div class="flow-name">1. Screen</div><div class="flow-desc">Find candidates across the watchlist or universe.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">2. Regime</div><div class="flow-desc">Trend structure + anchored VWAP pick the strategy family.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">3. Timing</div><div class="flow-desc">%B, RSI and squeeze confirm — or veto — the entry now.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">4. Strikes</div><div class="flow-desc">Fib levels and swing pivots place short strikes behind structure.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">5. Size</div><div class="flow-desc">1–2% max loss per trade; total heat under 40%.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">6. Preflight</div><div class="flow-desc">Buying power, events, fees — then your confirmation.</div></div></div></section>
-<section class="card"><h2>Latest reports</h2><div class="cards"><div class="repcard"><div class="k">Daily screen</div><p class="blurb empty">No runs yet.</p></div><div class="repcard"><div class="k">Day-trade screen</div><p class="blurb empty">No runs yet.</p></div><div class="repcard"><div class="k">PMCC screen</div><p class="blurb empty">No runs yet.</p></div></div></section>
-
-<footer>Hub regenerated 2026-10-11 14:54 UTC · screeners never place orders.</footer>
+<section class="card"><p class="empty">No reports yet — the first scheduled run will populate this archive.</p></section>
+<footer>Archive regenerated 2026-10-11 15:06 UTC · screeners never place orders.</footer>
 </div>
 </body>
 </html>
