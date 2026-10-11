@@ -285,6 +285,53 @@ Notes for manual runs:
   screener pulls full chains + Greeks per name (an hour-plus on 500 names).
   `sp100`/`nasdaq100` are the sweet spot for options.
 
+## Risk management
+
+### What the system measures today
+
+| Metric | How it's used |
+|---|---|
+| Delta | Strike-selection gates (0.10–0.20 shorts, 0.80–0.95 LEAPS); net delta reported per structure |
+| Gamma / Vega / Theta | Fetched and reported — not used in any gate or decision |
+| Open interest / volume | Liquidity gates only (≥10 per leg, ≥25 for PMCC long legs) |
+| Implied volatility | Not used in any Python screener |
+| Max loss / credit / breakeven | Gates (≤$1,000 per spread, ≤$10,000 per PMCC pair) + reported; structures ranked by return-on-risk |
+| Realized volatility | ATR% as a stock-screen gate only |
+
+Risk is managed today through **defined-risk structures only** (no naked
+legs), conservative fills, liquidity/friction/earnings gates, and the human
+1–2% sizing rule and 30–40% heat cap. What the code enforces ends at the
+structure level; the book level is human.
+
+### Gaps to fix
+
+- **No cheap-vs-expensive framework.** The system is structurally always a
+  premium seller — it never asks whether premium is worth selling. Needed:
+  IV Rank/percentile, IV-vs-HV, skew, and term structure per underlying,
+  feeding a Vol regime assessment between Regime and Timing (rich premium →
+  sell; cheap premium → buy debit spreads or stand down).
+- **No long-premium structures.** A complete system needs debit strategies
+  for low-vol regimes; today the only honest answer to cheap premium is cash.
+- **No portfolio Greeks.** Per-structure Greeks are fetched but never
+  aggregated — no net delta/gamma/vega/theta across the book, no scenario
+  P&L (±10% underlying, ±50% vol), no concentration view.
+- **Gamma/Vega/Theta don't drive decisions.** They're reported, not gating.
+
+### Data constraints to fix
+
+- **No historical IV.** IV Rank needs a year of IV history per underlying —
+  unverified whether the MCP serves it or it must be derived from archived
+  chains.
+- **No earnings/fundamentals feed.** Event gates run on flags ("date
+  unknown"), not dates — see the catalyst calendar roadmap item.
+- **No news/catalyst feed.** Gaps are technical-only.
+- **Request/response API, not streaming.** No tick-level Greeks or intraday
+  risk updates.
+
+Several of these are already on the [roadmap](#roadmap) (backtester, heat
+tracker, catalyst calendar, sizing calculator); the vol-valuation layer and
+portfolio Greeks are added there too.
+
 ## Pipeline and dashboard
 
 Every run follows the same pipeline — screeners produce JSON, renderers turn
@@ -407,6 +454,12 @@ What a portfolio manager would add, in order:
 **Before real money**
 - **Backtester** — validate the indicator pack, delta gates, and RoR ranking
   on history; none of it has been tested yet.
+- **Vol-valuation layer** — IV Rank/percentile, IV-vs-HV, skew, term structure
+  per underlying; a Vol regime step between Regime and Timing so the system
+  stops being a permanent premium seller (rich → sell, cheap → buy premium
+  or stand down).
+- **Long-premium structures** — debit strategies for cheap-vol regimes, or an
+  explicit stand-down policy.
 - **Catalyst calendar** — replace "earnings date unknown" flags with real
   dates wired into the event gates.
 - **Sizing calculator** — account size + max loss in → contracts out,
@@ -415,6 +468,8 @@ What a portfolio manager would add, in order:
 **Running the book**
 - **Heat/exposure tracker** — track open positions against the 30–40% heat
   cap and sector correlation limits.
+- **Portfolio Greeks + scenarios** — aggregate net delta/gamma/vega/theta
+  across the book; scenario P&L (±10% underlying, ±50% vol).
 - **Exit rules** — profit targets, rolling, assignment handling; entries
   without exits is half a system.
 - **Journal + attribution** — which layer (regime read vs structure) made or
