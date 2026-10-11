@@ -1,0 +1,61 @@
+name: Master — all screens
+
+# Runs every screen by CALLING the existing workflows (no duplicated logic).
+# Each called workflow declares `on: workflow_call`; their own `schedule`
+# blocks were removed so this file is the single scheduler. Manual runs of
+# the individual workflows still work via their workflow_dispatch triggers.
+on:
+  schedule:
+    # Weekdays ~9:45am ET (13:45 UTC; drifts an hour with DST).
+    - cron: "45 13 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Watchlist override for daily + monthly (blank = defaults)"
+        required: false
+        default: ""
+      universe:
+        description: "Universe override for the daily screen (blank = watchlist.txt)"
+        required: false
+        default: ""
+      limit:
+        description: "Cap for the day-trade universe (blank = full S&P 500)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      day: ${{ steps.d.outputs.day }}
+    steps:
+      - id: d
+        run: echo "day=$(date +%d)" >> $GITHUB_OUTPUT
+
+  daytrade:
+    needs: setup
+    uses: ./.github/workflows/daytrade-screen.yml
+    with:
+      names: ${{ inputs.names }}
+      limit: ${{ inputs.limit }}
+    secrets: inherit
+
+  daily:
+    needs: daytrade
+    uses: ./.github/workflows/daily-watch.yml
+    with:
+      names: ${{ inputs.names }}
+      universe: ${{ inputs.universe }}
+    secrets: inherit
+
+  monthly:
+    needs: setup
+    # Monthly screen runs on the 3rd; a manual master run always includes it.
+    if: needs.setup.outputs.day == '03' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/monthly-screen.yml
+    with:
+      names: ${{ inputs.names }}
+    secrets: inherit
