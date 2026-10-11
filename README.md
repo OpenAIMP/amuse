@@ -346,6 +346,9 @@ Public.com API → screeners → reports/*.json → render_report.py → docs/re
 workflow ever produced, grouped by workflow (Daily screen / Pre-market
 day-trade / Monthly PMCC), then by universe, newest first. Each report carries
 a provenance banner — e.g. "Source: Nasdaq-100 · 101 names · Run 2026-10-11".
+The archive is published at **https://amuse.openaimp.com** — a custom domain
+on the GitHub Pages site, configured by the repo's `CNAME` file (Pages serves
+`/docs`).
 
 | Workflow | Schedule | Scripts it runs, in order | Publishes |
 |---|---|---|---|
