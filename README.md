@@ -86,20 +86,56 @@ profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
 scheduled case, and a full multi-universe sweep in CI would be hours of API
 calls. `semis.py` is kept for reference only.
 
-### Stock screen vs day-trade screen
+### The screeners compared — what each one does for your P&L
 
-| | Stock screen | Day-trade screen |
-|---|---|---|
-| **Question** | Where should I sell premium for the coming weeks? | What's moving abnormally *right now*? |
-| **Horizon** | Days to weeks (income structures) | Minutes to hours (intraday momentum) |
-| **Data** | Daily bars, a year of history | Intraday bars, today's developing session |
-| **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend structure | Gap % vs prior close, relative volume, developing VWAP distance, ATR range position |
-| **Output** | Ranked 0–40 with a readout narrative | Ranked by gap × volume, labeled gap-and-go or fade risk |
+| | Stock screen | Day-trade screen | Monthly PMCC screen |
+|---|---|---|---|
+| **Question** | Where is it safe to sell premium for the coming weeks? | What's moving abnormally *right now*? | Which LEAPS pairs earn income for months? |
+| **Horizon** | Days to weeks | Minutes to hours | Months |
+| **Data** | Daily bars, a year of history | Intraday bars, today's session | Option chains + Greeks |
+| **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend | Gap %, rel volume, developing VWAP, ATR range | Delta gates, liquidity, friction, capital, earnings |
+| **Output** | Ranked 0–40 + readout narrative | Ranked by gap × volume, gap-and-go / fade bias | Pairs ranked by 30-day premium-to-debit |
+| **How it makes money** | Avoids losers: premium only where regime agrees — the veto list is worth as much as the leaderboard | Catches abnormal morning moves for same-day trades | Durable income: a few pairs generating monthly premium with less daily attention |
 
-The day-trade screen catches the morning's movers for same-day trades; the
-stock screen picks the names worth selling 30–60 day spreads on. They share
-nothing but the watchlist machinery — that's why they run as separate
-workflows.
+**Strategies vs patterns, per screener.** `spread_screener.py` implements the
+three income *strategies* (bull put spreads, iron condors, Jade Lizards) —
+those are the actual trade structures. `pmcc_quality.py` implements the PMCC
+*strategy*. `stock_screener.py` implements no strategy; it implements
+*patterns* (trend, squeeze, VWAP positioning) that classify regime and timing.
+`daytrade_screen.py` implements one intraday *pattern* (gap + volume + VWAP →
+momentum bias). `pmcc_watch.py` implements monitoring, not a strategy.
+
+**How they combine into a daily pick.** The stock screen answers *where* it's
+safe to sell premium; the spread screen answers *what* to sell (priced
+strikes, credits, max loss). The best trade is where they agree: a
+high-return-on-risk structure on a high-regime-score name. That agreement is
+made by you, reading both tables — see the overlap note below.
+
+### Overlap between the screeners
+
+- **The spread screener does not read the stock screener's output.** Verified:
+  every screener imports stdlib only — no cross-imports, no shared modules.
+  Regime→structure agreement happens in the dashboard (tables side by side)
+  and in the operating loop, not in code.
+- **Shared gate architecture, not shared code.** Every screener uses the same
+  pattern — categorized rejections, conservative fills, plain-English readout,
+  JSON output — but each file implements it independently.
+- **VWAP and ATR are computed twice.** `stock_screener` (session VWAP from
+  15-minute bars, ATR14% from daily bars) and `daytrade_screen` (developing
+  VWAP, intraday ATR) use the same indicators on different bar sets for
+  different horizons — intentionally not deduplicated.
+- **Short-premium selection overlaps** between `spread_screener` (0.10–0.20Δ
+  shorts, 21–60 DTE, liquidity/friction/earnings gates) and `pmcc_quality`
+  (0.15–0.35Δ shorts, 21–60 DTE, same gate families) — one philosophy, two
+  structures.
+
+### Beyond screeners
+
+Reporting (`render_report.py`, `render_hub.py`), frozen data
+(`universes.py`), orchestration (`scan_loop.py`), and monitoring
+(`pmcc_watch.py`) round out the system. Not built: a backtester, a trade
+journal, a sizing calculator, and anything that touches orders — Size and
+Preflight stay human.
 
 ## Signal packs
 
