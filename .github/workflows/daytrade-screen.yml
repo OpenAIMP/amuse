@@ -1,0 +1,53 @@
+name: Pre-market day-trade screen
+
+# Scans the embedded S&P 500 universe for pre-market gap + volume candidates.
+# Designed to run ~9:00am ET on weekdays, before the open.
+# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
+# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+on:
+  schedule:
+    # 9:00am ET on weekdays (13:00 UTC; drifts an hour with DST)
+    - cron: "0 13 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Comma-separated watchlist override (blank = embedded S&P 500)"
+        required: false
+        default: ""
+      limit:
+        description: "Cap universe size (for tests; blank = full universe)"
+        required: false
+        default: ""
+
+jobs:
+  daytrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pre-market screen
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          chmod +x bin/public-mcp
+          mkdir -p reports
+          STAMP=$(date +%F)
+          ARGS=""
+          if [ -n "${{ inputs.names }}" ]; then ARGS="$ARGS --names ${{ inputs.names }}"; fi
+          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
+          python3 daytrade_screen.py $ARGS \
+            --json-out reports/daytrade-screen-$STAMP.json | tee reports/daytrade-screen-$STAMP.txt
+
+      - name: Upload run outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daytrade-screen-${{ github.run_id }}
+          path: reports/
+          retention-days: 90
