@@ -472,17 +472,151 @@ def signal_score(m):
     return round(s, 1), detail
 
 
+def narrate_stock(passing, rejected, names):
+    """Plain-English readout. Every claim comes from computed values.
+
+    Returns a list of lines; empty theme groups are skipped.
+    """
+    lines = []
+
+    def trend_of(ind):
+        try:
+            return (ind or {}).get("structure", {}).get("trend")
+        except AttributeError:
+            return None
+
+    census = {"UP": 0, "RNG": 0, "DN": 0}
+    for m in passing:
+        t = trend_of(m.get("indicators"))
+        if t in census:
+            census[t] += 1
+    for r in rejected.values():
+        t = trend_of((r or {}).get("indicators"))
+        if t in census:
+            census[t] += 1
+
+    if not passing:
+        lines.append("No names passed all gates — the screen found no "
+                     "tradeable setups today.")
+    else:
+        lead = passing[0]
+        det = (lead.get("score_breakdown", {}) or {}).get("detail", {}) or {}
+        up_leaders = [m["symbol"] for m in passing
+                      if trend_of(m.get("indicators")) == "UP"]
+        only_up = len(up_leaders) == 1 and up_leaders[0] == lead["symbol"]
+        # decisive reason: biggest signal contributor, regime first on ties
+        prio = ["uptrend", "squeeze", "pct_b_sweet_spot", "anchored_vwap"]
+        best = None
+        for k in prio:
+            if det.get(k, 0) > 0 and (best is None
+                                     or det[k] > det.get(best, 0)):
+                best = k
+        if best == "uptrend" and only_up:
+            reason = ("the only name with UP trend structure — regime filter "
+                      "doing its job")
+        elif best == "uptrend":
+            reason = "uptrend structure with the strongest signal stack"
+        elif best == "squeeze":
+            reason = "coiling into a volatility squeeze"
+        elif best == "pct_b_sweet_spot":
+            reason = "%B in the sweet spot — extended neither hot nor cold"
+        elif best == "anchored_vwap":
+            reason = "holding above anchored VWAP with momentum intact"
+        else:
+            reason = "the strongest base technicals on the watchlist"
+        lines.append(f"{lead['symbol']} {lead['score']:.1f} leads — {reason}.")
+
+    # ---- rejection themes ----
+    OLD = {"price out of range", "rsi out of range", "below 50-day SMA",
+           "below 200-day SMA", "ATR% out of range", "volume trend weak",
+           "too far below 52w high", "insufficient history"}
+    NEW = {"pctB outside bands", "below anchored VWAP", "downtrend structure"}
+    extended, underwater, stayaway, oldonly, other_new, dataerr = \
+        [], [], [], [], [], []
+    for sym in names:
+        r = rejected.get(sym)
+        if not r:
+            continue
+        reasons = r.get("reasons", []) or []
+        ind = r.get("indicators") or {}
+        pb = (ind.get("bollinger") or {}).get("pct_b")
+        new_hits = [x for x in reasons if x in NEW]
+        if any(x.startswith(("data error", "evaluation error",
+                             "unexpected error")) for x in reasons):
+            dataerr.append(sym)
+        elif len(reasons) >= 3 and new_hits:
+            stayaway.append(sym)
+        elif "below anchored VWAP" in reasons:
+            underwater.append(sym)
+        elif ("pctB outside bands" in reasons
+              and pb is not None and pb > 1.0):
+            extended.append(sym)
+        elif all(x in OLD for x in reasons):
+            oldonly.append(sym)
+        else:
+            other_new.append((sym, reasons))
+
+    if extended:
+        verb = "rides" if len(extended) == 1 else "ride"
+        lines.append(f"{', '.join(extended)} passed the classic gates but "
+                     f"{verb} above the upper band (%B > 1.0) — extended, "
+                     f"don't chase.")
+    if underwater:
+        pron = "it" if len(underwater) == 1 else "them"
+        lines.append(f"{', '.join(underwater)} failed the anchored-VWAP gate "
+                     f"— institutional money is underwater on {pron}.")
+    if stayaway:
+        verb = "trips" if len(stayaway) == 1 else "trip"
+        lines.append(f"{', '.join(stayaway)} {verb} multiple gates at once — "
+                     f"the screen is saying stay away, loudly.")
+    if other_new:
+        bits = "; ".join(f"{s} ({', '.join(rs)})" for s, rs in other_new)
+        lines.append(f"Other new-gate rejections: {bits}.")
+    if oldonly:
+        lines.append(f"Rejected on classic gates alone: "
+                     f"{', '.join(oldonly)}.")
+    if dataerr:
+        lines.append(f"Data issues, not screened: {', '.join(dataerr)}.")
+
+    lines.append(f"Regime census: {census['UP']} UP / {census['RNG']} RNG / "
+                 f"{census['DN']} DN across the watchlist.")
+    if passing:
+        n_up = sum(1 for m in passing
+                   if trend_of(m.get("indicators")) == "UP")
+        if n_up == 0:
+            lines.append("No uptrend names qualified — premium selling has no "
+                         "regime tailwind today.")
+        else:
+            lines.append(f"{n_up} uptrend "
+                         f"{'name' if n_up == 1 else 'names'} qualified — "
+                         f"regime favors bullish premium structures today.")
+    return lines
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", default=None,
                     help="comma-separated watchlist, e.g. AAPL,MSFT,NVDA")
+    ap.add_argument("--universe", default=None,
+                    help="index universe from universes.py: sp500, sp100, nasdaq100, dow30 (--names wins if both given)")
     ap.add_argument("--json-out", default=None,
                     help="write machine-readable ranked results to FILE")
     args = ap.parse_args()
-    names = [n.strip().upper() for n in args.names.split(",") if n.strip()] \
-        if args.names else DEFAULT_NAMES
+    if args.names:
+        names = [n.strip().upper() for n in args.names.split(",") if n.strip()]
+        universe_tag = "custom"
+    elif args.universe:
+        from universes import UNIVERSES
+        key = args.universe.strip().lower()
+        if key not in UNIVERSES:
+            raise SystemExit(f"unknown universe {key!r}; choose from {sorted(UNIVERSES)}")
+        names = list(UNIVERSES[key])
+        universe_tag = key
+    else:
+        names = DEFAULT_NAMES
+        universe_tag = "default"
 
-    print(f"Technical stock screen -- run {RUN_TS} (America/New_York)")
+    print(f"Technical stock screen -- run {RUN_TS} (America/New_York) [{universe_tag}, {len(names)} names]")
     print(f"Settings: price ${PRICE_MIN:.0f}-${PRICE_MAX:.0f}, "
           f"RSI14 {RSI_MIN:.0f}-{RSI_MAX:.0f}, "
           f"above SMA50={'yes' if REQUIRE_ABOVE_SMA50 else 'no'}, "
@@ -575,6 +709,15 @@ def main():
     else:
         print("  none -- every name passed")
 
+    print("\n=== READOUT ===")
+    readout = []
+    try:
+        readout = narrate_stock(passing, rejected, names)
+        for line in readout:
+            print(line)
+    except Exception:
+        print("readout unavailable")
+
     if args.json_out:
         with open(args.json_out, "w") as f:
             json.dump({"asof": RUN_DATE.isoformat(),
@@ -592,9 +735,11 @@ def main():
                                           "squeeze_lookback": SQUEEZE_LOOKBACK},
                            "require_above_anchored_vwap": REQUIRE_ABOVE_ANCHORED_VWAP,
                            "reject_downtrend": REJECT_DOWNTREND,
-                           "score": "0-40 = base 0-30 + signals 0-10"},
+                           "score": "0-40 = base 0-30 + signals 0-10",
+                           "universe": universe_tag},
                        "passing": passing,
-                       "rejected": rejected}, f, indent=1)
+                       "rejected": rejected,
+                       "readout": readout}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
 
 
