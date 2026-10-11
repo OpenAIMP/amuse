@@ -44,6 +44,44 @@ across a row to see every file and workflow that implements a stage. Size
 and Preflight are human stages in every flow — the code hands you max loss
 and event flags; you check buying power and fees, and confirm.
 
+### How it coheres: indicators → patterns → strategies → loop → workflows
+
+Five layers, each built from the one below:
+
+```
+Indicators → Patterns → Strategies → Operating loop → Workflows
+ (measure)   (interpret)  (structure)   (decide in order)   (run on schedule)
+```
+
+- **Indicators** measure: RSI, %B, VWAP distance, ATR, delta, DTE, gap %,
+  relative volume.
+- **Patterns** interpret the measurements: UP / RANGE / DOWN regime from
+  trend + VWAP; "extended, don't chase" from %B > 1.0; "wait" from a squeeze;
+  gap-and-go vs fade from gap direction + VWAP side.
+- **Strategies** are *guided* by patterns — the screeners price every
+  structure independently, and you select using the pattern read:
+
+| Pattern | Strategy to favor | Why |
+|---|---|---|
+| UP trend, healthy timing | Bull put spread | Directional income with the trend |
+| UP trend, strong momentum | Jade Lizard | Bullish tilt; the call wing finances the put spread |
+| Range, no conviction | Iron condor | Income from staying inside the wings |
+| UP trend, want duration | PMCC | LEAPS-based income over months |
+| Pre-market gap + volume | Day-trade momentum | Same-day move, in and out |
+
+- **The operating loop** sequences the decision: Screen finds, Regime +
+  Timing qualify, Strikes place, Size + Preflight protect.
+- **The workflows** run the loop on three clocks: intraday
+  (`daytrade-screen`), daily (`daily-watch`), monthly (`monthly-screen`).
+
+**Worked example — XOM, 2026-10-11.** Indicators: RSI 64, %B 0.96 (near the
+top of the band, not over), 16.8% above anchored VWAP, mixed swing structure.
+Patterns: RANGE regime, timing acceptable-but-warm. Strategy: the iron condor
+(28.5% return-on-risk) over the bull put (14.7%) — the regime doesn't support
+directional income. Loop: Screen surfaced it → Regime said neutral → Timing
+said okay → Strikes at 155/150P × 185/190C → Size and Preflight yours.
+Workflow: `daily-watch` priced both; the archive keeps the report.
+
 ## How this helps make money
 
 The screeners don't generate profit — they enforce the process that does.
