@@ -61,7 +61,7 @@ stock:
   bias_bull_min: 4          # >= this many bullish votes = bullish
   bias_bear_max: 2          # <= this many bullish votes = bearish
 
-daytrade:
+premarket:
   gap_min_pct: 2.0          # |gap| must be at least 2%
   rel_vol_min: 1.5          # today's volume so far vs 20d avg daily volume
   price_min: 10.0
