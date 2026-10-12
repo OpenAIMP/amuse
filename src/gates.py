@@ -52,6 +52,12 @@ DEFAULTS = {
         "atr_pct_min": 1.0, "atr_pct_max": 8.0,
         "top_n": 20, "min_daily_bars": 30,
     },
+    "intraday": {
+        "or_minutes": 15, "breakout_buffer_pct": 0.1,
+        "rel_vol_min": 1.5, "price_min": 10.0,
+        "atr_pct_min": 1.0, "atr_pct_max": 8.0,
+        "top_n": 20, "min_daily_bars": 30, "vwap_lookback_bars": 6,
+    },
     "pmcc": {
         "long_dte_min": 270, "long_dte_max": 800,
         "long_delta_min": 0.80, "long_delta_max": 0.95,
