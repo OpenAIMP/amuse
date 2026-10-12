@@ -158,11 +158,32 @@ def stock_section(data):
         )
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Symbol</th><th>Price</th><th>RSI14</th><th>%B</th><th>BW%</th>"
-        "<th>SQZ</th><th>aVWAP%</th><th>Trend</th><th>Score</th>"
+        "<th>Symbol</th><th>Price</th>"
+        "<th title='RSI(14): momentum oscillator 0-100. Gate keeps 30-70; "
+        "below 30 = washed out, above 70 = overheated.'>RSI(14)</th>"
+        "<th title='Bollinger %B: where price sits inside the bands "
+        "(0 = lower band, 0.5 = middle, 1 = upper). Timing use: above 1.0 = "
+        "extended, do not chase (rejected).'>%B</th>"
+        "<th title='Bollinger bandwidth as % of the middle band: how wide the "
+        "bands are. Low = volatility compression.'>Band width</th>"
+        "<th title='Squeeze: bandwidth at its 125-day minimum. A volatility "
+        "coil before expansion — timing use: wait, do not enter now.'>Squeeze</th>"
+        "<th title='Distance from VWAP anchored at the 52-week low. Regime use: "
+        "negative = institutional money underwater — rejected for bullish "
+        "premium selling.'>vs Anchored VWAP</th>"
+        "<th>Trend</th><th>Score</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifiers this run.</td></tr>')
         + "</tbody></table></div>"
+        '<p class="fine"><b>Column guide.</b> '
+        "<b>%B</b> — price position inside Bollinger Bands (0 lower, 1 upper); "
+        "timing: &gt;1.0 is extended, rejected. "
+        "<b>Band width</b> — band width as % of the middle band; low reads as compression. "
+        "<b>Squeeze \u25cf</b> — bandwidth at its 125-day low: volatility is coiled, "
+        "expansion likely &mdash; wait, do not enter. "
+        "<b>vs Anchored VWAP</b> — distance from VWAP anchored at the 52-week low; "
+        "regime: below it means institutional money is underwater, rejected for bullish income. "
+        "<b>Score</b> — composite 0&ndash;40 (regime + timing).</p>"
     )
     readout = ""
     ro = data.get("readout") or []
@@ -204,7 +225,7 @@ def spread_tables(data):
     out.append(
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th>Sym</th><th>Exp</th><th>Strikes</th><th>DTE</th><th>Credit</th>"
-        "<th>Max loss</th><th>Breakeven</th><th>RoR</th><th>Events</th>"
+        "<th>Max loss</th><th>Breakeven</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr>')
         + "</tbody></table></div>"
@@ -237,7 +258,7 @@ def spread_tables(data):
     out.append(
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
-        "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>RoR</th><th>Events</th>"
+        "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="10" class="empty">No qualifying condors.</td></tr>')
         + "</tbody></table></div>"
@@ -249,7 +270,7 @@ def spread_tables(data):
         out.append(
             '<div class="tbl-wrap"><table><thead><tr>'
             "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
-            "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>Up% dist</th><th>RoR</th><th>Events</th>"
+            "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>Up% dist</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
             "</tr></thead><tbody>"
             + "".join(ac_rows)
             + "</tbody></table></div>"
