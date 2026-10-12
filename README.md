@@ -205,6 +205,35 @@ earnings calendar), and SEC EDGAR filings. To add or remove a destination,
 edit the `QUOTE_LINKS` table at the top of `src/render_report.py` — one
 line per site, `{s}` for the uppercase symbol, `{sl}` for lowercase.
 
+### Market news (hybrid: morning snapshot + live widget)
+
+`src/fetch_news.py` pulls Google News RSS (stdlib-only, no API key) for
+market-wide headlines (S&P 500, Fed) and per-ticker catalyst news:
+
+```bash
+python3 src/fetch_news.py --names NVDA,AAPL --out reports/news.json --market-out docs/news.json
+```
+
+- **Reports** get a *Catalyst watch* section (`--news reports/news.json`):
+  morning headlines for the tickers in that report — check these before
+  trusting any regime read.
+- **The hub page** bakes the market headlines into `docs/news.json` and shows
+  them in a *Market news* card. A small inline script then tries a live
+  refresh on page load via the rss2json CORS proxy; if it fails, the morning
+  snapshot stays with an explanatory note. The ↻ button retries manually.
+
+The workflow step (added to daily-watch.yml before rendering):
+
+```yaml
+      - name: Fetch market news
+        run: |
+          python3 src/fetch_news.py --names "$WATCHLIST" \
+            --out reports/news.json --market-out docs/news.json || true
+```
+
+`docs/news.json` is committed so Pages always has a fallback; `reports/news.json`
+is a build artifact like the other screen outputs.
+
 ## How value is created
 
 ### Concepts
