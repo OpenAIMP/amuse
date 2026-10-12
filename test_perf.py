@@ -318,5 +318,51 @@ class TestIndicators(unittest.TestCase):
         self.assertIsNone(st.sma_cross(closes, 50, 200, 20))
 
 
+class TestRenderSmoke(unittest.TestCase):
+    """Issue #17 follow-up: render_report.py must at least import and render.
+
+    A SyntaxError in the renderer once broke two scheduled jobs while the
+    whole unit suite stayed green (nothing imported the renderer)."""
+
+    def _record(self, **kw):
+        rec = {
+            "symbol": "TST", "price": 100.0, "rsi14": 55.0, "score": 26.3,
+            "indicators": {
+                "bollinger": {"pct_b": 0.6, "bandwidth_pct": 8.0,
+                              "squeeze": False},
+                "vwap": {"anchored_dist_pct": 2.0},
+                "structure": {"trend": "UP"},
+                "trend": {"cross": "golden"},
+                "macd": {"hist": 0.5},
+            },
+        }
+        rec.update(kw)
+        return rec
+
+    def test_imports(self):
+        import render_report  # noqa: F401 — must not SyntaxError
+
+    def test_stock_section_renders(self):
+        import render_report as rr
+        html = rr.stock_section({"passing": [self._record()]})
+        self.assertIn("TST", html)
+        self.assertIn("GC", html)          # golden-cross badge
+        self.assertIn("+0.50", html)       # macd hist cell
+        self.assertIn("/40", html)
+
+    def test_stock_section_empty(self):
+        import render_report as rr
+        html = rr.stock_section({"passing": []})
+        self.assertIn("No qualifiers", html)
+
+    def test_stock_section_missing_indicators(self):
+        import render_report as rr
+        rec = self._record()
+        del rec["indicators"]["trend"]
+        del rec["indicators"]["macd"]
+        html = rr.stock_section({"passing": [rec]})
+        self.assertIn("TST", html)  # must not crash on absent fields
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
