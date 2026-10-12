@@ -41,6 +41,9 @@ def _apply_gates(path=None):
     global REJECT_DOWNTREND, PIVOT_N, SWING_LOOKBACK_BARS
     global EMA_FAST, EMA_SLOW, MACD_FAST, MACD_SLOW, MACD_SIGNAL
     global CROSS_LOOKBACK, REJECT_DEATH_CROSS
+    global GAP_LABEL_ABS_PCT, RSI_OVERSOLD, RSI_OVERBOUGHT
+    global VALUE_UNDER_MAX_PCT, VALUE_OVER_MIN_PCT
+    global BIAS_BULL_MIN, BIAS_BEAR_MAX
     G = _gates_mod.load(path)["stock"]
     PRICE_MIN, PRICE_MAX = G["price_min"], G["price_max"]
     RSI_PERIOD = G["rsi_period"]
@@ -64,6 +67,11 @@ def _apply_gates(path=None):
     MACD_FAST, MACD_SLOW, MACD_SIGNAL = G["macd_fast"], G["macd_slow"], G["macd_signal"]
     CROSS_LOOKBACK = G["cross_lookback"]
     REJECT_DEATH_CROSS = G["reject_death_cross"]
+    GAP_LABEL_ABS_PCT = G["gap_label_abs_pct"]
+    RSI_OVERSOLD, RSI_OVERBOUGHT = G["rsi_oversold"], G["rsi_overbought"]
+    VALUE_UNDER_MAX_PCT = G["value_under_max_pct"]
+    VALUE_OVER_MIN_PCT = G["value_over_min_pct"]
+    BIAS_BULL_MIN, BIAS_BEAR_MAX = G["bias_bull_min"], G["bias_bear_max"]
 
 
 _apply_gates()
@@ -103,7 +111,8 @@ def mcp_call(tool, args):
 
 
 def bars_for(symbol):
-    """Return list of (close, high, low, volume), validated finite/positive."""
+    """Return list of (close, high, low, volume, open), validated finite/positive.
+    open may be None when the feed omits it (gap is then unknown)."""
     p = mcp_call("get_price_history",
                  {"symbol": symbol, "account_id": ACCT,
                   "period": PERIOD, "aggregation": "ONE_DAY"})
@@ -115,13 +124,16 @@ def bars_for(symbol):
         try:
             c, h, l, v = (float(b["close"]), float(b["high"]),
                           float(b["low"]), float(b["volume"]))
+            o = float(b["open"]) if b.get("open") is not None else None
         except (KeyError, TypeError, ValueError):
             continue
         if not all(math.isfinite(x) for x in (c, h, l, v)):
             continue
         if c <= 0 or h <= 0 or l <= 0 or v < 0:
             continue
-        bars.append((c, h, l, v))
+        if o is not None and (not math.isfinite(o) or o <= 0):
+            o = None
+        bars.append((c, h, l, v, o))
     return bars
 
 
@@ -349,7 +361,7 @@ def anchored_vwap(bars):
     window = bars[-n:]
     anchor = min(range(n), key=lambda i: window[i][2])  # lowest low
     num = den = 0.0
-    for (c, h, l, v) in window[anchor:]:
+    for (c, h, l, v, _o) in window[anchor:]:
         tp = (h + l + c) / 3.0
         num += tp * v
         den += v
@@ -375,6 +387,81 @@ def find_pivots(bars):
         if all(l < bars[j][2] for j in range(i - n, i + n + 1) if j != i):
             lows.append((i, l))
     return highs, lows
+
+
+# ---- issue #18: gap / momentum / value / bias readouts ----
+# Labels, not gates: they describe the tape; they never reject a name.
+
+def gap_pct(bars):
+    """Overnight gap: (open_t / close_{t-1} - 1) * 100. None if open missing."""
+    if len(bars) < 2:
+        return None
+    o, prev_c = bars[-1][4], bars[-2][0]
+    if o is None or prev_c <= 0:
+        return None
+    return (o / prev_c - 1) * 100
+
+
+def gap_label(g):
+    if g is None:
+        return None
+    if g >= GAP_LABEL_ABS_PCT:
+        return "gap up"
+    if g <= -GAP_LABEL_ABS_PCT:
+        return "gap down"
+    return "no gap"
+
+
+def rsi_state(rsi14):
+    """Oversold < 30, overbought > 70, else neutral. State, not a signal."""
+    if rsi14 is None:
+        return None
+    if rsi14 < RSI_OVERSOLD:
+        return "oversold"
+    if rsi14 > RSI_OVERBOUGHT:
+        return "overbought"
+    return "neutral"
+
+
+def value_position(price, lo52, hi52):
+    """Where price sits in its 52-week range, 0-100. Purely technical —
+    the MCP has no fundamentals, so this is NOT intrinsic-value analysis."""
+    if lo52 is None or hi52 is None or hi52 <= lo52 or price is None:
+        return None
+    return (price - lo52) / (hi52 - lo52) * 100
+
+
+def value_label(vp):
+    if vp is None:
+        return None
+    if vp <= VALUE_UNDER_MAX_PCT:
+        return "undervalued"
+    if vp >= VALUE_OVER_MIN_PCT:
+        return "overvalued"
+    return "mid-range"
+
+
+def bias_votes(price, s50, s200, macd_hist, rsi14, trend):
+    """Six trend votes; returns (bullish_votes, total)."""
+    votes = [
+        price is not None and s50 is not None and price > s50,
+        price is not None and s200 is not None and price > s200,
+        s50 is not None and s200 is not None and s50 > s200,
+        macd_hist is not None and macd_hist > 0,
+        rsi14 is not None and rsi14 > 50,
+        trend == "UP",
+    ]
+    return sum(1 for v in votes if v), len(votes)
+
+
+def bias_label(bull_votes):
+    if bull_votes is None:
+        return None
+    if bull_votes >= BIAS_BULL_MIN:
+        return "bullish"
+    if bull_votes <= BIAS_BEAR_MAX:
+        return "bearish"
+    return "neutral"
 
 
 def market_structure(bars):
@@ -456,6 +543,7 @@ def evaluate(sym, bars):
     if vratio < VOL_RATIO_MIN:
         reasons.append("volume trend weak")
     hi52 = max(b[1] for b in bars)
+    lo52 = min(b[2] for b in bars)
     off_hi = (price / hi52 - 1) * 100
     if off_hi < -MAX_OFF_HIGH_PCT:
         reasons.append("too far below 52w high")
@@ -525,6 +613,20 @@ def evaluate(sym, bars):
             "signal": r2(macd_sig),
             "hist": r2(macd_hist),
         },
+    }
+    # ---- issue #18 readouts ----
+    g = gap_pct(bars)
+    vp = value_position(price, lo52, hi52)
+    bull_votes, _nvotes = bias_votes(price, s50, s200, macd_hist, rsi14,
+                                     struct["trend"])
+    indicators["tape"] = {
+        "gap_pct": r1(g),
+        "gap": gap_label(g),
+        "momentum": rsi_state(rsi14),
+        "value_pct": r1(vp),
+        "value": value_label(vp),
+        "bias_votes": bull_votes,
+        "bias": bias_label(bull_votes),
     }
     metrics = {
         "price": round(price, 2), "rsi14": round(rsi14, 1),
