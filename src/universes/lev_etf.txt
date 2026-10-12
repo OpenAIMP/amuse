@@ -1,0 +1,39 @@
+# Leveraged ETFs with liquid options (issue #32)
+# 3x/2x index + sector + volatility. Updated 2026-10-12.
+#
+# NOTE: leveraged ETFs reset daily and suffer volatility decay.
+# Suitable for short-term option structures (21-60 DTE spreads),
+# NOT for buy-and-hold. High IV = rich premiums for sellers.
+# Index 3x
+TQQQ
+SQQQ
+SPXL
+SPXS
+UPRO
+SPXU
+UDOW
+SDOW
+# Index 2x
+QLD
+QID
+SSO
+SDS
+DDM
+DXD
+# Sector 3x
+SOXL
+SOXS
+LABU
+LABD
+FAS
+FAZ
+TECL
+TECS
+TNA
+TZA
+ERX
+ERY
+# Volatility
+UVXY
+SVXY
+VXX
