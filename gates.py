@@ -66,6 +66,11 @@ DEFAULTS = {
         "max_loss_pct": 0.02, "heat_cap_pct": 0.35,
         "fee_per_contract": 0.65,
     },
+    "vol": {
+        "hv_short": 20, "hv_long": 60,
+        "ivr_sell": 50, "ivr_stand_down": 25,
+        "min_iv_history": 30,
+    },
 }
 
 
