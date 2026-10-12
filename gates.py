@@ -55,6 +55,13 @@ DEFAULTS = {
         "min_long_liquidity": 25, "min_short_liquidity": 10,
         "max_capital": 10000, "max_friction": 3.0,
     },
+    "exits": {
+        "bull_put_spread": {
+            "profit_target_pct": 0.50, "stop_loss_mult": 2.0,
+            "min_dte_exit": 7, "assignment_dte": 2,
+            "no_assignment": True,
+        },
+    },
 }
 
 
