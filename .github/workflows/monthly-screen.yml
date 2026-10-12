@@ -80,8 +80,18 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase || true
+          # bin/public-mcp is chmod +x'd every run, flipping the mode of a
+          # tracked file (API pushes land as 100644). Discard the flip so it
+          # never blocks the rebase below.
+          git checkout -- bin/public-mcp 2>/dev/null || true
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update monthly PMCC screen"
+          # Fold in concurrent pushes (doc edits, other jobs). If the hub
+          # conflicts, keep the remote copy — it is re-rendered from all
+          # reports right below, so nothing is lost.
+          git pull --rebase --strategy-option=theirs
+          python3 src/render_hub.py
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
           git push
 
