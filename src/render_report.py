@@ -194,6 +194,36 @@ def stock_section(data):
         else:
             cls = "good" if mh > 0 else "bad"
             mh_cell = f"<span class='num {cls}'>{mh:+.2f}</span>"
+        tp = ind.get("tape") or {}
+        gp = tp.get("gap_pct")
+        if gp is None:
+            gap_cell = '<span class="na">—</span>'
+        else:
+            gcls = "good" if gp > 0 else ("bad" if gp < 0 else "")
+            gap_cell = f"<span class='num {gcls}'>{gp:+.1f}%</span>"
+        mom = tp.get("momentum")
+        if mom is None:
+            mom_cell = '<span class="na">—</span>'
+        elif mom == "neutral":
+            mom_cell = '<span class="dim">neutral</span>'
+        else:
+            mcls = "bad" if mom == "overbought" else "warn"
+            mom_cell = f"<span class='badge {mcls}'>{mom}</span>"
+        vpct = tp.get("value_pct")
+        vv = tp.get("value")
+        if vpct is None:
+            val_cell = '<span class="na">—</span>'
+        else:
+            vcls = "warn" if vv == "undervalued" else ("bad" if vv == "overvalued" else "")
+            val_cell = f"<span class='num {vcls}'>{vpct:.0f}%</span>"
+        bv = tp.get("bias")
+        bvotes = tp.get("bias_votes")
+        if bv is None:
+            bias_cell = '<span class="na">—</span>'
+        else:
+            bcls = "good" if bv == "bullish" else ("bad" if bv == "bearish" else "")
+            votes_txt = f" ({bvotes}/6)" if bvotes is not None else ""
+            bias_cell = f"<span class='badge {bcls}'>{bv}{votes_txt}</span>"
         rows.append(
             "<tr>"
             f"{sym_cell(p.get('symbol'))}"
@@ -210,6 +240,10 @@ def stock_section(data):
             f"<td>{trend_badge(st.get('trend'))}</td>"
             f"<td>{cross_cell}</td>"
             f"<td>{mh_cell}</td>"
+            f"<td>{gap_cell}</td>"
+            f"<td>{mom_cell}</td>"
+            f"<td>{val_cell}</td>"
+            f"<td>{bias_cell}</td>"
             f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/40</span></td>"
             "</tr>"
         )
@@ -245,9 +279,20 @@ def stock_section(data):
         "DC = death cross (bearish, rejected).'>Cross</th>"
         "<th title='MACD histogram (12,26,9): MACD line minus signal line. "
         "Positive = bullish momentum (+1 score); negative = bearish.'>MACD hist</th>"
+        "<th title='Overnight gap: (open / prior close − 1). ±2% or more labels "
+        "gap up / gap down; smaller = no gap.'>Gap</th>"
+        "<th title='RSI(14) state: oversold below 30, overbought above 70, "
+        "neutral between. A state label, not a trade signal.'>Momentum</th>"
+        "<th title='Technical value: where price sits in its 52-week range. "
+        "&le;25% = beaten-down (undervalued), &ge;75% = priced at the top "
+        "(overvalued). NOT fundamental valuation — the feed has no "
+        "fundamentals.'>Value</th>"
+        "<th title='Trend bias: votes from price vs SMA50/200, SMA50 vs SMA200, "
+        "MACD hist, RSI>50, pivot trend. 4+ of 6 = bullish, 2 or fewer = "
+        "bearish, else neutral.'>Bias</th>"
         "<th>Score</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="15" class="empty">No qualifiers this run.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="19" class="empty">No qualifiers this run.</td></tr>')
         + "</tbody></table></div>"
         '<details><summary><b>Column guide — what each value means for decisions</b></summary>'
         '<ul class="guide">'
@@ -286,6 +331,19 @@ def stock_section(data):
         "rejected. &mdash; = no cross in window.</li>"
         "<li><b>MACD hist</b> (12,26,9): MACD line minus signal. Positive (green) = bullish "
         "momentum, +1. Negative (red) = bearish momentum.</li>"
+        "<li><b>Gap</b> (overnight, open vs prior close): &ge;+2% gap up (green), "
+        "&le;&minus;2% gap down (red). Large gaps mean overnight news — check the "
+        "catalyst before trusting the regime read.</li>"
+        "<li><b>Momentum</b> (RSI state): <i>oversold</i> (RSI&lt;30), <i>overbought</i> "
+        "(RSI&gt;70), else neutral. A state label, not a buy/sell signal — "
+        "overbought names can stay overbought.</li>"
+        "<li><b>Value</b> (% of 52-week range): &le;25% = beaten-down (technically "
+        "undervalued), &ge;75% = priced at the top (technically overvalued). "
+        "This is chart position, NOT fundamental valuation — the data feed has "
+        "no earnings, P/E, or balance-sheet data.</li>"
+        "<li><b>Bias</b> (trend composite, votes/6): price&gt;SMA50, price&gt;SMA200, "
+        "SMA50&gt;SMA200, MACD hist&gt;0, RSI&gt;50, pivot trend UP. 4+ votes = "
+        "bullish, &le;2 = bearish, else neutral.</li>"
         "<li><b>Score</b> (0&ndash;40): base 0&ndash;30 (regime: SMA position 10 + RSI "
         "sweet spot 10 + volume expansion 10) + signals 0&ndash;10 (timing: %B 2 + "
         "anchored VWAP 2 + trend 3 + golden cross 2 + MACD 1; squeeze 0). A pure "
