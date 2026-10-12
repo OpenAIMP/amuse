@@ -268,5 +268,55 @@ class TestStockRegression(unittest.TestCase):
         self.assertIn("score", metrics)
 
 
+class TestIndicators(unittest.TestCase):
+    """Issue #17: pure-function tests for ema/mACD/cross (no MCP)."""
+
+    def test_ema_flat(self):
+        import stock_screener as st
+        self.assertAlmostEqual(st.ema([100.0] * 60, 50), 100.0)
+
+    def test_ema_follows_trend(self):
+        import stock_screener as st
+        vals = [100.0 + i for i in range(60)]
+        e = st.ema(vals, 50)
+        self.assertLess(e, vals[-1])
+        self.assertGreater(e, vals[0])
+
+    def test_ema_insufficient(self):
+        import stock_screener as st
+        self.assertIsNone(st.ema([1.0] * 10, 50))
+
+    def test_macd_flat(self):
+        import stock_screener as st
+        line, _sig, hist = st.macd([100.0] * 60)
+        self.assertAlmostEqual(line, 0.0)
+        self.assertAlmostEqual(hist, 0.0)
+
+    def test_macd_uptrend_positive_hist(self):
+        import stock_screener as st
+        vals = [100.0 + i * 0.5 for i in range(60)]
+        _line, _sig, hist = st.macd(vals)
+        self.assertGreater(hist, 0)
+
+    def test_macd_insufficient(self):
+        import stock_screener as st
+        self.assertEqual(st.macd([100.0] * 20), (None, None, None))
+
+    def test_golden_cross(self):
+        import stock_screener as st
+        closes = [120.0] * 200 + [100.0] * 30 + [130.0] * 40
+        self.assertEqual(st.sma_cross(closes, 50, 200, 20), "golden")
+
+    def test_death_cross(self):
+        import stock_screener as st
+        closes = [100.0] * 200 + [120.0] * 30 + [90.0] * 40
+        self.assertEqual(st.sma_cross(closes, 50, 200, 20), "death")
+
+    def test_no_cross(self):
+        import stock_screener as st
+        closes = [100.0] * 245
+        self.assertIsNone(st.sma_cross(closes, 50, 200, 20))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
