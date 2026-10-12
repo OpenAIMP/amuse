@@ -65,6 +65,14 @@ class TestLoad(unittest.TestCase):
         self.assertEqual(g["ledger"]["heat_cap_pct"], 0.35)
         self.assertEqual(g["ledger"]["fee_per_contract"], 0.65)
 
+    def test_vol_section(self):
+        g = gates.load()
+        self.assertEqual(g["vol"]["hv_short"], 20)
+        self.assertEqual(g["vol"]["hv_long"], 60)
+        self.assertEqual(g["vol"]["ivr_sell"], 50)
+        self.assertEqual(g["vol"]["ivr_stand_down"], 25)
+        self.assertEqual(g["vol"]["min_iv_history"], 30)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
