@@ -357,7 +357,10 @@ Notes for manual runs:
 
 The system was structurally always a premium seller: it never asked whether
 premium was worth selling. `vol.py` adds that read, sitting between Regime
-and Timing in the loop.
+and Timing in the loop — and `spread_screener.py` now consumes it: every
+underlying with candidate structures gets the read attached, and
+`STAND_DOWN` names have their structures vetoed (counted, not silently
+dropped).
 
 **What it measures:**
 
@@ -432,10 +435,12 @@ structure level; the book level is human.
 
 ### Gaps to fix
 
-- **Vol framework not yet wired into screeners.** `vol.py` (issue #7) measures
-  IV Rank, IV-vs-HV, skew, and term structure, but no screener consumes the
-  read yet — the Vol regime assessment still needs to sit between Regime and
-  Timing in the daily flow.
+- **Vol framework wired into the spread screener (issue #7).** Each underlying
+  with candidate structures gets a cheap-vs-expensive read (IV Rank, IV-vs-HV,
+  25-delta skew, term structure); `STAND_DOWN` names have their structures
+  vetoed and counted, `SELL_PREMIUM`/`NO_READ` pass through with the read
+  attached. `--no-vol` skips it; `--iv-history` points at the snapshot file.
+  Not yet in `pmcc_quality.py`.
 - **No long-premium structures.** A complete system needs debit strategies
   for low-vol regimes; today the only honest answer to cheap premium is cash.
 - **No portfolio Greeks.** Per-structure Greeks are fetched but never
@@ -443,16 +448,40 @@ structure level; the book level is human.
   P&L (±10% underlying, ±50% vol), no concentration view.
 - **Gamma/Vega/Theta don't drive decisions.** They're reported, not gating.
 
-### Data constraints to fix
+### MCP data limitations
 
-- **Historical IV builds forward.** The MCP serves no historical-IV endpoint,
-  so IV Rank accumulates from per-run snapshots (`vol.record_snapshot`) and
-  is trusted after 30 observations — no year-one rank.
-- **No earnings/fundamentals feed.** Event gates run on flags ("date
-  unknown"), not dates — see the catalyst calendar roadmap item.
+What the Public MCP gives us: real-time quotes, historical OHLCV bars,
+full option chains per expiry, per-contract Greeks (delta, gamma, theta,
+vega, rho, IV), multi-leg strategy quotes, and order preflight. What it
+does not give us — and how the system copes:
+
+- **No historical IV or Greeks.** Only point-in-time. IV Rank builds forward
+  from per-run snapshots (`vol.record_snapshot`), trusted after 30
+  observations — no year-one rank.
+- **No historical option quotes.** We cannot replay what a spread actually
+  traded for last year. The #11 backtester must synthesize historical
+  option prices (from HV and vol-surface assumptions) — a known modeling
+  risk, to be disclosed with the results.
+- **No fundamentals.** No market cap, P/E, dividend yield, or earnings
+  dates. Event gates run on flags ("date unknown"), not dates — see the
+  catalyst calendar roadmap item.
+- **No dividend / ex-div calendar.** Short-call assignment risk over ex-div
+  (PMCC) cannot be screened automatically; the manual events file is the
+  only input.
+- **No corporate-action feed.** Splits and symbol changes arrive unannounced;
+  OSI symbols are validated per chain fetch, not monitored.
+- **No intraday option data.** The day-trade lane is equity-only; there are
+  no intraday option quotes or Greeks for exit timing.
+- **No market-wide discovery.** All screening is watchlist-driven; the
+  thinkScript scan is the stage-one discovery outside this repo.
 - **No news/catalyst feed.** Gaps are technical-only.
-- **Request/response API, not streaming.** No tick-level Greeks or intraday
-  risk updates.
+- **Request/response, not streaming.** No tick-level Greeks or intraday risk
+  updates; everything is a scheduled snapshot.
+- **Quote staleness.** Closed-market quotes come back bad/wide — the reason
+  weekend spread screens correctly return zero candidates.
+- **Unverified service limits.** The Greeks batch size (40) and chain-call
+  pacing are our choices, not published limits; heavy universes (S&P 500
+  chains) take an hour-plus.
 
 Several of these are already on the [roadmap](#roadmap) (backtester, live heat
 tracker, catalyst calendar); the vol-valuation layer and portfolio Greeks
