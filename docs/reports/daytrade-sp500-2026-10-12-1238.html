@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Options Lab — Day-Trade Screen</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+--green:#3fb950;--red:#f85149;--amber:#d29922;--blue:#58a6ff}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+margin:0;padding:24px 16px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto}
+header{margin-bottom:20px}
+h1{font-size:1.6rem;margin:0 0 4px}
+.sub{color:var(--dim);font-size:.9rem;margin:2px 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+padding:18px;margin:0 0 18px}
+h2{font-size:1.15rem;margin:0 0 12px;color:var(--text)}
+h3{font-size:1rem;margin:18px 0 8px}
+.flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 0}
+.flow-step{flex:1;min-width:130px;background:#0d1117;border:1px solid var(--border);
+border-radius:8px;padding:10px 12px}
+.flow-name{font-weight:700;color:var(--blue);font-size:.85rem;margin-bottom:4px}
+.flow-desc{font-size:.78rem;color:var(--dim)}
+.flow-arrow{align-self:center;color:var(--dim);padding:0 8px;font-size:1.2rem;flex:none}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.85rem;min-width:640px}
+thead th{background:#0d1117;color:var(--dim);text-align:left;font-weight:600;
+padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;
+position:sticky;top:0}
+tbody td{padding:9px 12px;border-bottom:1px solid #21262d;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#1c2128}
+.num{font-variant-numeric:tabular-nums;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.sym{font-weight:700}
+.sym .ticker{color:var(--text);text-decoration:none}
+.sym .ticker:hover{color:var(--blue);text-decoration:underline}
+details.qlinks{display:inline-block;margin-left:5px;vertical-align:middle;font-weight:400}
+details.qlinks summary{cursor:pointer;list-style:none;color:var(--dim);font-size:.68rem;
+padding:1px 5px;border-radius:4px;line-height:1.5}
+details.qlinks summary::-webkit-details-marker{display:none}
+details.qlinks summary:hover{background:#21262d;color:var(--text)}
+.qmenu{margin-top:5px;border-top:1px solid var(--border);padding-top:5px}
+.qmenu a{display:block;padding:4px 8px;font-size:.78rem;color:var(--text);
+text-decoration:none;border-radius:4px;white-space:nowrap}
+.qmenu a:hover{background:#1c2128;color:var(--blue)}
+.good{color:var(--green)} .bad{color:var(--red)} .warn{color:var(--amber)}
+.na,.dim{color:var(--dim)} .empty{color:var(--dim);font-style:italic;text-align:center!important}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:700}
+.badge.good{background:rgba(63,185,80,.15);color:var(--green)}
+.badge.bad{background:rgba(248,81,73,.15);color:var(--red)}
+.badge.warn{background:rgba(210,153,34,.15);color:var(--amber)}
+.readout{background:#0d1117;border-left:3px solid var(--blue);border-radius:0 8px 8px 0;
+padding:12px 16px;margin:16px 0 4px}
+.readout-title{font-weight:700;color:var(--blue);font-size:.85rem;margin-bottom:6px}
+.readout ul{margin:0;padding-left:18px}
+.readout li{margin:4px 0;font-size:.9rem}
+.whyrow td{white-space:normal!important;font-size:.8rem;color:var(--dim);
+border-bottom:1px solid var(--border);padding:4px 12px 10px 28px!important;font-style:italic}
+.fine{font-size:.78rem;color:var(--dim);margin:10px 0 0}
+ul.guide{columns:2;column-gap:32px;font-size:.82rem;list-style:none;margin:10px 0 0;padding:0}
+ul.guide li{margin:0 0 8px;break-inside:avoid}
+details{border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:#0d1117}
+summary{cursor:pointer;font-weight:600}
+ul.rej{columns:2;column-gap:32px;font-size:.85rem}
+ul.rej li{margin:3px 0;break-inside:avoid}
+footer{color:var(--dim);font-size:.78rem;text-align:center;margin-top:8px}
+@media(max-width:640px){ul.rej{columns:1}body{padding:16px 10px}}
+
+.backlink{margin:0 0 14px;font-size:.9rem}
+.backlink a{color:var(--blue);text-decoration:none}
+.backlink a:hover{text-decoration:underline}
+.prov{font-size:.9rem;color:var(--dim);margin:6px 0 0}
+.prov b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="backlink"><a href="../index.html">← Back to hub</a></p>
+<header>
+<h1>Options Lab — Day-Trade Screen</h1>
+<p class="prov">Source: <b>S&amp;P 500</b> · 502 names · Run 2026-10-12T08:38:22-04:00</p>
+<p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
+</header>
+<section class="card"><h2>How a trade gets made</h2><div class="flow"><div class="flow-step"><div class="flow-name">1. Screen</div><div class="flow-desc">Find candidates across the watchlist or universe.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">2. Regime</div><div class="flow-desc">Trend structure + anchored VWAP pick the strategy family.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">3. Timing</div><div class="flow-desc">%B, RSI and squeeze confirm — or veto — the entry now.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">4. Strikes</div><div class="flow-desc">Fib levels and swing pivots place short strikes behind structure.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">5. Size</div><div class="flow-desc">1–2% max loss per trade; total heat under 40%.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">6. Preflight</div><div class="flow-desc">Buying power, events, fees — then your confirmation.</div></div></div></section>
+<section class="card"><h2>Methodology &amp;mdash; patterns and strategies</h2><h3>How patterns are identified</h3><div class="tbl-wrap"><table><thead><tr><th>Pattern</th><th>What it means</th><th>Criteria (all must hold)</th></tr></thead><tbody><tr><td class='sym'>UP regime</td><td>trend supports selling puts</td><td>price &gt; SMA50 &amp; SMA200, above anchored VWAP (52w low), no downtrend pivot structure</td></tr><tr><td class='sym'>Timing OK</td><td>not chasing, not dead</td><td>RSI 30&ndash;70, %B within 0&ndash;1 (%B&gt;1 = extended, reject), no 125-day squeeze, MACD hist &gt; 0, no death cross</td></tr><tr><td class='sym'>Golden cross</td><td>bullish regime confirmation</td><td>SMA50 crossed above SMA200 within 20 sessions (+2 timing)</td></tr><tr><td class='sym'>Day-trade momentum</td><td>abnormal morning move</td><td>|gap| &ge; 2%, rel volume &ge; 1.5&times;, developing-VWAP side sets gap-and-go vs fade bias</td></tr><tr><td class='sym'>Vol regime: rich</td><td>premium worth selling</td><td>IV rank &gt; 50 and IV &gt; 20-day HV</td></tr><tr><td class='sym'>Vol regime: cheap</td><td>premium not worth selling</td><td>IV rank &lt; 25 &rarr; stand down (structures vetoed, none shown)</td></tr></tbody></table></div><h3>How the strategies generate income</h3><div class="tbl-wrap"><table><thead><tr><th>Strategy</th><th>Structure</th><th>The edge it harvests</th></tr></thead><tbody><tr><td class='sym'>Bull put spread</td><td>short 0.10&ndash;0.20&Delta; put + long lower-strike put, 21&ndash;60 DTE</td><td>keeps the net credit (short bid &minus; long ask) if the underlying stays above the short strike &mdash; harvests time decay and the premium difference between the two strikes</td></tr><tr><td class='sym'>Iron condor</td><td>bull put spread + bear call spread, same expiry</td><td>keeps both credits if the underlying pins between the short strikes &mdash; harvests premium from range-bound price action on both sides</td></tr><tr><td class='sym'>Asymmetric iron condor</td><td>bull put spread + far-OTM call wing (&ge;8% above spot)</td><td>bullish tilt; the call wing's premium helps finance the put spread</td></tr><tr><td class='sym'>PMCC</td><td>0.80&ndash;0.95&Delta; LEAPS (270&ndash;800 DTE) + 0.15&ndash;0.35&Delta; short calls (21&ndash;60 DTE)</td><td>harvests repeated short-call premium against durable delta exposure, at a fraction of 100-share capital</td></tr></tbody></table></div><p class="fine">Every structure is defined-risk &mdash; max loss is known before entry, no naked legs. &ldquo;Return on risk&rdquo; (credit &divide; max loss) is a screening ratio, not a forecast. Thresholds above are the live values from <span class='num'>gates.yaml</span>.</p></section>
+
+
+<section class="card"><h2>Day-trade screen</h2><div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th><th>VWAP dist</th><th>ATR%</th><th>Bias</th></tr></thead><tbody><tr><td colspan="7" class="empty">No gap candidates — quiet pre-market.</td></tr></tbody></table></div><p class="fine">Ranked by conviction = |gap| × relative volume. Gates: gap ≥ 2.0%, rel vol ≥ 1.5×, price ≥ $10.0, ATR% 1.0–8.0. Technical-only — check headlines before trading any candidate. Bias is not a prediction.</p></section>
+
+
+<footer>Generated 2026-10-12 12:38 UTC · screeners never place orders.</footer>
+</div>
+</body>
+</html>
