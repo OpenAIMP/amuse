@@ -353,6 +353,36 @@ Notes for manual runs:
   screener pulls full chains + Greeks per name (an hour-plus on 500 names).
   `sp100`/`nasdaq100` are the sweet spot for options.
 
+## Volatility regime — cheap vs expensive (issue #7)
+
+The system was structurally always a premium seller: it never asked whether
+premium was worth selling. `vol.py` adds that read, sitting between Regime
+and Timing in the loop.
+
+**What it measures:**
+
+- **IV vs HV** — current implied vol (30-day ATM from chain Greeks) against
+  20/60-day realized vol from daily bars. IV > HV means options price more
+  movement than recently happened: richer premium, edge to the seller.
+- **IV Rank** — percentile of current IV within its trailing history.
+- **25-delta skew** — put IV minus call IV; the market's price for crash
+  protection.
+- **Term structure** — far-expiry IV minus near-expiry IV; backwardation flags
+  a priced-in near-term event.
+
+**Decision rules** (tuned in `gates.yaml` under `vol:`):
+
+- IV rank > 50 **and** IV > HV → **SELL_PREMIUM**: vol is rich, edge to sellers.
+- IV rank < 25 → **STAND_DOWN**: premium too cheap; no long-premium
+  structures exist yet, so the correct trade is none.
+- Anything else, or insufficient data → **NO_READ**: other gates decide.
+
+**Honest limitation:** the MCP has no historical-IV endpoint, so IV rank
+cannot look back a year on day one. `vol.py` builds the history forward:
+each run appends a per-underlying IV snapshot (`record_snapshot`), and the
+rank is trusted only after 30 snapshots (`min_iv_history`). Until then the
+read is IV-vs-HV plus skew/term-structure — useful, but not a full rank.
+
 ## Risk management
 
 ### Exit policy — bull put spreads (issue #9)
@@ -391,9 +421,9 @@ entry → exit signal → ledger close → realized P&L, using the real gate val
 | Delta | Strike-selection gates (0.10–0.20 shorts, 0.80–0.95 LEAPS); net delta reported per structure |
 | Gamma / Vega / Theta | Fetched and reported — not used in any gate or decision |
 | Open interest / volume | Liquidity gates only (≥10 per leg, ≥25 for PMCC long legs) |
-| Implied volatility | Not used in any Python screener |
+| Implied volatility | Vol framework (`vol.py`): IV Rank, IV-vs-HV, skew, term structure; not yet wired into screener gates |
 | Max loss / credit / breakeven | Gates (≤$1,000 per spread, ≤$10,000 per PMCC pair) + reported; structures ranked by return-on-risk |
-| Realized volatility | ATR% as a stock-screen gate only |
+| Realized volatility | ATR% as a stock-screen gate; formal 20/60-day HV in `vol.py` |
 
 Risk is managed today through **defined-risk structures only** (no naked
 legs), conservative fills, liquidity/friction/earnings gates, and the human
@@ -402,11 +432,10 @@ structure level; the book level is human.
 
 ### Gaps to fix
 
-- **No cheap-vs-expensive framework.** The system is structurally always a
-  premium seller — it never asks whether premium is worth selling. Needed:
-  IV Rank/percentile, IV-vs-HV, skew, and term structure per underlying,
-  feeding a Vol regime assessment between Regime and Timing (rich premium →
-  sell; cheap premium → buy debit spreads or stand down).
+- **Vol framework not yet wired into screeners.** `vol.py` (issue #7) measures
+  IV Rank, IV-vs-HV, skew, and term structure, but no screener consumes the
+  read yet — the Vol regime assessment still needs to sit between Regime and
+  Timing in the daily flow.
 - **No long-premium structures.** A complete system needs debit strategies
   for low-vol regimes; today the only honest answer to cheap premium is cash.
 - **No portfolio Greeks.** Per-structure Greeks are fetched but never
@@ -416,9 +445,9 @@ structure level; the book level is human.
 
 ### Data constraints to fix
 
-- **No historical IV.** IV Rank needs a year of IV history per underlying —
-  unverified whether the MCP serves it or it must be derived from archived
-  chains.
+- **Historical IV builds forward.** The MCP serves no historical-IV endpoint,
+  so IV Rank accumulates from per-run snapshots (`vol.record_snapshot`) and
+  is trusted after 30 observations — no year-one rank.
 - **No earnings/fundamentals feed.** Event gates run on flags ("date
   unknown"), not dates — see the catalyst calendar roadmap item.
 - **No news/catalyst feed.** Gaps are technical-only.
