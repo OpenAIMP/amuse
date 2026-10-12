@@ -1,0 +1,15 @@
+# Core intersection: stocks in ALL major large-cap indices
+# Dow 30 ∩ Nasdaq-100 ∩ S&P 500 ∩ S&P 100 (computed 2026-10-12)
+# These 7 mega-caps are the most universally-held large caps.
+#
+# NOTE: Russell 2000 (small-cap) has zero overlap with large-cap indices
+# by construction. Russell 1000/3000 and S&P 600 files are not in the
+# repo; the Russell 3000 = Russell 1000 + Russell 2000, so any large-cap
+# name here is implicitly in the Russell 1000/3000 as well.
+AAPL
+AMGN
+AMZN
+CSCO
+MSFT
+NVDA
+WMT
