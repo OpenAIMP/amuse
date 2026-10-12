@@ -1,0 +1,98 @@
+# Options Lab gate configuration.
+# Every tunable threshold lives here. Edit values, not code.
+# Screeners read this file at startup; use --config PATH for a different file.
+#
+# Supported YAML subset (see gates.py): nested maps via 2-space indent,
+# `key: value` scalars (int, float, true/false), `#` comments. No lists.
+
+spreads:
+  dte_min: 21
+  dte_max: 60
+  short_delta_min: 0.10
+  short_delta_max: 0.20
+  # auto width = min(width_max, max(width_min, round(spot / width_divisor)))
+  width_min: 1.0
+  width_max: 5.0
+  width_divisor: 25
+  max_spread_pct: 0.25      # reject legs whose bid/ask spread > 25% of mid
+  min_liquidity: 10         # OI or volume floor per leg
+  max_loss: 1000            # $ max loss gate per spread
+  max_friction: 3.0         # combined leg spreads / net credit
+  call_distance_min: 0.08   # asym condor: call-wing short strike >= 8% above spot
+
+stock:
+  price_min: 10.0
+  price_max: 500.0
+  rsi_period: 14
+  rsi_min: 30.0
+  rsi_max: 70.0
+  sma_fast: 50
+  sma_slow: 200
+  require_above_sma_fast: true
+  require_above_sma_slow: true
+  atr_pct_min: 1.0
+  atr_pct_max: 6.0
+  vol_ratio_min: 0.9        # 20d avg volume / 60d avg volume
+  max_off_high_pct: 25.0    # must be within 25% below 52-week high
+  min_bars: 200             # need a full SMA200 of history
+  bb_period: 20
+  bb_mult: 2.0
+  bb_pctb_min: 0.0          # %B gate: price must be inside the bands
+  bb_pctb_max: 1.0
+  squeeze_lookback: 125     # squeeze = bandwidth at N-day minimum
+  min_bars_squeeze: 130     # else squeeze is unknown (ranking only)
+  require_above_anchored_vwap: true
+  reject_downtrend: true    # gate: reject downtrend pivot structure
+  pivot_n: 5                # fractal pivot: extreme of n bars each side
+  swing_lookback_bars: 126  # ~6 months for the reference swing
+  ema_fast: 50
+  ema_slow: 200
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  cross_lookback: 20        # golden/death cross: SMA50 x SMA200 within N sessions
+  reject_death_cross: true  # gate: reject recent death cross
+
+daytrade:
+  gap_min_pct: 2.0          # |gap| must be at least 2%
+  rel_vol_min: 1.5          # today's volume so far vs 20d avg daily volume
+  price_min: 10.0
+  atr_pct_min: 1.0
+  atr_pct_max: 8.0
+  top_n: 20                 # print top 20 by conviction
+  min_daily_bars: 30        # need 20d volume avg + 14d ATR with margin
+
+pmcc:
+  long_dte_min: 270
+  long_dte_max: 800
+  long_delta_min: 0.80
+  long_delta_max: 0.95
+  short_dte_min: 21
+  short_dte_max: 60
+  short_delta_min: 0.15
+  short_delta_max: 0.35
+  max_spread_pct: 0.25
+  min_long_liquidity: 25    # OI or volume floor for the expensive long leg
+  min_short_liquidity: 10   # OI or volume floor for the short leg
+  max_capital: 10000        # $ per-pair capital gate
+  max_friction: 3.0         # (long spread + short spread) / short bid
+
+exits:
+  bull_put_spread:
+    profit_target_pct: 0.50  # close when this much of the credit is kept
+    stop_loss_mult: 2.0      # close when buy-back costs this many x the credit
+    min_dte_exit: 7         # never hold past this DTE; close or roll
+    assignment_dte: 2       # inside this window, ITM short = close, no assignment
+    no_assignment: true     # close rather than take assignment
+
+ledger:
+  max_loss_pct: 0.02   # one trade's max loss <= 2% of account
+  heat_cap_pct: 0.35   # total open max loss <= 35% of account
+  fee_per_contract: 0.65  # all-in per-contract fee assumption, each side
+
+vol:
+  hv_short: 20        # short HV window (trading days)
+  hv_long: 60         # long HV window (trading days)
+  ivr_sell: 50        # IV rank above this + IV > HV -> sell premium
+  ivr_stand_down: 25  # IV rank below this -> stand down (premium too cheap)
+  min_iv_history: 30  # snapshots needed before IV rank is trusted
