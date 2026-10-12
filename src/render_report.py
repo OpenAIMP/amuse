@@ -62,6 +62,10 @@ QUOTE_LINKS = [
     ("Public", "https://public.com/stocks/{sl}"),
     ("TradingView", "https://www.tradingview.com/symbols/{s}/"),
     ("Finviz", "https://finviz.com/quote.ashx?t={s}&p=d"),
+    ("Fintel", "https://fintel.io/s/us/{sl}"),
+    ("WhaleWisdom", "https://whalewisdom.com/stock/{sl}"),
+    ("Seeking Alpha", "https://seekingalpha.com/symbol/{s}"),
+    ("Zacks", "https://www.zacks.com/stock/research/{s}/earnings-calendar"),
     ("SEC filings", "https://www.sec.gov/cgi-bin/browse-edgar"
                      "?action=getcompany&ticker={s}&type=&dateb=&owner=include&count=40"),
 ]
