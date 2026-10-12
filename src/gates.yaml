@@ -70,6 +70,17 @@ premarket:
   top_n: 20                 # print top 20 by conviction
   min_daily_bars: 30        # need 20d volume avg + 14d ATR with margin
 
+intraday:
+  or_minutes: 15            # opening-range window (9:30-9:45 ET)
+  breakout_buffer_pct: 0.1  # price must clear OR by this % to trigger
+  rel_vol_min: 1.5          # today's volume vs TIME-PRORATED 20d average
+  price_min: 10.0
+  atr_pct_min: 1.0
+  atr_pct_max: 8.0
+  top_n: 20
+  min_daily_bars: 30
+  vwap_lookback_bars: 6     # bars used to detect VWAP cross direction
+
 pmcc:
   long_dte_min: 270
   long_dte_max: 800
