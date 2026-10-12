@@ -69,3 +69,11 @@ pmcc:
   min_short_liquidity: 10   # OI or volume floor for the short leg
   max_capital: 10000        # $ per-pair capital gate
   max_friction: 3.0         # (long spread + short spread) / short bid
+
+exits:
+  bull_put_spread:
+    profit_target_pct: 0.50  # close when this much of the credit is kept
+    stop_loss_mult: 2.0      # close when buy-back costs this many x the credit
+    min_dte_exit: 7         # never hold past this DTE; close or roll
+    assignment_dte: 2       # inside this window, ITM short = close, no assignment
+    no_assignment: true     # close rather than take assignment
