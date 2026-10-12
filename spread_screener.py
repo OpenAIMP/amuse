@@ -35,14 +35,27 @@ ACCT = os.environ.get("PUBLIC_ACCOUNT_ID", "5OI32712")
 NAMES = ["T", "VZ", "BAC", "PFE", "KO", "MRK", "BMY", "SBUX", "DIS", "XOM"]
 
 # ---- screening configuration (design choices, printed in every report) ----
-SPREAD_DTE_MIN, SPREAD_DTE_MAX = 21, 60
-SHORT_DELTA_MIN, SHORT_DELTA_MAX = 0.10, 0.20
-SPREAD_WIDTH = 5              # strike width in dollars (configurable via --width)
-MAX_SPREAD_PCT = 0.25         # reject contracts whose bid/ask spread > 25% of mid
-MIN_LIQUIDITY = 10            # OI or volume floor per leg
-MAX_SPREAD_LOSS = 1000        # max loss gate per spread ($)
-MAX_FRICTION = 3.0            # combined leg spreads / net credit: reject above
-CALL_DISTANCE_MIN = 0.08     # asym condor skew: call-wing short strike >= 8% above spot
+# Tunables live in gates.yaml; this block binds them to module constants.
+import gates as _gates_mod
+
+
+def _apply_gates(path=None):
+    global SPREAD_DTE_MIN, SPREAD_DTE_MAX, SHORT_DELTA_MIN, SHORT_DELTA_MAX
+    global SPREAD_WIDTH, MAX_SPREAD_PCT, MIN_LIQUIDITY, MAX_SPREAD_LOSS
+    global MAX_FRICTION, CALL_DISTANCE_MIN, WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR
+    G = _gates_mod.load(path)["spreads"]
+    SPREAD_DTE_MIN, SPREAD_DTE_MAX = G["dte_min"], G["dte_max"]
+    SHORT_DELTA_MIN, SHORT_DELTA_MAX = G["short_delta_min"], G["short_delta_max"]
+    SPREAD_WIDTH = 5              # strike width in dollars (configurable via --width)
+    MAX_SPREAD_PCT = G["max_spread_pct"]
+    MIN_LIQUIDITY = G["min_liquidity"]
+    MAX_SPREAD_LOSS = G["max_loss"]
+    MAX_FRICTION = G["max_friction"]
+    CALL_DISTANCE_MIN = G["call_distance_min"]
+    WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR = G["width_min"], G["width_max"], G["width_divisor"]
+
+
+_apply_gates()
 GREEKS_BATCH = 40             # implementation setting, not a verified service limit
 REJECT_EARNINGS = True        # earnings inside the spread window rejects it
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
@@ -476,7 +489,11 @@ def main():
     ap.add_argument("--width", type=float, default=None,
                         help="strike width in dollars; default auto-scales to price: "
                              "min(5, max(1, round(spot/25)))")
+    ap.add_argument("--config", default=None,
+                        help="path to gates.yaml (default: gates.yaml next to the script)")
     args = ap.parse_args()
+    if args.config:
+        _apply_gates(args.config)
     if args.names:
         names = args.names.split(",")
         universe_tag = "custom"
@@ -506,7 +523,7 @@ def main():
     print(f"Options spread screener -- run {RUN_TS} (America/New_York)")
     print("Settings: "
           f"DTE {SPREAD_DTE_MIN}-{SPREAD_DTE_MAX}, short Δ {SHORT_DELTA_MIN}-{SHORT_DELTA_MAX} (abs), "
-          f"width {'$' + repr(width_arg) if width_arg else 'auto (price-scaled 1-5)'}, max spread {MAX_SPREAD_PCT:.0%} of mid, "
+          f"width {'$' + repr(width_arg) if width_arg else f'auto (price-scaled {WIDTH_MIN:g}-{WIDTH_MAX:g})'}, max spread {MAX_SPREAD_PCT:.0%} of mid, "
           f"liquidity >= {MIN_LIQUIDITY} OI/volume per leg, "
           f"max loss ${MAX_SPREAD_LOSS}/spread, max friction {MAX_FRICTION}x, "
           f"asym condor call distance >= {CALL_DISTANCE_MIN:.0%} above spot, "
@@ -550,7 +567,7 @@ def main():
         # long leg into unquotable delta ~0.03 territory. Scale keeps both
         # legs in liquid strikes.
         width = width_arg if width_arg is not None \
-            else min(5.0, max(1.0, round(spot / 25)))
+            else min(WIDTH_MAX, max(WIDTH_MIN, round(spot / WIDTH_DIVISOR)))
         try:
             raw = mcp_call("get_option_expirations",
                            {"symbol": sym, "account_id": ACCT})
