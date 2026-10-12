@@ -327,6 +327,8 @@ class TestRenderSmoke(unittest.TestCase):
     def _record(self, **kw):
         rec = {
             "symbol": "TST", "price": 100.0, "rsi14": 55.0, "score": 26.3,
+            "vs_sma50_pct": 3.2, "off_52w_high_pct": 8.5,
+            "atr_pct": 2.1, "vol_ratio": 1.2,
             "indicators": {
                 "bollinger": {"pct_b": 0.6, "bandwidth_pct": 8.0,
                               "squeeze": False},
@@ -349,6 +351,10 @@ class TestRenderSmoke(unittest.TestCase):
         self.assertIn("GC", html)          # golden-cross badge
         self.assertIn("+0.50", html)       # macd hist cell
         self.assertIn("/40", html)
+        self.assertIn("3.2%", html)        # vs SMA50
+        self.assertIn("8.5%", html)        # off 52w high
+        self.assertIn("2.1<", html)         # ATR%
+        self.assertIn("1.20", html)        # vol ratio
 
     def test_stock_section_empty(self):
         import render_report as rr
