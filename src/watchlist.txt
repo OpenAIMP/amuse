@@ -1,0 +1,24 @@
+# Shared watchlist: one symbol per line.
+# Every screener in the daily workflow runs against this list —
+# edit it and the next scheduled run picks it up automatically.
+# (Manual runs can override with workflow_dispatch inputs.)
+AAPL
+MSFT
+NVDA
+AVGO
+AMZN
+GOOGL
+META
+JPM
+V
+XOM
+JNJ
+PG
+HD
+BAC
+DIS
+T
+VZ
+KO
+MRK
+PFE
