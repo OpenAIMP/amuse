@@ -83,3 +83,4 @@ jobs:
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update monthly PMCC screen"
           git push
+
