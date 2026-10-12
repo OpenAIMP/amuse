@@ -637,24 +637,23 @@ What a portfolio manager would add, in order:
     **empyrical** (Sharpe, drawdowns, tear sheets).
   - **Data** — **OpenBB** if you outgrow single-provider MCP data.
   Greeks/IV currently come from the broker with no independent check.
-- **Vol-valuation layer** — IV Rank/percentile, IV-vs-HV, skew, term structure
-  per underlying; a Vol regime step between Regime and Timing so the system
-  stops being a permanent premium seller (rich → sell, cheap → buy premium
-  or stand down).
+- **Vol-valuation layer** — done for the spread screener (issue #7): IV Rank,
+  IV-vs-HV, skew, term structure per underlying, wired between Regime and
+  Timing with a STAND_DOWN veto. Not yet in `pmcc_quality.py`.
 - **Long-premium structures** — debit strategies for cheap-vol regimes, or an
   explicit stand-down policy.
 - **Catalyst calendar** — replace "earnings date unknown" flags with real
   dates wired into the event gates.
-- **Sizing calculator** — account size + max loss in → contracts out,
-  enforcing the 1–2% rule before every trade.
 
 **Running the book**
-- **Heat/exposure tracker** — track open positions against the 30–40% heat
-  cap and sector correlation limits.
+- **Heat/exposure tracker** — paper positions tracked against the 35% heat
+  cap in `ledger.py` (issue #10); live-book tracking and sector correlation
+  limits still manual.
 - **Portfolio Greeks + scenarios** — aggregate net delta/gamma/vega/theta
   across the book; scenario P&L (±10% underlying, ±50% vol).
-- **Exit rules** — profit targets, rolling, assignment handling; entries
-  without exits is half a system.
+- **Exit rules** — done for bull put spreads (issue #9): 50% profit target,
+  2×-credit stop, 7-DTE time exit, no assignment. Other structures still
+  need theirs.
 - **Journal + attribution** — which layer (regime read vs structure) made or
   lost money, so the system learns.
 
