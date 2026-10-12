@@ -52,6 +52,14 @@ stock:
   macd_signal: 9
   cross_lookback: 20        # golden/death cross: SMA50 x SMA200 within N sessions
   reject_death_cross: true  # gate: reject recent death cross
+  # ---- issue #18: gap / momentum / value / bias readouts (labels, not gates) ----
+  gap_label_abs_pct: 2.0    # |gap| >= this labels "gap up"/"gap down"
+  rsi_oversold: 30.0        # RSI(14) below = oversold
+  rsi_overbought: 70.0      # RSI(14) above = overbought
+  value_under_max_pct: 25.0 # 52w-range position <= this = technically undervalued
+  value_over_min_pct: 75.0  # 52w-range position >= this = technically overvalued
+  bias_bull_min: 4          # >= this many bullish votes = bullish
+  bias_bear_max: 2          # <= this many bullish votes = bearish
 
 daytrade:
   gap_min_pct: 2.0          # |gap| must be at least 2%
