@@ -61,7 +61,7 @@ jobs:
             echo "WATCHLIST=" >> $GITHUB_ENV
             echo "SRC=${{ inputs.universe }}" >> $GITHUB_ENV
           else
-            echo "WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
+            echo "WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
             echo "UNIVERSE=" >> $GITHUB_ENV
             echo "SRC=watchlist" >> $GITHUB_ENV
           fi
@@ -127,7 +127,7 @@ jobs:
           if [ "$SRC" = "custom" ]; then
             DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
           elif [ "$SRC" = "watchlist" ]; then
-            DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
+            DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           else
             DETAIL="$(python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
           fi
