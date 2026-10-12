@@ -37,12 +37,14 @@ NAMES = ["T", "VZ", "BAC", "PFE", "KO", "MRK", "BMY", "SBUX", "DIS", "XOM"]
 # ---- screening configuration (design choices, printed in every report) ----
 # Tunables live in gates.yaml; this block binds them to module constants.
 import gates as _gates_mod
+import vol as _vol
 
 
 def _apply_gates(path=None):
     global SPREAD_DTE_MIN, SPREAD_DTE_MAX, SHORT_DELTA_MIN, SHORT_DELTA_MAX
     global SPREAD_WIDTH, MAX_SPREAD_PCT, MIN_LIQUIDITY, MAX_SPREAD_LOSS
     global MAX_FRICTION, CALL_DISTANCE_MIN, WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR
+    global VOL_CFG
     G = _gates_mod.load(path)["spreads"]
     SPREAD_DTE_MIN, SPREAD_DTE_MAX = G["dte_min"], G["dte_max"]
     SHORT_DELTA_MIN, SHORT_DELTA_MAX = G["short_delta_min"], G["short_delta_max"]
@@ -53,6 +55,7 @@ def _apply_gates(path=None):
     MAX_FRICTION = G["max_friction"]
     CALL_DISTANCE_MIN = G["call_distance_min"]
     WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR = G["width_min"], G["width_max"], G["width_divisor"]
+    VOL_CFG = _gates_mod.load(path)["vol"]
 
 
 _apply_gates()
@@ -199,6 +202,95 @@ def greeks(syms):
             except (KeyError, TypeError, ValueError) as exc:
                 errors.append(f"invalid greeks for {x.get('symbol', '?')}: {exc}")
     return out, errors
+
+
+def vol_read_for(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
+    """Cheap-vs-expensive read for one underlying (issue #7).
+
+    Uses the already-fetched chains/Greeks plus one get_price_history call
+    for HV. Records an IV snapshot so IV Rank builds forward. Never raises
+    for bad data -- returns a NO_READ assessment instead.
+    """
+    try:
+        return _vol_read_inner(sym, spot, puts_by_exp, calls_by_exp, exps,
+                               iv_history_path)
+    except Exception as e:
+        return {"iv": None, "hv": None, "iv_rank": None, "iv_vs_hv": None,
+                "skew_25d": None, "term_structure": None,
+                "decision": _vol.NO_READ,
+                "reason": f"vol assessment failed: {e}"}
+
+
+def _vol_read_inner(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
+    # HV from one year of daily bars.
+    closes = []
+    try:
+        p = mcp_call("get_price_history",
+                     {"symbol": sym, "account_id": ACCT,
+                      "period": "YEAR", "aggregation": "ONE_DAY"})
+        for b in p.get("regularMarket", {}).get("bars", []):
+            try:
+                c = float(b["close"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(c) and c > 0:
+                closes.append(c)
+    except Exception:
+        closes = []
+    hv20 = _vol.realized_vol(closes, VOL_CFG["hv_short"]) if closes else None
+    hv60 = _vol.realized_vol(closes, VOL_CFG["hv_long"]) if closes else None
+
+    all_puts = [c for pc in puts_by_exp.values() for c in pc.values()
+                if c.get("iv")]
+    all_calls = [c for cc in calls_by_exp.values() for c in cc.values()
+                 if c.get("iv")]
+
+    def atm_iv(contracts):
+        if not contracts:
+            return None
+        return min(contracts, key=lambda x: abs(x["strike"] - spot))["iv"]
+
+    # 30-day IV: average of ATM put/call IV at the expiry nearest 30 DTE.
+    iv30 = None
+    if exps:
+        e30 = min(exps, key=lambda e: abs(dte(e) - 30))
+        sleeve = ([c for c in all_puts if c["expiration"] == e30]
+                  + [c for c in all_calls if c["expiration"] == e30])
+        # atm of puts and calls separately, then average
+        p_iv = atm_iv([c for c in all_puts if c["expiration"] == e30])
+        c_iv = atm_iv([c for c in all_calls if c["expiration"] == e30])
+        ivs = [v for v in (p_iv, c_iv) if v]
+        iv30 = sum(ivs) / len(ivs) if ivs else None
+
+    # 25-delta skew from the full fetched set.
+    def near_delta(contracts, target):
+        cands = [c for c in contracts if c.get("delta") is not None]
+        if not cands:
+            return None
+        return min(cands,
+                   key=lambda x: abs(abs(x["delta"]) - target))["iv"]
+
+    put25 = near_delta(all_puts, 0.25)
+    call25 = near_delta(all_calls, 0.25)
+
+    # Term structure: ATM put IV at nearest vs farthest expiry in window.
+    iv_near = iv_far = None
+    if exps:
+        e_near = min(exps, key=dte)
+        e_far = max(exps, key=dte)
+        iv_near = atm_iv([c for c in all_puts if c["expiration"] == e_near])
+        iv_far = atm_iv([c for c in all_puts if c["expiration"] == e_far])
+
+    history = _vol.load_history(iv_history_path, sym)
+    read = _vol.assess(iv30, hv20, history, put25, call25,
+                       iv_near, iv_far, VOL_CFG)
+    read["hv20"], read["hv60"] = hv20, hv60
+    if iv30:
+        try:
+            _vol.record_snapshot(iv_history_path, sym, iv30)
+        except OSError:
+            pass
+    return read
 
 
 def spread_events(sym, exp, events):
@@ -491,6 +583,11 @@ def main():
                              "min(5, max(1, round(spot/25)))")
     ap.add_argument("--config", default=None,
                         help="path to gates.yaml (default: gates.yaml next to the script)")
+    ap.add_argument("--no-vol", action="store_true",
+                    help="skip the cheap-vs-expensive vol assessment")
+    ap.add_argument("--iv-history", default=None,
+                    help="path to IV snapshot history (default: iv_history.jsonl "
+                         "next to the script; created if missing)")
     args = ap.parse_args()
     if args.config:
         _apply_gates(args.config)
@@ -510,6 +607,8 @@ def main():
     print(f"Universe: {universe_tag} ({len(names)} names)")
     width_arg = args.width
     events_file = args.events or EVENTS_FILE
+    iv_hist_path = args.iv_history or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "iv_history.jsonl")
 
     events = {}
     if events_file:
@@ -531,6 +630,10 @@ def main():
           f"unknown-earnings={'REJECT' if REQUIRE_EARNINGS_DATE else 'flag'}, "
           f"credit = short bid - long ask (conservative). "
           f"Assumes standard 100-share deliverables (not validated).")
+    if not args.no_vol:
+        print(f"Vol assessment: on (cheap-vs-expensive; IV history: {iv_hist_path})")
+    else:
+        print("Vol assessment: OFF (--no-vol)")
 
     spot_map = {}
     q = mcp_call("get_quotes", {"symbols": names, "account_id": ACCT})
@@ -556,6 +659,7 @@ def main():
 
     bull_puts, condors, asym_condors = [], [], []
     stock_notes = {}
+    vol_veto_total = 0
     rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
                "asym_condor": {}}
     for sym in names:
@@ -726,6 +830,28 @@ def main():
             bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
             ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+
+            # Vol assessment (issue #7): sits between Regime and Timing.
+            # Cheap premium stands down -- structures are vetoed, not ranked.
+            if not args.no_vol and (bp_accepted or ic_accepted or ac_accepted):
+                vol_read = vol_read_for(sym, spot, puts_by_exp, calls_by_exp,
+                                        exps, iv_hist_path)
+                slim = {k: vol_read[k] for k in
+                        ("iv", "hv", "iv_rank", "iv_vs_hv",
+                         "skew_25d", "term_structure", "decision")}
+                for r in bp_accepted + ic_accepted + ac_accepted:
+                    r["vol"] = slim
+                notes.append(
+                    "vol: " + ", ".join(f"{k}={v}" for k, v in slim.items())
+                    + f" ({vol_read['reason']})")
+                if vol_read["decision"] == _vol.STAND_DOWN:
+                    n_veto = (len(bp_accepted) + len(ic_accepted)
+                              + len(ac_accepted))
+                    vol_veto_total += n_veto
+                    notes.append(f"vol veto: {n_veto} structures stood down "
+                                 "(cheap premium)")
+                    bp_accepted, ic_accepted, ac_accepted = [], [], []
+
             bull_puts.extend(bp_accepted[:3])
             condors.extend(ic_accepted[:3])
             asym_condors.extend(ac_accepted[:3])
@@ -757,6 +883,9 @@ def main():
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     asym_condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    if vol_veto_total:
+        print(f"\nVol vetoes: {vol_veto_total} structures stood down on cheap "
+              "premium (issue #7).")
 
     print("\n=== BULL PUT SPREADS (ranked by return on risk) ===")
     print(f"{'sym':<5}{'exp':<12}{'strikes':<10}{'DTE':>4}{'Δsh':>6}"
@@ -827,6 +956,7 @@ def main():
                     "breakeven": round(r["breakeven"], 2),
                     "return_on_risk": round(r["return_on_risk"], 4),
                     "events": r["events"],
+                    "vol": r.get("vol"),
                 }
         for r in condors:
             if r["stock"] not in best["iron_condors"]:
@@ -840,6 +970,7 @@ def main():
                     "breakeven_call": round(r["breakeven_call"], 2),
                     "return_on_risk": round(r["return_on_risk"], 4),
                     "events": r["events"],
+                    "vol": r.get("vol"),
                 }
         for r in asym_condors:
             if r["stock"] not in best["asym_condors"]:
@@ -854,6 +985,7 @@ def main():
                     "upside_distance_pct": round(r["upside_distance_pct"], 1),
                     "return_on_risk": round(r["return_on_risk"], 4),
                     "events": r["events"],
+                    "vol": r.get("vol"),
                 }
         with open(args.json_out, "w") as f:
             json.dump({"asof": RUN_DATE.isoformat(), "results": best,
