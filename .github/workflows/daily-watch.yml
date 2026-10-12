@@ -75,10 +75,10 @@ jobs:
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
           if [ -n "$UNIVERSE" ]; then
-            python3 stock_screener.py --universe "$UNIVERSE" \
+            python3 src/stock_screener.py --universe "$UNIVERSE" \
               --json-out reports/stock-screen.json | tee reports/stock-screen.txt
           else
-            python3 stock_screener.py --names "$WATCHLIST" \
+            python3 src/stock_screener.py --names "$WATCHLIST" \
               --json-out reports/stock-screen.json | tee reports/stock-screen.txt
           fi
 
@@ -89,10 +89,10 @@ jobs:
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
           if [ -n "$UNIVERSE" ]; then
-            python3 spread_screener.py --universe "$UNIVERSE" \
+            python3 src/spread_screener.py --universe "$UNIVERSE" \
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           else
-            python3 spread_screener.py --names "$WATCHLIST" \
+            python3 src/spread_screener.py --names "$WATCHLIST" \
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           fi
 
@@ -102,7 +102,7 @@ jobs:
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
-          python3 pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
+          python3 src/pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
 
       - name: Save watch state
         uses: actions/cache/save@v4
@@ -131,10 +131,10 @@ jobs:
           else
             DETAIL="$(python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
           fi
-          python3 render_report.py --stock reports/stock-screen.json \
+          python3 src/render_report.py --stock reports/stock-screen.json \
             --spreads reports/spread-screen.json \
             --report-id daily-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
-          python3 render_hub.py
+          python3 src/render_hub.py
           ls docs/index.html
 
       - name: Publish dashboard to GitHub Pages
@@ -152,7 +152,7 @@ jobs:
           # conflicts, keep the remote copy — it is re-rendered from all
           # reports right below, so nothing is lost.
           git pull --rebase --strategy-option=theirs
-          python3 render_hub.py
+          python3 src/render_hub.py
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
           git push
