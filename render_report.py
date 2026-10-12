@@ -294,6 +294,78 @@ def pmcc_section(data):
     return section("PMCC watch", body)
 
 
+def method_section(config_path=None):
+    """Methodology card: pattern-identification criteria + how each strategy
+    earns. Thresholds read live from gates.yaml so the report never drifts
+    from the config the screeners actually ran with."""
+    import gates as _g
+    G = _g.load(config_path)
+    st, sp, dt, v, pm = G["stock"], G["spreads"], G["daytrade"], G["vol"], G["pmcc"]
+
+    pats = [
+        ("UP regime", "trend supports selling puts",
+         f"price &gt; SMA{st['sma_fast']} &amp; SMA{st['sma_slow']}, above anchored VWAP "
+         f"(52w low), no downtrend pivot structure"),
+        ("Timing OK", "not chasing, not dead",
+         f"RSI {st['rsi_min']:.0f}&ndash;{st['rsi_max']:.0f}, %B within "
+         f"{st['bb_pctb_min']:.0f}&ndash;{st['bb_pctb_max']:.0f} "
+         f"(%B&gt;1 = extended, reject), no {st['squeeze_lookback']}-day squeeze"),
+        ("Day-trade momentum", "abnormal morning move",
+         f"|gap| &ge; {dt['gap_min_pct']:.0f}%, rel volume &ge; {dt['rel_vol_min']:.1f}&times;, "
+         "developing-VWAP side sets gap-and-go vs fade bias"),
+        ("Vol regime: rich", "premium worth selling",
+         f"IV rank &gt; {v['ivr_sell']:.0f} and IV &gt; {v['hv_short']}-day HV"),
+        ("Vol regime: cheap", "premium not worth selling",
+         f"IV rank &lt; {v['ivr_stand_down']:.0f} &rarr; stand down "
+         "(structures vetoed, none shown)"),
+    ]
+    prows = "".join(
+        f"<tr><td class='sym'>{p}</td><td>{m}</td><td>{c}</td></tr>"
+        for p, m, c in pats)
+
+    strs = [
+        ("Bull put spread",
+         f"short {sp['short_delta_min']:.2f}&ndash;{sp['short_delta_max']:.2f}&Delta; put + "
+         f"long lower-strike put, {sp['dte_min']}&ndash;{sp['dte_max']} DTE",
+         "keeps the net credit (short bid &minus; long ask) if the underlying stays "
+         "above the short strike &mdash; harvests time decay and the premium "
+         "difference between the two strikes"),
+        ("Iron condor",
+         "bull put spread + bear call spread, same expiry",
+         "keeps both credits if the underlying pins between the short strikes "
+         "&mdash; harvests premium from range-bound price action on both sides"),
+        ("Asymmetric iron condor",
+         f"bull put spread + far-OTM call wing (&ge;{sp['call_distance_min']:.0%} above spot)",
+         "bullish tilt; the call wing's premium helps finance the put spread"),
+        ("PMCC",
+         f"{pm['long_delta_min']:.2f}&ndash;{pm['long_delta_max']:.2f}&Delta; LEAPS "
+         f"({pm['long_dte_min']}&ndash;{pm['long_dte_max']} DTE) + "
+         f"{pm['short_delta_min']:.2f}&ndash;{pm['short_delta_max']:.2f}&Delta; short calls "
+         f"({pm['short_dte_min']}&ndash;{pm['short_dte_max']} DTE)",
+         "harvests repeated short-call premium against durable delta exposure, "
+         "at a fraction of 100-share capital"),
+    ]
+    srows = "".join(
+        f"<tr><td class='sym'>{n}</td><td>{s}</td><td>{e}</td></tr>"
+        for n, s, e in strs)
+
+    return section(
+        "Methodology &mdash; patterns and strategies",
+        "<h3>How patterns are identified</h3>"
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th>Pattern</th><th>What it means</th><th>Criteria (all must hold)</th>"
+        "</tr></thead><tbody>" + prows + "</tbody></table></div>"
+        "<h3>How the strategies generate income</h3>"
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th>Strategy</th><th>Structure</th><th>The edge it harvests</th>"
+        "</tr></thead><tbody>" + srows + "</tbody></table></div>"
+        '<p class="fine">Every structure is defined-risk &mdash; max loss is known '
+        "before entry, no naked legs. &ldquo;Return on risk&rdquo; (credit &divide; max "
+        "loss) is a screening ratio, not a forecast. Thresholds above are the live "
+        "values from <span class='num'>gates.yaml</span>.</p>",
+    )
+
+
 def rejections_section(stock_data):
     if not stock_data:
         return ""
@@ -659,6 +731,7 @@ PAGE = """<!DOCTYPE html>
 <p class="sub">All figures computed from Public.com API data in-run. Credits use conservative short-bid minus long-ask fills.</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2>{flow}</section>
+{method}
 {stock}
 {spreads}
 {daytrade}
@@ -683,6 +756,9 @@ def main():
                     help="report source key: watchlist|nasdaq100|sp100|sp500|dow30|custom (authoritative over --report-id)")
     ap.add_argument("--source-detail", default=None,
                     help='e.g. "101 names"')
+    ap.add_argument("--config", default=None,
+                    help="path to gates.yaml (default: gates.yaml next to the script); "
+                         "keeps the methodology section in sync with a custom screener config")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -736,6 +812,7 @@ def main():
         backlink=backlink,
         provline=provline,
         flow=workflow_strip(),
+        method=method_section(args.config),
         stock=stock_html,
         spreads=spreads_html,
         daytrade=daytrade_html,
