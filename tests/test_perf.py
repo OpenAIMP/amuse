@@ -393,5 +393,57 @@ class TestRenderSmoke(unittest.TestCase):
         self.assertFalse(st.bollinger(closes)["squeeze"])
 
 
+class TestTapeReadouts(unittest.TestCase):
+    """Issue #18: gap / momentum / value / bias helpers."""
+
+    def test_gap_up_down_flat(self):
+        import stock_screener as st
+        mk = lambda o, pc: [(pc, pc, pc, 1, None), (100, 100, 100, 1, o)]
+        self.assertEqual(st.gap_label(st.gap_pct(mk(103, 100))), "gap up")
+        self.assertEqual(st.gap_label(st.gap_pct(mk(97, 100))), "gap down")
+        self.assertEqual(st.gap_label(st.gap_pct(mk(100.5, 100))), "no gap")
+
+    def test_gap_unknown_without_open(self):
+        import stock_screener as st
+        bars = [(100, 100, 100, 1, None), (101, 101, 101, 1, None)]
+        self.assertIsNone(st.gap_pct(bars))
+        self.assertIsNone(st.gap_label(None))
+
+    def test_rsi_state(self):
+        import stock_screener as st
+        self.assertEqual(st.rsi_state(25), "oversold")
+        self.assertEqual(st.rsi_state(75), "overbought")
+        self.assertEqual(st.rsi_state(55), "neutral")
+        self.assertIsNone(st.rsi_state(None))
+
+    def test_value_position_and_label(self):
+        import stock_screener as st
+        self.assertAlmostEqual(st.value_position(110, 100, 200), 10.0)
+        self.assertEqual(st.value_label(10.0), "undervalued")
+        self.assertEqual(st.value_label(90.0), "overvalued")
+        self.assertEqual(st.value_label(50.0), "mid-range")
+        self.assertIsNone(st.value_position(110, 200, 200))  # hi <= lo
+
+    def test_bias_votes_and_label(self):
+        import stock_screener as st
+        v, n = st.bias_votes(110, 100, 90, 1.5, 60, "UP")
+        self.assertEqual((v, n), (6, 6))
+        self.assertEqual(st.bias_label(6), "bullish")
+        self.assertEqual(st.bias_label(4), "bullish")
+        self.assertEqual(st.bias_label(3), "neutral")
+        self.assertEqual(st.bias_label(2), "bearish")
+        self.assertEqual(st.bias_label(0), "bearish")
+
+    def test_evaluate_carries_tape(self):
+        import stock_screener as st
+        bars = [(100 + i * 0.1, 101 + i * 0.1, 99 + i * 0.1, 1_000_000,
+                 100 + i * 0.1) for i in range(210)]
+        ok, m, _ = st.evaluate("T", bars)
+        tape = m["indicators"]["tape"]
+        for k in ("gap_pct", "gap", "momentum", "value_pct", "value",
+                  "bias_votes", "bias"):
+            self.assertIn(k, tape)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
