@@ -364,5 +364,23 @@ class TestRenderSmoke(unittest.TestCase):
         self.assertIn("TST", html)  # must not crash on absent fields
 
 
+    def test_squeeze_fires_at_125d_minimum(self):
+        import random
+        import stock_screener as st
+        random.seed(7)
+        closes = [100 + random.uniform(-8, 8) for _ in range(200)]
+        closes += [105 + random.uniform(-1, 1) * 0.1 * (1 - i / 30)
+                   for i in range(30)]
+        bb = st.bollinger(closes)
+        self.assertTrue(bb["squeeze"])
+
+    def test_squeeze_false_when_not_minimum(self):
+        import random
+        import stock_screener as st
+        random.seed(7)
+        closes = [100 + i * 0.1 + random.uniform(-2, 2) for i in range(230)]
+        self.assertFalse(st.bollinger(closes)["squeeze"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
