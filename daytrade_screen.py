@@ -38,13 +38,24 @@ CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID", "5OI32712")
 
 # ---- screening configuration (design choices, printed in every report) ----
-GAP_MIN_PCT = 2.0        # |gap| must be at least 2%
-REL_VOL_MIN = 1.5        # today's volume so far vs 20d avg daily volume
-PRICE_MIN = 10.0
-ATR_PCT_MIN, ATR_PCT_MAX = 1.0, 8.0
-TOP_N = 20               # print top 20 by conviction
+# Tunables live in gates.yaml; this block binds them to module constants.
+import gates as _gates_mod
+
+
+def _apply_gates(path=None):
+    global GAP_MIN_PCT, REL_VOL_MIN, PRICE_MIN
+    global ATR_PCT_MIN, ATR_PCT_MAX, TOP_N, MIN_DAILY_BARS
+    G = _gates_mod.load(path)["daytrade"]
+    GAP_MIN_PCT = G["gap_min_pct"]
+    REL_VOL_MIN = G["rel_vol_min"]
+    PRICE_MIN = G["price_min"]
+    ATR_PCT_MIN, ATR_PCT_MAX = G["atr_pct_min"], G["atr_pct_max"]
+    TOP_N = G["top_n"]
+    MIN_DAILY_BARS = G["min_daily_bars"]
+
+
+_apply_gates()
 PACE_S = 0.2             # seconds between MCP calls
-MIN_DAILY_BARS = 30      # need 20d volume avg + 14d ATR with margin
 
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
 RUN_DATE_ET = datetime.now(ZoneInfo("America/New_York")).date()
@@ -288,10 +299,28 @@ def main():
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--names", default=None,
                     help="comma-separated override (default: embedded S&P 500)")
+    ap.add_argument("--universe", default=None,
+                    help="index universe from universes.py: sp500, sp100, nasdaq100, dow30 (--names wins)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap universe size (for tests)")
+    ap.add_argument("--config", default=None,
+                    help="path to gates.yaml (default: gates.yaml next to the script)")
     args = ap.parse_args()
-    names = args.names.split(",") if args.names else list(SP500)
+    if args.config:
+        _apply_gates(args.config)
+    if args.names:
+        names = args.names.split(",")
+        universe_tag = "custom"
+    elif getattr(args, "universe", None):
+        from universes import UNIVERSES
+        key = args.universe.strip().lower()
+        if key not in UNIVERSES:
+            raise SystemExit(f"unknown universe {key!r}; choose from {sorted(UNIVERSES)}")
+        names = list(UNIVERSES[key])
+        universe_tag = key
+    else:
+        names = list(SP500)
+        universe_tag = "sp500"
     if args.limit:
         names = names[:args.limit]
 
