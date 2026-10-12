@@ -19,6 +19,11 @@ on:
         required: false
         type: string
         default: ""
+      universe:
+        description: "Index universe override (blank = S&P 500)"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       names:
@@ -27,6 +32,10 @@ on:
         default: ""
       limit:
         description: "Cap universe size (for tests; blank = full universe)"
+        required: false
+        default: ""
+      universe:
+        description: "Index universe override (blank = S&P 500)"
         required: false
         default: ""
 
@@ -57,6 +66,7 @@ jobs:
           echo "STAMP=$STAMP" >> $GITHUB_ENV
           ARGS=""
           if [ -n "${{ inputs.names }}" ]; then ARGS="$ARGS --names ${{ inputs.names }}"; fi
+          if [ -n "${{ inputs.universe }}" ]; then ARGS="$ARGS --universe ${{ inputs.universe }}"; fi
           if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
           python3 src/daytrade_screen.py $ARGS \
             --json-out reports/daytrade-screen-$STAMP.json | tee reports/daytrade-screen-$STAMP.txt
@@ -77,6 +87,9 @@ jobs:
           if [ -n "${{ inputs.names }}" ]; then
             SRC="custom"
             DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          elif [ -n "${{ inputs.universe }}" ]; then
+            SRC="${{ inputs.universe }}"
+            DETAIL="$(grep -v '^#' src/universes/${{ inputs.universe }}.txt | grep -vc '^$' | tr -d ' ') names"
           elif [ -n "${{ inputs.limit }}" ]; then
             SRC="custom"
             DETAIL="first ${{ inputs.limit }} of S&P 500"
