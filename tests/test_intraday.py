@@ -54,7 +54,7 @@ class TestORB(unittest.TestCase):
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 103.2},
                                       now_et=_today_at(11, 0))
-        self.assertEqual(res["orb_signal"], "breakout_up")
+        self.assertEqual(res["orb_signal"], "breakout_up_hold")
         self.assertEqual(res["orb_high"], 102)
         self.assertEqual(res["orb_low"], 100)
 
@@ -68,7 +68,7 @@ class TestORB(unittest.TestCase):
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 98.7},
                                       now_et=_today_at(11, 0))
-        self.assertEqual(res["orb_signal"], "breakdown_down")
+        self.assertEqual(res["orb_signal"], "breakdown_down_hold")
 
     def test_no_breakout_inside_range(self):
         bars = [
@@ -81,7 +81,7 @@ class TestORB(unittest.TestCase):
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 100.5},
                                       now_et=_today_at(11, 0))
         self.assertIsNone(res["orb_signal"])
-        self.assertIn("no ORB breakout or VWAP cross", reasons)
+        self.assertIn("no session momentum signal", reasons)
 
 
 class TestVWAP(unittest.TestCase):
