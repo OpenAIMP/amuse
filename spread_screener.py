@@ -21,6 +21,7 @@ Deliberate label choices (not sloppiness):
     source; selection uses abs(delta) and is robust to either convention.
 """
 import argparse
+import concurrent.futures
 import json
 import os
 import math
@@ -571,6 +572,236 @@ def narrate_spreads(bull_puts, condors, asym_condors, rej_all):
     return lines
 
 
+def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
+    """Price all structures for one underlying. Returns a result dict.
+
+    Pure per-symbol work; safe to run in a thread pool (issue #14).
+    Keys: bp/ic/ac (top-3 accepted structure lists), notes (list),
+    rejs ({kind: {reason: count}}), vol_veto (int), error (None or str).
+    """
+    out = {"bp": [], "ic": [], "ac": [], "notes": [],
+           "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {},
+                    "asym_condor": {}},
+           "vol_veto": 0, "error": None}
+    spot = spot_map.get(sym)
+    if spot is None or not math.isfinite(spot) or spot <= 0:
+        out["notes"] = ["missing or invalid underlying quote"]
+        return out
+    # Width auto-scales to price: a $5 width on a $44 stock forces the
+    # long leg into unquotable delta ~0.03 territory. Scale keeps both
+    # legs in liquid strikes.
+    width = width_arg if width_arg is not None \
+        else min(WIDTH_MAX, max(WIDTH_MIN, round(spot / WIDTH_DIVISOR)))
+    try:
+        raw = mcp_call("get_option_expirations",
+                       {"symbol": sym, "account_id": ACCT})
+        exps = eligible_expirations(
+            sorted(set(re.findall(r"20\d\d-\d\d-\d\d", json.dumps(raw)))),
+            SPREAD_DTE_MIN, SPREAD_DTE_MAX)
+        if not exps:
+            out["notes"] = ["no expirations in DTE window"]
+            return out
+
+        # One chain call per expiration; parse puts and calls separately.
+        puts_by_exp, calls_by_exp = {}, {}
+        diag_p, diag_c = {}, {}
+        for exp in exps:
+            pc, dp = parse_options(sym, exp, MIN_LIQUIDITY, "puts")
+            cc, dc = parse_options(sym, exp, MIN_LIQUIDITY, "calls")
+            puts_by_exp[exp], calls_by_exp[exp] = pc, cc
+            for k, v in dp.items():
+                diag_p[k] = diag_p.get(k, 0) + v
+            for k, v in dc.items():
+                diag_c[k] = diag_c.get(k, 0) + v
+
+        # Greeks for strike-plausible candidates only (limits batch size).
+        put_syms = [c["sym"] for pc in puts_by_exp.values()
+                    for c in pc.values()
+                    if spot * 0.60 <= c["strike"] < spot]
+        call_syms = [c["sym"] for cc in calls_by_exp.values()
+                     for c in cc.values()
+                     if spot < c["strike"] <= spot * 1.40]
+        g, gerr = greeks(put_syms + call_syms)
+        for pc in puts_by_exp.values():
+            for c in pc.values():
+                if c["sym"] in g:
+                    c["delta"], c["iv"] = g[c["sym"]]
+        for cc in calls_by_exp.values():
+            for c in cc.values():
+                if c["sym"] in g:
+                    c["delta"], c["iv"] = g[c["sym"]]
+
+        notes = []
+        for src, name in ((diag_p, "put"), (diag_c, "call")):
+            for k, v in sorted(src.items()):
+                if v:
+                    notes.append(f"{name} contracts rejected: {k} x{v}")
+        if gerr:
+            notes.append(f"greeks issues: {len(gerr)} ({gerr[0][:100]})")
+
+        # Candidate short legs: delta-gated, OTM.
+        short_puts, short_calls = [], []
+        for pc in puts_by_exp.values():
+            for c in pc.values():
+                if "delta" not in c:
+                    continue
+                if (SHORT_DELTA_MIN <= abs(c["delta"]) <= SHORT_DELTA_MAX
+                        and c["strike"] < spot):
+                    short_puts.append(c)
+        for cc in calls_by_exp.values():
+            for c in cc.values():
+                if "delta" not in c:
+                    continue
+                if (SHORT_DELTA_MIN <= abs(c["delta"]) <= SHORT_DELTA_MAX
+                        and c["strike"] > spot):
+                    short_calls.append(c)
+        notes.append(f"{len(short_puts)} put / {len(short_calls)} call "
+                     f"short-leg candidates in delta range")
+
+        # Index long legs by (expiration, strike) for exact-width pairing.
+        puts_by_strike, calls_by_strike = {}, {}
+        for pc in puts_by_exp.values():
+            for c in pc.values():
+                puts_by_strike[(c["expiration"], c["strike"])] = c
+        for cc in calls_by_exp.values():
+            for c in cc.values():
+                calls_by_strike[(c["expiration"], c["strike"])] = c
+
+        bp_rej, bc_rej, ic_rej, ac_rej = {}, {}, {}, {}
+        bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
+        bp_accepted, bc_accepted = [], []
+
+        for s in short_puts:
+            target = round(s["strike"] - width, 3)
+            l = puts_by_strike.get((s["expiration"], target))
+            if l is None:
+                bp_n_rej += 1
+                bp_rej["long leg missing at width"] = \
+                    bp_rej.get("long leg missing at width", 0) + 1
+                continue
+            flags, event_reasons = spread_events(sym, s["expiration"], events)
+            r = evaluate_vertical(spot, s, l, width, "bull_put")
+            reasons = r.get("reasons", []) + event_reasons
+            if reasons:
+                bp_n_rej += 1
+                for reason in reasons:
+                    bp_rej[reason] = bp_rej.get(reason, 0) + 1
+                continue
+            r.update({"stock": sym, "spot": spot, "events": flags})
+            bp_accepted.append(r)
+
+        for s in short_calls:
+            target = round(s["strike"] + width, 3)
+            l = calls_by_strike.get((s["expiration"], target))
+            if l is None:
+                bc_n_rej += 1
+                bc_rej["long leg missing at width"] = \
+                    bc_rej.get("long leg missing at width", 0) + 1
+                continue
+            flags, event_reasons = spread_events(sym, s["expiration"], events)
+            r = evaluate_vertical(spot, s, l, width, "bear_call")
+            reasons = r.get("reasons", []) + event_reasons
+            if reasons:
+                bc_n_rej += 1
+                for reason in reasons:
+                    bc_rej[reason] = bc_rej.get(reason, 0) + 1
+                continue
+            r.update({"stock": sym, "spot": spot, "events": flags})
+            bc_accepted.append(r)
+
+        # Iron condors: cross accepted wings on the same expiration.
+        ic_accepted = []
+        for pw in bp_accepted:
+            for cw in bc_accepted:
+                if pw["expiration"] != cw["expiration"]:
+                    continue
+                flags, event_reasons = spread_events(
+                    sym, pw["expiration"], events)
+                r = evaluate_condor(spot, pw, cw, width)
+                reasons = r.get("reasons", []) + event_reasons
+                if reasons:
+                    ic_n_rej += 1
+                    for reason in reasons:
+                        ic_rej[reason] = ic_rej.get(reason, 0) + 1
+                    continue
+                r.update({"stock": sym, "spot": spot, "events": flags})
+                ic_accepted.append(r)
+
+        # asymmetric iron condors (defined-risk): accepted put wing + accepted call
+        # wing with the call wing skewed far OTM (asym condor character).
+        ac_accepted = []
+        for pw in bp_accepted:
+            for cw in bc_accepted:
+                if pw["expiration"] != cw["expiration"]:
+                    continue
+                flags, event_reasons = spread_events(
+                    sym, pw["expiration"], events)
+                r = evaluate_asym_condor(spot, pw, cw, width)
+                reasons = r.get("reasons", []) + event_reasons
+                if reasons:
+                    jl_n_rej += 1
+                    for reason in reasons:
+                        ac_rej[reason] = ac_rej.get(reason, 0) + 1
+                    continue
+                r.update({"stock": sym, "spot": spot, "events": flags})
+                ac_accepted.append(r)
+
+        bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+
+        # Vol assessment (issue #7): sits between Regime and Timing.
+        # Cheap premium stands down -- structures are vetoed, not ranked.
+        if not no_vol and (bp_accepted or ic_accepted or ac_accepted):
+            vol_read = vol_read_for(sym, spot, puts_by_exp, calls_by_exp,
+                                    exps, iv_hist_path)
+            slim = {k: vol_read[k] for k in
+                    ("iv", "hv", "iv_rank", "iv_vs_hv",
+                     "skew_25d", "term_structure", "decision")}
+            for r in bp_accepted + ic_accepted + ac_accepted:
+                r["vol"] = slim
+            notes.append(
+                "vol: " + ", ".join(f"{k}={v}" for k, v in slim.items())
+                + f" ({vol_read['reason']})")
+            if vol_read["decision"] == _vol.STAND_DOWN:
+                n_veto = (len(bp_accepted) + len(ic_accepted)
+                          + len(ac_accepted))
+                out["vol_veto"] += n_veto
+                notes.append(f"vol veto: {n_veto} structures stood down "
+                             "(cheap premium)")
+                bp_accepted, ic_accepted, ac_accepted = [], [], []
+
+        out["bp"] = bp_accepted[:3]
+        out["ic"] = ic_accepted[:3]
+        out["ac"] = ac_accepted[:3]
+
+        notes.append(f"bull puts: {len(bp_accepted)} accepted, "
+                     f"{bp_n_rej} rejected")
+        for reason, cnt in sorted(bp_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  bull-put rejections: {reason} x{cnt}")
+        notes.append(f"bear-call wings: {len(bc_accepted)} accepted, "
+                     f"{bc_n_rej} rejected")
+        for reason, cnt in sorted(bc_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  bear-call rejections: {reason} x{cnt}")
+        notes.append(f"iron condors: {len(ic_accepted)} accepted, "
+                     f"{ic_n_rej} rejected")
+        for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  condor rejections: {reason} x{cnt}")
+        notes.append(f"asym condors: {len(ac_accepted)} accepted, "
+                     f"{jl_n_rej} rejected")
+        for reason, cnt in sorted(ac_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  asym condor rejections: {reason} x{cnt}")
+        for src, key in ((bp_rej, "bull_put"), (bc_rej, "bear_call"),
+                         (ic_rej, "iron_condor"), (ac_rej, "asym_condor")):
+            for k, v in src.items():
+                out["rejs"][key][k] = out["rejs"][key].get(k, 0) + v
+        out["notes"] = notes
+    except McpError as e:
+        out["error"] = f"MCP error: {e}"
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json-out", default=None)
@@ -583,6 +814,8 @@ def main():
                              "min(5, max(1, round(spot/25)))")
     ap.add_argument("--config", default=None,
                         help="path to gates.yaml (default: gates.yaml next to the script)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrent MCP workers (default 8; 1 = sequential)")
     ap.add_argument("--no-vol", action="store_true",
                     help="skip the cheap-vs-expensive vol assessment")
     ap.add_argument("--iv-history", default=None,
@@ -662,223 +895,33 @@ def main():
     vol_veto_total = 0
     rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
                "asym_condor": {}}
-    for sym in names:
-        spot = spot_map.get(sym)
-        if spot is None or not math.isfinite(spot) or spot <= 0:
-            stock_notes[sym] = ["missing or invalid underlying quote"]
-            continue
-        # Width auto-scales to price: a $5 width on a $44 stock forces the
-        # long leg into unquotable delta ~0.03 territory. Scale keeps both
-        # legs in liquid strikes.
-        width = width_arg if width_arg is not None \
-            else min(WIDTH_MAX, max(WIDTH_MIN, round(spot / WIDTH_DIVISOR)))
+
+    def safe(sym):
         try:
-            raw = mcp_call("get_option_expirations",
-                           {"symbol": sym, "account_id": ACCT})
-            exps = eligible_expirations(
-                sorted(set(re.findall(r"20\d\d-\d\d-\d\d", json.dumps(raw)))),
-                SPREAD_DTE_MIN, SPREAD_DTE_MAX)
-            if not exps:
-                stock_notes[sym] = ["no expirations in DTE window"]
-                continue
+            return (sym, screen_spreads_sym(sym, spot_map, width_arg,
+                                            events, iv_hist_path,
+                                            args.no_vol))
+        except Exception as e:  # one bad name never kills the run
+            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
+                          "rejs": {"bull_put": {}, "bear_call": {},
+                                   "iron_condor": {}, "asym_condor": {}},
+                          "vol_veto": 0,
+                          "error": f"unexpected error: {type(e).__name__}: {e}"})
 
-            # One chain call per expiration; parse puts and calls separately.
-            puts_by_exp, calls_by_exp = {}, {}
-            diag_p, diag_c = {}, {}
-            for exp in exps:
-                pc, dp = parse_options(sym, exp, MIN_LIQUIDITY, "puts")
-                cc, dc = parse_options(sym, exp, MIN_LIQUIDITY, "calls")
-                puts_by_exp[exp], calls_by_exp[exp] = pc, cc
-                for k, v in dp.items():
-                    diag_p[k] = diag_p.get(k, 0) + v
-                for k, v in dc.items():
-                    diag_c[k] = diag_c.get(k, 0) + v
-
-            # Greeks for strike-plausible candidates only (limits batch size).
-            put_syms = [c["sym"] for pc in puts_by_exp.values()
-                        for c in pc.values()
-                        if spot * 0.60 <= c["strike"] < spot]
-            call_syms = [c["sym"] for cc in calls_by_exp.values()
-                         for c in cc.values()
-                         if spot < c["strike"] <= spot * 1.40]
-            g, gerr = greeks(put_syms + call_syms)
-            for pc in puts_by_exp.values():
-                for c in pc.values():
-                    if c["sym"] in g:
-                        c["delta"], c["iv"] = g[c["sym"]]
-            for cc in calls_by_exp.values():
-                for c in cc.values():
-                    if c["sym"] in g:
-                        c["delta"], c["iv"] = g[c["sym"]]
-
-            notes = []
-            for src, name in ((diag_p, "put"), (diag_c, "call")):
-                for k, v in sorted(src.items()):
-                    if v:
-                        notes.append(f"{name} contracts rejected: {k} x{v}")
-            if gerr:
-                notes.append(f"greeks issues: {len(gerr)} ({gerr[0][:100]})")
-
-            # Candidate short legs: delta-gated, OTM.
-            short_puts, short_calls = [], []
-            for pc in puts_by_exp.values():
-                for c in pc.values():
-                    if "delta" not in c:
-                        continue
-                    if (SHORT_DELTA_MIN <= abs(c["delta"]) <= SHORT_DELTA_MAX
-                            and c["strike"] < spot):
-                        short_puts.append(c)
-            for cc in calls_by_exp.values():
-                for c in cc.values():
-                    if "delta" not in c:
-                        continue
-                    if (SHORT_DELTA_MIN <= abs(c["delta"]) <= SHORT_DELTA_MAX
-                            and c["strike"] > spot):
-                        short_calls.append(c)
-            notes.append(f"{len(short_puts)} put / {len(short_calls)} call "
-                         f"short-leg candidates in delta range")
-
-            # Index long legs by (expiration, strike) for exact-width pairing.
-            puts_by_strike, calls_by_strike = {}, {}
-            for pc in puts_by_exp.values():
-                for c in pc.values():
-                    puts_by_strike[(c["expiration"], c["strike"])] = c
-            for cc in calls_by_exp.values():
-                for c in cc.values():
-                    calls_by_strike[(c["expiration"], c["strike"])] = c
-
-            bp_rej, bc_rej, ic_rej, ac_rej = {}, {}, {}, {}
-            bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
-            bp_accepted, bc_accepted = [], []
-
-            for s in short_puts:
-                target = round(s["strike"] - width, 3)
-                l = puts_by_strike.get((s["expiration"], target))
-                if l is None:
-                    bp_n_rej += 1
-                    bp_rej["long leg missing at width"] = \
-                        bp_rej.get("long leg missing at width", 0) + 1
-                    continue
-                flags, event_reasons = spread_events(sym, s["expiration"], events)
-                r = evaluate_vertical(spot, s, l, width, "bull_put")
-                reasons = r.get("reasons", []) + event_reasons
-                if reasons:
-                    bp_n_rej += 1
-                    for reason in reasons:
-                        bp_rej[reason] = bp_rej.get(reason, 0) + 1
-                    continue
-                r.update({"stock": sym, "spot": spot, "events": flags})
-                bp_accepted.append(r)
-
-            for s in short_calls:
-                target = round(s["strike"] + width, 3)
-                l = calls_by_strike.get((s["expiration"], target))
-                if l is None:
-                    bc_n_rej += 1
-                    bc_rej["long leg missing at width"] = \
-                        bc_rej.get("long leg missing at width", 0) + 1
-                    continue
-                flags, event_reasons = spread_events(sym, s["expiration"], events)
-                r = evaluate_vertical(spot, s, l, width, "bear_call")
-                reasons = r.get("reasons", []) + event_reasons
-                if reasons:
-                    bc_n_rej += 1
-                    for reason in reasons:
-                        bc_rej[reason] = bc_rej.get(reason, 0) + 1
-                    continue
-                r.update({"stock": sym, "spot": spot, "events": flags})
-                bc_accepted.append(r)
-
-            # Iron condors: cross accepted wings on the same expiration.
-            ic_accepted = []
-            for pw in bp_accepted:
-                for cw in bc_accepted:
-                    if pw["expiration"] != cw["expiration"]:
-                        continue
-                    flags, event_reasons = spread_events(
-                        sym, pw["expiration"], events)
-                    r = evaluate_condor(spot, pw, cw, width)
-                    reasons = r.get("reasons", []) + event_reasons
-                    if reasons:
-                        ic_n_rej += 1
-                        for reason in reasons:
-                            ic_rej[reason] = ic_rej.get(reason, 0) + 1
-                        continue
-                    r.update({"stock": sym, "spot": spot, "events": flags})
-                    ic_accepted.append(r)
-
-            # asymmetric iron condors (defined-risk): accepted put wing + accepted call
-            # wing with the call wing skewed far OTM (asym condor character).
-            ac_accepted = []
-            for pw in bp_accepted:
-                for cw in bc_accepted:
-                    if pw["expiration"] != cw["expiration"]:
-                        continue
-                    flags, event_reasons = spread_events(
-                        sym, pw["expiration"], events)
-                    r = evaluate_asym_condor(spot, pw, cw, width)
-                    reasons = r.get("reasons", []) + event_reasons
-                    if reasons:
-                        jl_n_rej += 1
-                        for reason in reasons:
-                            ac_rej[reason] = ac_rej.get(reason, 0) + 1
-                        continue
-                    r.update({"stock": sym, "spot": spot, "events": flags})
-                    ac_accepted.append(r)
-
-            bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-            bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-            ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-            ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
-
-            # Vol assessment (issue #7): sits between Regime and Timing.
-            # Cheap premium stands down -- structures are vetoed, not ranked.
-            if not args.no_vol and (bp_accepted or ic_accepted or ac_accepted):
-                vol_read = vol_read_for(sym, spot, puts_by_exp, calls_by_exp,
-                                        exps, iv_hist_path)
-                slim = {k: vol_read[k] for k in
-                        ("iv", "hv", "iv_rank", "iv_vs_hv",
-                         "skew_25d", "term_structure", "decision")}
-                for r in bp_accepted + ic_accepted + ac_accepted:
-                    r["vol"] = slim
-                notes.append(
-                    "vol: " + ", ".join(f"{k}={v}" for k, v in slim.items())
-                    + f" ({vol_read['reason']})")
-                if vol_read["decision"] == _vol.STAND_DOWN:
-                    n_veto = (len(bp_accepted) + len(ic_accepted)
-                              + len(ac_accepted))
-                    vol_veto_total += n_veto
-                    notes.append(f"vol veto: {n_veto} structures stood down "
-                                 "(cheap premium)")
-                    bp_accepted, ic_accepted, ac_accepted = [], [], []
-
-            bull_puts.extend(bp_accepted[:3])
-            condors.extend(ic_accepted[:3])
-            asym_condors.extend(ac_accepted[:3])
-
-            notes.append(f"bull puts: {len(bp_accepted)} accepted, "
-                         f"{bp_n_rej} rejected")
-            for reason, cnt in sorted(bp_rej.items(), key=lambda kv: (-kv[1], kv[0])):
-                notes.append(f"  bull-put rejections: {reason} x{cnt}")
-            notes.append(f"bear-call wings: {len(bc_accepted)} accepted, "
-                         f"{bc_n_rej} rejected")
-            for reason, cnt in sorted(bc_rej.items(), key=lambda kv: (-kv[1], kv[0])):
-                notes.append(f"  bear-call rejections: {reason} x{cnt}")
-            notes.append(f"iron condors: {len(ic_accepted)} accepted, "
-                         f"{ic_n_rej} rejected")
-            for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
-                notes.append(f"  condor rejections: {reason} x{cnt}")
-            notes.append(f"asym condors: {len(ac_accepted)} accepted, "
-                         f"{jl_n_rej} rejected")
-            for reason, cnt in sorted(ac_rej.items(), key=lambda kv: (-kv[1], kv[0])):
-                notes.append(f"  asym condor rejections: {reason} x{cnt}")
-            for src, key in ((bp_rej, "bull_put"), (bc_rej, "bear_call"),
-                             (ic_rej, "iron_condor"), (ac_rej, "asym_condor")):
-                for k, v in src.items():
-                    rej_all[key][k] = rej_all[key].get(k, 0) + v
-            stock_notes[sym] = notes
-        except McpError as e:
-            stock_notes[sym] = [f"MCP error: {e}"]
+    # Thread pool over names (issue #14). Merge in submission order in the
+    # main thread: no shared-state locks, deterministic output.
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(1, args.workers)) as ex:
+        results = list(ex.map(safe, names))
+    for sym, r in results:
+        stock_notes[sym] = [r["error"]] if r["error"] else r["notes"]
+        for key, d in r["rejs"].items():
+            for k, v in d.items():
+                rej_all[key][k] = rej_all[key].get(k, 0) + v
+        bull_puts.extend(r["bp"])
+        condors.extend(r["ic"])
+        asym_condors.extend(r["ac"])
+        vol_veto_total += r["vol_veto"]
 
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
