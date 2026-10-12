@@ -370,6 +370,12 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     else:
         breakeven = sk + credit
     net_delta = long_c.get("delta", 0.0) - short_c["delta"]  # long minus short
+    # probability estimates: P(short expires OTM) ≈ 1 - |delta|
+    _pwin = max(0.0, min(1.0, 1 - abs(short_c["delta"])))
+    _cd = credit * 100
+    # bull put: best = above breakeven; worst = below long strike
+    # bear call: best = below breakeven; worst = above long strike
+    _is_put = kind == "bull_put_spread"
     return {
         "accepted": True,
         "kind": kind,
@@ -387,6 +393,12 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "friction": friction,
         "net_delta": net_delta,
         "leg_spread_sum": short_c["spread"] + long_c["spread"],
+        "win_prob_est": round(_pwin, 3),
+        "expected_value": round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
+        "loss_multiple": round(max_loss / _cd, 2) if _cd > 0 else None,
+        "best_case_range": ([round(breakeven, 2), "and up"] if _is_put
+                            else ["and down", round(breakeven, 2)]),
+        "worst_case_price": round(lk, 2),
     }
 
 
@@ -428,7 +440,49 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "friction": friction,
         "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
         "width": width,
+        # --- probability estimates (#28): delta-based, labeled as estimates ---
+        # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence
+        "put_short_delta": put_wing["short_delta"],
+        "call_short_delta": call_wing["short_delta"],
     }
+    # win probability and expected value from the short-leg deltas
+    # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence.
+    # These are ESTIMATES, not market facts -- see the hub guide.
+    pd = abs(put_wing["short_delta"])
+    cd = abs(call_wing["short_delta"])
+    p_win = max(0.0, min(1.0, (1 - pd) * (1 - cd)))
+    credit_dollars = total_credit * 100
+    result = {
+        "accepted": True,
+        "kind": "iron_condor",
+        "expiration": put_wing["expiration"],
+        "dte": put_wing["dte"],
+        "put_short_strike": put_wing["short_strike"],
+        "put_long_strike": put_wing["long_strike"],
+        "call_short_strike": call_wing["short_strike"],
+        "call_long_strike": call_wing["long_strike"],
+        "put_wing_credit": put_wing["credit_total"],
+        "call_wing_credit": call_wing["credit_total"],
+        "credit_total": total_credit * 100,
+        "max_loss_total": max_loss,
+        "breakeven_put": put_wing["short_strike"] - total_credit,
+        "breakeven_call": call_wing["short_strike"] + total_credit,
+        "return_on_risk": total_credit / (width - total_credit),
+        "friction": friction,
+        "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
+        "width": width,
+        "put_short_delta": put_wing["short_delta"],
+        "call_short_delta": call_wing["short_delta"],
+        "win_prob_est": round(p_win, 3),
+        "expected_value": round(p_win * credit_dollars - (1 - p_win) * max_loss, 0),
+        "loss_multiple": round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None,
+        # price ranges for the explainer
+        "best_case_range": [round(put_wing["short_strike"] - total_credit, 2),
+                            round(call_wing["short_strike"] + total_credit, 2)],
+        "worst_case_put": round(put_wing["long_strike"], 2),
+        "worst_case_call": round(call_wing["long_strike"], 2),
+    }
+    return result
 
 
 def evaluate_asym_condor(spot, put_wing, call_wing, width):
@@ -497,6 +551,14 @@ def evaluate_asym_condor(spot, put_wing, call_wing, width):
         "friction": friction,
         "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
         "width": width,
+        "put_short_delta": put_wing["short_delta"],
+        "call_short_delta": call_wing["short_delta"],
+        "win_prob_est": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))), 3),
+        "expected_value": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))) * total_credit * 100 - (1 - max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"]))))) * max_loss, 0),
+        "loss_multiple": round(max_loss / (total_credit * 100), 2) if total_credit > 0 else None,
+        "best_case_range": [round(breakeven_put, 2), round(breakeven_call, 2)],
+        "worst_case_put": round(put_wing["long_strike"], 2),
+        "worst_case_call": round(call_wing["long_strike"], 2),
     }
 
 
