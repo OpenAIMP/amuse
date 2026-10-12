@@ -59,6 +59,12 @@ class TestLoad(unittest.TestCase):
         g = gates.load("/tmp/definitely-not-here-12345.yaml")
         self.assertEqual(g["daytrade"]["top_n"], 20)
 
+    def test_ledger_section(self):
+        g = gates.load()
+        self.assertEqual(g["ledger"]["max_loss_pct"], 0.02)
+        self.assertEqual(g["ledger"]["heat_cap_pct"], 0.35)
+        self.assertEqual(g["ledger"]["fee_per_contract"], 0.65)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
