@@ -139,7 +139,8 @@ didn't — so your job narrows to judgment: selection, sizing, confirmation.
 
 - Will this trade make money? Probabilities are market-implied, not forecasts.
 - How many contracts? No sizing calculator yet (roadmap).
-- When do I exit? No exit rules yet (roadmap).
+- When do I exit? Bull put spreads now have a defined exit policy (below);
+  other structures still need theirs.
 - Is my book within risk limits? No heat tracker yet (roadmap).
 - What will the market do tomorrow? Nothing here predicts — ever.
 
@@ -286,6 +287,23 @@ Notes for manual runs:
   `sp100`/`nasdaq100` are the sweet spot for options.
 
 ## Risk management
+
+### Exit policy — bull put spreads (issue #9)
+
+Entries without exits is half a system. The first strategy with a complete
+policy is the bull put spread, implemented as pure logic in `exits.py` and
+tuned in `gates.yaml` under `exits:`:
+
+- **Take profit:** close when the buy-back costs 50% of the credit (keep half).
+- **Stop loss:** close when the buy-back costs 2× the credit — a fraction of
+  the spread's max loss, never the full width.
+- **Time exit:** never hold past 7 DTE; close or roll before gamma run-up.
+- **No assignment:** short leg ITM inside 2 DTE → close the spread, never take
+  the shares.
+
+Priority: assignment risk > time exit > profit target > stop loss > hold.
+These are starting values to be validated out-of-sample (issue #11), not
+proven optima. Other structures still need their policies.
 
 ### What the system measures today
 
