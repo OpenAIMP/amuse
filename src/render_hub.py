@@ -274,6 +274,21 @@ the two columns read together.</li>
 breakevens through expiration — you keep the full credit. Worst case: price blows
 through a long strike — you lose the max. Optimal: price pins near the short
 strikes, maximizing time decay. The breakeven column shows the exact boundaries.</p>
+<h3>Winners vs losers — how to read Win%</h3>
+<p>Every spread row now carries <b>Win%</b>, <b>EV$</b>, and <b>Loss×</b>:</p>
+<ul>
+<li><b>High Win% (70%+) + positive EV$</b> — the market prices this in your favor.
+These are the "high chance of winning" candidates. Still defined-risk: a gap
+through the long strike loses the max.</li>
+<li><b>High Win% + negative EV$</b> — you're paying for safety. Common on
+low-IV names; the trade is a hedge-like income position, not an edge.</li>
+<li><b>Low Win% (&lt;55%) + high RoR</b> — lottery tickets. Big payout if right,
+but the odds say you'll lose more often than not. Size these tiny or skip.</li>
+<li><b>Loss× above 4</b> — you're risking $4+ per $1 of credit. Needs Win%
+above 80% to break even on expectancy. Treat with suspicion.</li>
+</ul>
+<p>Sort mentally by <b>EV$ first, Win% second, RoR third</b>. RoR ranks payout
+efficiency; EV$ ranks whether the odds justify the risk.</p>
 <h3>Reading the legs</h3>
 <p>First strike = <b>short (sell)</b>, second = <b>long (buy)</b>.
 210/205P means sell the 210 put, buy the 205 put. 245/250C means sell the 245
