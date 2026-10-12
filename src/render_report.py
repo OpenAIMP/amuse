@@ -557,6 +557,37 @@ def method_section(config_path=None):
     )
 
 
+def catalyst_section(news_data, symbols):
+    """Per-ticker headline watch (issue #21). Only tickers present in the
+    report are shown; missing/empty news degrades to nothing."""
+    if not news_data or not symbols:
+        return ""
+    tickers = news_data.get("tickers") or {}
+    blocks = []
+    for sym in symbols:
+        heads = tickers.get(sym) or []
+        if not heads:
+            continue
+        items = "".join(
+            f"<li><a href=\"{esc(h['link'])}\" target=\"_blank\" rel=\"noopener\">"
+            f"{esc(h['title'])}</a>"
+            f"<span class=\"dim\"> — {esc(h.get('source') or '')}</span></li>"
+            for h in heads[:3]
+        )
+        blocks.append(
+            f"<div class=\"news-ticker\"><h4>{sym_cell(sym)}</h4><ul>{items}</ul></div>"
+        )
+    if not blocks:
+        return ""
+    fetched = esc((news_data.get("fetched_at") or "")[:16].replace("T", " "))
+    return (
+        "<section class=\"card\"><h2>Catalyst watch</h2>"
+        f"<p class=\"dim\">Headlines from the morning fetch ({fetched} UTC) — "
+        "check these before trusting any regime read or pricing a structure.</p>"
+        + "".join(blocks) + "</section>"
+    )
+
+
 def rejections_section(stock_data):
     if not stock_data:
         return ""
@@ -943,6 +974,7 @@ PAGE = """<!DOCTYPE html>
 {daytrade}
 {pmcc}
 {rejections}
+{catalyst}
 <footer>Generated {now} · screeners never place orders.</footer>
 </div>
 </body>
@@ -965,6 +997,8 @@ def main():
     ap.add_argument("--config", default=None,
                     help="path to gates.yaml (default: gates.yaml next to the script); "
                          "keeps the methodology section in sync with a custom screener config")
+    ap.add_argument("--news", default=None,
+                    help="path to fetch_news.py output JSON for the Catalyst watch section")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -975,6 +1009,7 @@ def main():
     spreads = load_json(args.spreads)
     pmcc = load_json(args.pmcc)
     daytrade = load_json(args.daytrade)
+    news = load_json(args.news)
 
     if report_mode:
         rid = args.report_id
@@ -1011,6 +1046,9 @@ def main():
     spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
     pmcc_html = pmcc_section(pmcc) if (pmcc or not report_mode) else ""
     daytrade_html = daytrade_section(daytrade, report_mode) if daytrade else ""
+    passing_syms = [p.get("symbol") for p in (stock or {}).get("passing", [])
+                    if p.get("symbol")]
+    catalyst_html = catalyst_section(news, passing_syms)
 
     page = PAGE.format(
         css=css,
@@ -1024,6 +1062,7 @@ def main():
         daytrade=daytrade_html,
         pmcc=pmcc_html,
         rejections=rejections_section(stock),
+        catalyst=catalyst_html,
         now=esc(dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")),
     )
     outdir = os.path.dirname(os.path.abspath(out))
