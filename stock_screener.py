@@ -27,25 +27,40 @@ DEFAULT_NAMES = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO",
                  "JPM", "V", "XOM", "JNJ", "PG", "HD", "BAC", "DIS"]
 
 # ---- screening configuration (design choices, printed in every report) ----
-PRICE_MIN, PRICE_MAX = 10.0, 500.0
-RSI_MIN, RSI_MAX = 30.0, 70.0
-REQUIRE_ABOVE_SMA50 = True
-REQUIRE_ABOVE_SMA200 = True
-ATR_PCT_MIN, ATR_PCT_MAX = 1.0, 6.0
-VOL_RATIO_MIN = 0.9          # 20d avg volume / 60d avg volume
-MAX_OFF_HIGH_PCT = 25.0      # must be within 25% below 52-week high
-MIN_BARS = 200               # need a full SMA200 of history
-PERIOD = "YEAR"
+# Tunables live in gates.yaml; this block binds them to module constants.
+import gates as _gates_mod
 
-# ---- indicator-pack configuration (design choices, printed in every report) --
-BB_PERIOD, BB_MULT = 20, 2.0          # Bollinger: 20-period SMA +/- 2 sample stdev
-BB_PCTB_MIN, BB_PCTB_MAX = 0.0, 1.0   # %B gate: price must be inside the bands
-SQUEEZE_LOOKBACK = 125                # squeeze = bandwidth at N-day minimum
-MIN_BARS_SQUEEZE = 130                # else squeeze is unknown (ranking only)
-REQUIRE_ABOVE_ANCHORED_VWAP = True    # gate: close must hold anchored VWAP
-REJECT_DOWNTREND = True               # gate: reject downtrend pivot structure
-PIVOT_N = 5                           # fractal pivot: extreme of n bars each side
-SWING_LOOKBACK_BARS = 126             # ~6 months for the reference swing
+
+def _apply_gates(path=None):
+    global PRICE_MIN, PRICE_MAX, RSI_PERIOD, RSI_MIN, RSI_MAX
+    global SMA_FAST, SMA_SLOW, REQUIRE_ABOVE_SMA_FAST, REQUIRE_ABOVE_SMA_SLOW
+    global ATR_PCT_MIN, ATR_PCT_MAX, VOL_RATIO_MIN, MAX_OFF_HIGH_PCT, MIN_BARS
+    global BB_PERIOD, BB_MULT, BB_PCTB_MIN, BB_PCTB_MAX
+    global SQUEEZE_LOOKBACK, MIN_BARS_SQUEEZE, REQUIRE_ABOVE_ANCHORED_VWAP
+    global REJECT_DOWNTREND, PIVOT_N, SWING_LOOKBACK_BARS
+    G = _gates_mod.load(path)["stock"]
+    PRICE_MIN, PRICE_MAX = G["price_min"], G["price_max"]
+    RSI_PERIOD = G["rsi_period"]
+    RSI_MIN, RSI_MAX = G["rsi_min"], G["rsi_max"]
+    SMA_FAST, SMA_SLOW = G["sma_fast"], G["sma_slow"]
+    REQUIRE_ABOVE_SMA_FAST = G["require_above_sma_fast"]
+    REQUIRE_ABOVE_SMA_SLOW = G["require_above_sma_slow"]
+    ATR_PCT_MIN, ATR_PCT_MAX = G["atr_pct_min"], G["atr_pct_max"]
+    VOL_RATIO_MIN = G["vol_ratio_min"]
+    MAX_OFF_HIGH_PCT = G["max_off_high_pct"]
+    MIN_BARS = G["min_bars"]
+    BB_PERIOD, BB_MULT = G["bb_period"], G["bb_mult"]
+    BB_PCTB_MIN, BB_PCTB_MAX = G["bb_pctb_min"], G["bb_pctb_max"]
+    SQUEEZE_LOOKBACK = G["squeeze_lookback"]
+    MIN_BARS_SQUEEZE = G["min_bars_squeeze"]
+    REQUIRE_ABOVE_ANCHORED_VWAP = G["require_above_anchored_vwap"]
+    REJECT_DOWNTREND = G["reject_downtrend"]
+    PIVOT_N = G["pivot_n"]
+    SWING_LOOKBACK_BARS = G["swing_lookback_bars"]
+
+
+_apply_gates()
+PERIOD = "YEAR"
 INTRADAY_PERIOD = "DAY"
 INTRADAY_AGG = "FIFTEEN_MINUTES"
 FIB_LEVELS = (0.382, 0.50, 0.618)
@@ -107,18 +122,18 @@ def sma(vals, n):
     return sum(vals[-n:]) / n
 
 
-def rsi14(closes):
-    """Wilder's RSI(14). Returns None if insufficient data."""
-    if len(closes) < 15:
+def rsi(closes, period=14):
+    """Wilder's RSI. Returns None if insufficient data."""
+    if len(closes) < period + 1:
         return None
     deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
     gains = [max(d, 0.0) for d in deltas]
     losses = [max(-d, 0.0) for d in deltas]
-    ag = sum(gains[:14]) / 14
-    al = sum(losses[:14]) / 14
-    for g, l in zip(gains[14:], losses[14:]):
-        ag = (ag * 13 + g) / 14
-        al = (al * 13 + l) / 14
+    ag = sum(gains[:period]) / period
+    al = sum(losses[:period]) / period
+    for g, l in zip(gains[period:], losses[period:]):
+        ag = (ag * (period - 1) + g) / period
+        al = (al * (period - 1) + l) / period
     if al == 0:
         return 100.0
     return 100.0 - 100.0 / (1.0 + ag / al)
@@ -354,15 +369,15 @@ def evaluate(sym, bars):
     price = closes[-1]
     if not (PRICE_MIN <= price <= PRICE_MAX):
         reasons.append("price out of range")
-    rsi = rsi14(closes)
+    rsi = rsi(closes, RSI_PERIOD)
     if rsi is None or not (RSI_MIN <= rsi <= RSI_MAX):
         reasons.append("rsi out of range")
-    s50, s200 = sma(closes, 50), sma(closes, 200)
+    s50, s200 = sma(closes, SMA_FAST), sma(closes, SMA_SLOW)
     vs50 = (price / s50 - 1) * 100
     vs200 = (price / s200 - 1) * 100
-    if REQUIRE_ABOVE_SMA50 and price < s50:
+    if REQUIRE_ABOVE_SMA_FAST and price < s50:
         reasons.append("below 50-day SMA")
-    if REQUIRE_ABOVE_SMA200 and price < s200:
+    if REQUIRE_ABOVE_SMA_SLOW and price < s200:
         reasons.append("below 200-day SMA")
     atrp = atr14_pct(bars, price)
     if atrp is None or not (ATR_PCT_MIN <= atrp <= ATR_PCT_MAX):
@@ -601,7 +616,11 @@ def main():
                     help="index universe from universes.py: sp500, sp100, nasdaq100, dow30 (--names wins if both given)")
     ap.add_argument("--json-out", default=None,
                     help="write machine-readable ranked results to FILE")
+    ap.add_argument("--config", default=None,
+                    help="path to gates.yaml (default: gates.yaml next to the script)")
     args = ap.parse_args()
+    if args.config:
+        _apply_gates(args.config)
     if args.names:
         names = [n.strip().upper() for n in args.names.split(",") if n.strip()]
         universe_tag = "custom"
@@ -619,8 +638,8 @@ def main():
     print(f"Technical stock screen -- run {RUN_TS} (America/New_York) [{universe_tag}, {len(names)} names]")
     print(f"Settings: price ${PRICE_MIN:.0f}-${PRICE_MAX:.0f}, "
           f"RSI14 {RSI_MIN:.0f}-{RSI_MAX:.0f}, "
-          f"above SMA50={'yes' if REQUIRE_ABOVE_SMA50 else 'no'}, "
-          f"above SMA200={'yes' if REQUIRE_ABOVE_SMA200 else 'no'}, "
+          f"above SMA{SMA_FAST}={'yes' if REQUIRE_ABOVE_SMA_FAST else 'no'}, "
+          f"above SMA{SMA_SLOW}={'yes' if REQUIRE_ABOVE_SMA_SLOW else 'no'}, "
           f"ATR% {ATR_PCT_MIN:.1f}-{ATR_PCT_MAX:.1f}, "
           f"vol20/60 >= {VOL_RATIO_MIN}, "
           f"within {MAX_OFF_HIGH_PCT:.0f}% of 52w high, "
@@ -723,9 +742,12 @@ def main():
             json.dump({"asof": RUN_DATE.isoformat(),
                        "settings": {
                            "price_range": [PRICE_MIN, PRICE_MAX],
-                           "rsi14_range": [RSI_MIN, RSI_MAX],
-                           "require_above_sma50": REQUIRE_ABOVE_SMA50,
-                           "require_above_sma200": REQUIRE_ABOVE_SMA200,
+                           "rsi_range": [RSI_MIN, RSI_MAX],
+                           "rsi_period": RSI_PERIOD,
+                           "require_above_sma_fast": REQUIRE_ABOVE_SMA_FAST,
+                           "require_above_sma_slow": REQUIRE_ABOVE_SMA_SLOW,
+                           "sma_fast": SMA_FAST,
+                           "sma_slow": SMA_SLOW,
                            "atr_pct_range": [ATR_PCT_MIN, ATR_PCT_MAX],
                            "vol_ratio_min": VOL_RATIO_MIN,
                            "max_off_high_pct": MAX_OFF_HIGH_PCT,
