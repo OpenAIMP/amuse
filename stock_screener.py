@@ -370,8 +370,8 @@ def evaluate(sym, bars):
     price = closes[-1]
     if not (PRICE_MIN <= price <= PRICE_MAX):
         reasons.append("price out of range")
-    rsi = rsi(closes, RSI_PERIOD)
-    if rsi is None or not (RSI_MIN <= rsi <= RSI_MAX):
+    rsi14 = rsi(closes, RSI_PERIOD)
+    if rsi14 is None or not (RSI_MIN <= rsi14 <= RSI_MAX):
         reasons.append("rsi out of range")
     s50, s200 = sma(closes, SMA_FAST), sma(closes, SMA_SLOW)
     vs50 = (price / s50 - 1) * 100
@@ -437,7 +437,7 @@ def evaluate(sym, bars):
         "structure": struct,
     }
     metrics = {
-        "price": round(price, 2), "rsi14": round(rsi, 1),
+        "price": round(price, 2), "rsi14": round(rsi14, 1),
         "vs_sma50_pct": round(vs50, 1), "vs_sma200_pct": round(vs200, 1),
         "atr_pct": round(atrp, 2), "vol_ratio": round(vratio, 2),
         "off_52w_high_pct": round(off_hi, 1),
