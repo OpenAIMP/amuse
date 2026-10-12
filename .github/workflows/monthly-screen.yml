@@ -46,7 +46,7 @@ jobs:
           if [ -n "${{ inputs.names }}" ]; then
             WATCHLIST="${{ inputs.names }}"
           else
-            WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
+            WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
           fi
           python3 src/pmcc_quality.py --names "$WATCHLIST" --json-out reports/pmcc-quality-$STAMP.json | tee reports/pmcc-quality-$STAMP.txt
 
@@ -68,7 +68,7 @@ jobs:
             DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
           else
             SRC="watchlist"
-            DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
+            DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           fi
           python3 src/render_report.py --pmcc reports/pmcc-quality-$STAMP.json \
             --report-id pmcc-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
