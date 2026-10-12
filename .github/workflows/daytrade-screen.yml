@@ -82,7 +82,7 @@ jobs:
             DETAIL="first ${{ inputs.limit }} of S&P 500"
           else
             SRC="sp500"
-            DETAIL="503 names"
+            DETAIL="502 names"
           fi
           python3 src/render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
             --report-id daytrade-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
