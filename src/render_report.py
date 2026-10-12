@@ -249,7 +249,7 @@ def stock_section(data):
         )
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Symbol</th><th>Price</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Symbol</th><th title='Last price at screen time.'>Price</th>"
         "<th title='RSI(14): momentum oscillator 0-100. Gate keeps 30-70; "
         "below 30 = washed out, above 70 = overheated.'>RSI(14)</th>"
         "<th title='Distance above the 50-day SMA (%). Regime use: the base score "
@@ -390,8 +390,14 @@ def spread_tables(data):
     out.append("<h3>Bull put spreads <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Sym</th><th>Exp</th><th>Strikes</th><th>DTE</th><th>Credit</th>"
-        "<th>Max loss</th><th>Breakeven</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Sym</th>"
+        "<th title='Option expiration date.'>Exp</th>"
+        "<th title='Short put strike / long put strike (e.g. 205/200P). Width auto-scales to price ($1–$5).'>Strikes</th>"
+        "<th title='Days to expiration. Gate: 21–60.'>DTE</th>"
+        "<th title='Net credit received per spread: short bid minus long ask (conservative fill).'>Credit</th>"
+        "<th title='Maximum loss per spread: width minus credit. Gate: at most $1000.'>Max loss</th>"
+        "<th title='Breakeven at expiration: short strike minus credit per share.'>Breakeven</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+        "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr>')
         + "</tbody></table></div>"
@@ -423,8 +429,15 @@ def spread_tables(data):
     out.append("<h3>Iron condors <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
-        "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Sym</th>"
+        "<th title='Option expiration date.'>Exp</th>"
+        "<th title='Put spread wing: short put strike / long put strike.'>Put wing</th>"
+        "<th title='Call spread wing: short call strike / long call strike.'>Call wing</th>"
+        "<th title='Days to expiration. Gate: 21–60.'>DTE</th>"
+        "<th title='Net credit received: sum of both wing credits (short bid minus long ask each).'>Credit</th>"
+        "<th title='Maximum loss: wider wing width minus credit. Gate: at most $1000.'>Max loss</th>"
+        "<th title='Put breakeven / call breakeven at expiration.'>Breakevens</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+        "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="10" class="empty">No qualifying condors.</td></tr>')
         + "</tbody></table></div>"
@@ -435,15 +448,42 @@ def spread_tables(data):
         out.append("<h3>Asymmetric iron condors <span class='dim'>(defined-risk: put spread + far-OTM call wing, ranked by return on risk)</span></h3>")
         out.append(
             '<div class="tbl-wrap"><table><thead><tr>'
-            "<th>Sym</th><th>Exp</th><th>Put wing</th><th>Call wing</th><th>DTE</th>"
-            "<th>Credit</th><th>Max loss</th><th>Breakevens</th><th>Up% dist</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th><th>Events</th>"
+            "<th title='Underlying symbol. Click for quote pages.'>Sym</th>"
+            "<th title='Option expiration date.'>Exp</th>"
+            "<th title='Put spread wing: short put strike / long put strike.'>Put wing</th>"
+            "<th title='Far-OTM call wing: short call strike / long call strike, at least 8% above spot.'>Call wing</th>"
+            "<th title='Days to expiration. Gate: 21–60.'>DTE</th>"
+            "<th title='Net credit received: put wing credit plus call wing credit.'>Credit</th>"
+            "<th title='Maximum loss: put wing width minus credit. Gate: at most $1000.'>Max loss</th>"
+            "<th title='Put breakeven / call breakeven at expiration.'>Breakevens</th>"
+            "<th title='Call wing distance above spot (%). Gate: at least 8%.'>Up% dist</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+            "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
             "</tr></thead><tbody>"
             + "".join(ac_rows)
             + "</tbody></table></div>"
         )
     used = {why_for(sym, readout) for sym, _ in list(bps) + list(ics)}
     used |= {why_for(sym, readout) for sym in ac_syms}
-    rest = [l for l in readout if isinstance(l, str) and l not in used and l.strip()]
+    # Group readout into (header, bullets); a header whose bullets were all
+    # consumed as why-rows under the tables is dropped so it isn't orphaned (#25).
+    rest = []
+    hdr, bullets = None, []
+    def _flush():
+        if bullets:
+            if hdr is not None:
+                rest.append(hdr)
+            rest.extend(bullets)
+        elif hdr is not None and hdr.startswith("No "):
+            rest.append(hdr)  # "No X qualified" stands alone
+    for l in readout:
+        if not isinstance(l, str) or not l.strip() or l in used:
+            continue
+        if l.startswith("Top ") or l.startswith("No "):
+            _flush()
+            hdr, bullets = l, []
+        else:
+            bullets.append(l)
+    _flush()
     if rest:
         lines = "".join(f"<li>{esc(l)}</li>" for l in rest)
         out.append(f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>')
@@ -472,7 +512,12 @@ def pmcc_section(data):
         )
     body = (
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Sym</th><th>Long / Short</th><th>P/D 30d</th><th>Capital</th><th>Breach</th><th>Events</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Sym</th>"
+        "<th title='LEAPS long-call strike / short-call strike.'>Long / Short</th>"
+        "<th title='Premium-to-debit ratio over 30 days (%). Qualifier gate: at least 4.0.'>P/D 30d</th>"
+        "<th title='Capital required for the PMCC position.'>Capital</th>"
+        "<th title='Breakeven distance above spot (%). Qualifier gate: within 8%.'>Breach</th>"
+        "<th title='Earnings or binary events: any flag disqualifies.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
            '<tr><td colspan="6" class="empty">No qualifiers — baseline set or nothing meeting entry gates.</td></tr>')
@@ -649,8 +694,13 @@ def daytrade_section(data, report_mode=False):
         )
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th>"
-        "<th>VWAP dist</th><th>ATR%</th><th>Bias</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Symbol</th>"
+        "<th title='Last price at screen time.'>Price</th>"
+        "<th title='Overnight gap: (open / prior close − 1). Gate: at least 2% in either direction.'>Gap%</th>"
+        "<th title='Pre-market volume vs its recent average. Gate: at least 1.5×.'>RelVol</th>"
+        "<th title='Distance from the developing session VWAP (%). Sets gap-and-go vs fade bias.'>VWAP dist</th>"
+        "<th title='Average True Range as % of price. Gate: 1–8%.'>ATR%</th>"
+        "<th title='Gap-and-go vs fade bias from the developing-VWAP side. Not a prediction.'>Bias</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
            '<tr><td colspan="7" class="empty">No gap candidates — quiet pre-market.</td></tr>')
