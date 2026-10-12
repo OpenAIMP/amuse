@@ -129,7 +129,7 @@ jobs:
           elif [ "$SRC" = "watchlist" ]; then
             DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           else
-            DETAIL="$(python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
+            DETAIL="$(PYTHONPATH=src python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
           fi
           python3 src/render_report.py --stock reports/stock-screen.json \
             --spreads reports/spread-screen.json \
