@@ -1,0 +1,43 @@
+name: Refresh index universes
+
+# Rebuilds src/universes/*.txt from upstream sources (Wikipedia constituent
+# tables, iShares IWM holdings) and commits only genuine changes.
+# The Dow 30 list is curated inside the script and verified annually.
+on:
+  schedule:
+    # First Sunday of each month, 06:00 UTC (constituent churn is slow).
+    - cron: "0 6 1-7 * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild universe files
+        run: |
+          python3 src/build_universes.py
+          git status --short src/universes/
+
+      - name: Commit changed universes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/universes/
+          if git diff --cached --quiet; then
+            echo "No universe changes — nothing to commit."
+          else
+            git commit -m "universes: monthly refresh of index constituents"
+            git pull --rebase
+            git push
+          fi
