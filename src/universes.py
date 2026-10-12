@@ -128,11 +128,30 @@ DOW30 = _dedupe([
     "V", "WMT",
 ])
 
+# Leveraged ETFs with liquid options (issue #32). Curated 2026-10-12.
+# Daily-reset: suitable for short-term spreads, NOT buy-and-hold.
+LEV_ETF = _dedupe([
+    # 3x index
+    "TQQQ", "SQQQ", "SPXL", "SPXS", "UPRO", "SPXU", "UDOW", "SDOW",
+    # 2x index
+    "QLD", "QID", "SSO", "SDS", "DDM", "DXD",
+    # 3x sector
+    "SOXL", "SOXS", "LABU", "LABD", "FAS", "FAZ", "TECL", "TECS",
+    "TNA", "TZA", "ERX", "ERY",
+    # volatility
+    "UVXY", "SVXY", "VXX",
+])
+
+# Core 7: intersection of Dow 30 / Nasdaq-100 / S&P 500 / S&P 100
+CORE7 = _dedupe(["AAPL", "AMGN", "AMZN", "CSCO", "MSFT", "NVDA", "WMT"])
+
 UNIVERSES = {
     "sp500": SP500,
     "sp100": SP100,
     "nasdaq100": NASDAQ100,
     "dow30": DOW30,
+    "lev_etf": LEV_ETF,
+    "core7": CORE7,
 }
 
 
