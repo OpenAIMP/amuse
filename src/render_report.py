@@ -9,8 +9,8 @@ Legacy hub mode (unchanged):
 Report mode (dated, non-overwriting, archived forever):
     python3 render_report.py --stock ... --spreads ... \
         --report-id daily-nasdaq100-2026-10-11 --source nasdaq100 --source-detail "101 names"
-    python3 render_report.py --daytrade reports/daytrade.json \
-        --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
+    python3 render_report.py --premarket reports/premarket.json \
+        --report-id premarket-watchlist-2026-10-13 --source watchlist --source-detail "101 names"
     python3 render_report.py --pmcc reports/pmcc.json \
         --report-id pmcc-watchlist-2026-10 --source watchlist --source-detail "20 names"
 
@@ -532,7 +532,7 @@ def method_section(config_path=None):
     from the config the screeners actually ran with."""
     import gates as _g
     G = _g.load(config_path)
-    st, sp, dt, v, pm = G["stock"], G["spreads"], G["daytrade"], G["vol"], G["pmcc"]
+    st, sp, dt, v, pm = G["stock"], G["spreads"], G["premarket"], G["vol"], G["pmcc"]
 
     pats = [
         ("UP regime", "trend supports selling puts",
@@ -671,11 +671,11 @@ def bias_badge(bias):
     return f'<span class="badge {cls}">{esc(bias) or "—"}</span>'
 
 
-def daytrade_section(data, report_mode=False):
+def premarket_section(data, report_mode=False):
     if not data:
         if report_mode:
             return ""
-        return section("Day-trade screen", '<p class="empty">No data yet — run the day-trade screener.</p>')
+        return section("Pre-market gap screen", '<p class="empty">No data yet — run the pre-market screener.</p>')
     cands = sorted(data.get("candidates") or [],
                    key=lambda c: -((c.get("conviction") or 0)
                                    if isinstance(c.get("conviction"), (int, float)) else -1))
@@ -706,6 +706,30 @@ def daytrade_section(data, report_mode=False):
            '<tr><td colspan="7" class="empty">No gap candidates — quiet pre-market.</td></tr>')
         + "</tbody></table></div>"
     )
+    # Near-misses: rejected but close — explains an empty table (#26)
+    near = data.get("near_misses") or []
+    near_html = ""
+    if near:
+        nrows = []
+        for n in near:
+            missed = "; ".join(n.get("missed") or [])
+            nrows.append(
+                "<tr>"
+                f"{sym_cell(n.get('symbol'))}"
+                f"<td class='num'>{num(n.get('price'), 2)}</td>"
+                f"<td class='num'>{num(n.get('gap_pct'), 2, '%')}</td>"
+                f"<td class='num'>{num(n.get('rel_vol'), 1)}×</td>"
+                f"<td class='num'>{num(n.get('atr_pct'), 2, '%')}</td>"
+                f"<td>{esc(missed)}</td>"
+                "</tr>"
+            )
+        near_html = (
+            "<h3>Near-misses <span class='dim'>(rejected but close — what almost qualified)</span></h3>"
+            '<div class="tbl-wrap"><table><thead><tr>'
+            "<th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th>"
+            "<th>ATR%</th><th>Missed gate</th>"
+            "</tr></thead><tbody>" + "".join(nrows) + "</tbody></table></div>"
+        )
     ro = data.get("readout") or []
     readout = ""
     if ro:
@@ -721,7 +745,7 @@ def daytrade_section(data, report_mode=False):
         "Technical-only — check headlines before trading any candidate. "
         "Bias is not a prediction.</p>"
     )
-    return section("Day-trade screen", table + readout + fine)
+    return section("Pre-market gap screen", table + near_html + readout + fine)
 
 
 def wing_str(wing, suffix):
@@ -800,7 +824,7 @@ def asym_condor_rows(data, asof, readout):
 
 REPORT_TITLES = {
     "daily": "Options Lab — Daily Screen",
-    "daytrade": "Options Lab — Day-Trade Screen",
+    "premarket": "Options Lab — Pre-market Gap Screen",
     "pmcc": "Options Lab — PMCC Screen",
 }
 
@@ -872,9 +896,9 @@ def spread_bits(spreads):
     return bits
 
 
-def build_blurb(rtype, stock, spreads, pmcc, daytrade):
-    if rtype == "daytrade":
-        cands = (daytrade or {}).get("candidates") or []
+def build_blurb(rtype, stock, spreads, pmcc, premarket):
+    if rtype == "premarket":
+        cands = (premarket or {}).get("candidates") or []
         if not cands:
             return "No qualifiers — quiet screen"
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
@@ -899,12 +923,12 @@ def build_blurb(rtype, stock, spreads, pmcc, daytrade):
     return "; ".join(parts)
 
 
-def build_stats(rtype, stock, spreads, pmcc, daytrade):
-    if rtype == "daytrade":
-        cands = (daytrade or {}).get("candidates") or []
+def build_stats(rtype, stock, spreads, pmcc, premarket):
+    if rtype == "premarket":
+        cands = (premarket or {}).get("candidates") or []
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
         return {"candidates": len(cands), "gap_and_go": gg,
-                "screened": (daytrade or {}).get("universe")}
+                "screened": (premarket or {}).get("universe")}
     if rtype == "pmcc":
         return {"pairs": len((pmcc or {}).get("pairs") or {})}
     res = (spreads or {}).get("results") or {}
@@ -1021,7 +1045,7 @@ PAGE = """<!DOCTYPE html>
 {method}
 {stock}
 {spreads}
-{daytrade}
+{premarket}
 {pmcc}
 {rejections}
 {catalyst}
@@ -1037,7 +1061,7 @@ def main():
     ap.add_argument("--stock", default=None)
     ap.add_argument("--spreads", default=None)
     ap.add_argument("--pmcc", default=None)
-    ap.add_argument("--daytrade", default=None)
+    ap.add_argument("--premarket", default=None)
     ap.add_argument("--report-id", default=None,
                     help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
     ap.add_argument("--source", default=None,
@@ -1058,7 +1082,7 @@ def main():
     stock = load_json(args.stock)
     spreads = load_json(args.spreads)
     pmcc = load_json(args.pmcc)
-    daytrade = load_json(args.daytrade)
+    premarket = load_json(args.premarket)
     news = load_json(args.news)
 
     if report_mode:
@@ -1072,7 +1096,7 @@ def main():
         back_href = esc(os.path.relpath(hub, start=os.path.dirname(os.path.abspath(out))))
         backlink = f'<p class="backlink"><a href="{back_href}">← Back to hub</a></p>'
         css = CSS + BACKLINK_CSS
-        rdate = rdate or str((stock or {}).get("asof") or (daytrade or {}).get("run") or "undated")
+        rdate = rdate or str((stock or {}).get("asof") or (premarket or {}).get("run") or "undated")
     else:
         title = "Options Lab — Daily Screen"
         out = args.out or "docs/index.html"
@@ -1081,7 +1105,7 @@ def main():
         source = source_detail = None
 
     asof = (stock or {}).get("asof") or (spreads or {}).get("asof") \
-        or (pmcc or {}).get("asof") or (daytrade or {}).get("run") or "unknown"
+        or (pmcc or {}).get("asof") or (premarket or {}).get("run") or "unknown"
 
     if source:
         bits = [f"Source: <b>{esc(source_label(source))}</b>"]
@@ -1095,7 +1119,7 @@ def main():
     stock_html = stock_section(stock) if (stock or not report_mode) else ""
     spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
     pmcc_html = pmcc_section(pmcc) if (pmcc or not report_mode) else ""
-    daytrade_html = daytrade_section(daytrade, report_mode) if daytrade else ""
+    premarket_html = premarket_section(premarket, report_mode) if premarket else ""
     passing_syms = [p.get("symbol") for p in (stock or {}).get("passing", [])
                     if p.get("symbol")]
     catalyst_html = catalyst_section(news, passing_syms)
@@ -1109,7 +1133,7 @@ def main():
         method=method_section(args.config),
         stock=stock_html,
         spreads=spreads_html,
-        daytrade=daytrade_html,
+        premarket=premarket_html,
         pmcc=pmcc_html,
         rejections=rejections_section(stock),
         catalyst=catalyst_html,
@@ -1122,8 +1146,8 @@ def main():
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
 
     if report_mode:
-        blurb = build_blurb(rtype, stock, spreads, pmcc, daytrade)
-        stats = build_stats(rtype, stock, spreads, pmcc, daytrade)
+        blurb = build_blurb(rtype, stock, spreads, pmcc, premarket)
+        stats = build_stats(rtype, stock, spreads, pmcc, premarket)
         write_meta_sidecar(out, rid, rtype, rdate,
                            f"{title} · {rdate}", blurb, stats,
                            source=source, source_detail=source_detail)
