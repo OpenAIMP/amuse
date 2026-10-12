@@ -217,6 +217,51 @@ def build_page(title, subtitle, sections, backlink=""):
 </header>
 <section class="card"><h2>How a trade gets made</h2>{workflow_strip()}</section>
 {sections}
+<section class="card"><h2>Reading the screens — notes &amp; lessons</h2>
+<h3>Pre-market gap vs intraday momentum</h3>
+<p>The <b>pre-market gap screen</b> (9:00am ET) looks for overnight gaps ≥ 2% with
+pre-market volume ≥ 1.5× average. It only works before the open — its volume gate
+compares partial-day volume to a full-day average, which becomes nearly impossible
+by midday. An empty pre-market report after the open means the signal is stale,
+not that the market is quiet.</p>
+<p>The <b>intraday momentum screen</b> (11am, 2pm ET) uses <b>session-aware</b>
+signals, rebuilt 2026-10-12 after the first version proved too narrow:</p>
+<ul>
+<li><b>Opening-range breakout — and holding.</b> The first version asked "is it
+piercing the 15-min range <i>right now</i>?" — but breakouts happen at 10am, not
+1:15pm. Now: did it break the range at any point today, and is it still holding
+above (or below) it? A breakout that faded back inside the range is flagged
+separately.</li>
+<li><b>VWAP — sustained position, not the cross moment.</b> The first version only
+saw crosses in the last 30 minutes, so an 11am reclaim was invisible by 1:15pm.
+Now: what fraction of the session has price held above/below the developing VWAP?
+≥ 70% one side counts as sustained.</li>
+<li><b>Time-prorated volume.</b> Today's volume so far vs the 20-day average
+<i>scaled by elapsed session time</i> — the fix for the pre-market screen's flaw.
+1.5× at 11am means genuinely heavy trading, not an impossible bar.</li>
+<li><b>Never a blank page.</b> If nothing meets the strict gates, the strongest
+volume-plus-drift names still show as <i>momentum watch</i> rows.</li>
+</ul>
+<h3>RoR — return on risk</h3>
+<p>RoR = credit ÷ max loss. A 39.7% RoR on a $142 credit / $358 max-loss condor
+means: best case you keep $142, worst case you lose $358 — $0.40 of profit per
+$1 risked <i>if</i> it works. Higher RoR = more credit per dollar risked.</p>
+<p>RoR is a <b>ranking</b> tool, not a gate and not a forecast. Nothing is rejected
+for low RoR; the tables are simply sorted by it. A high RoR never means a trade
+is likely to win — the edge in credit spreads is <i>probability</i> (price staying
+between the breakevens), not payout ratio.</p>
+<p>Max loss + credit always equals the wing width ($358 + $142 = $500 on a
+5-point wing). Max loss below credit would need RoR over 100% — the market never
+prices liquid spreads that way; if you see it, it's a bad quote.</p>
+<h3>Reading the legs</h3>
+<p>First strike = <b>short (sell)</b>, second = <b>long (buy)</b>.
+210/205P means sell the 210 put, buy the 205 put. 245/250C means sell the 245
+call, buy the 250 call. The short strikes are where premium is collected — and
+what defines the profit zone via the breakevens.</p>
+<p class="fine">Reports are static snapshots; regenerating means re-running the
+screener. Figures computed from Public.com API data in-run. Screeners never
+place orders.</p>
+</section>
 <footer>Regenerated {esc(dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))} · screeners never place orders.</footer>
 </div>
 </body>
