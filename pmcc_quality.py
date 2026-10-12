@@ -39,15 +39,28 @@ NAMES = ["KO", "DIS", "MRK", "XOM", "INTC", "QCOM",
          "SBUX", "BMY", "DUK", "SO", "MET", "KMB", "GIS"]
 
 # ---- screening configuration (design choices, printed in every report) ----
-LONG_DTE_MIN, LONG_DTE_MAX = 270, 800
-SHORT_DTE_MIN, SHORT_DTE_MAX = 21, 60
-LONG_DELTA_MIN, LONG_DELTA_MAX = 0.80, 0.95
-SHORT_DELTA_MIN, SHORT_DELTA_MAX = 0.15, 0.35
-MAX_SPREAD_PCT = 0.25        # reject contracts whose bid/ask spread > 25% of mid
-MIN_LONG_LIQUIDITY = 25      # OI or volume floor for the expensive long leg
-MIN_SHORT_LIQUIDITY = 10     # OI or volume floor for the short leg
-MAX_CAPITAL = 10000          # per-pair capital gate ($)
-MAX_FRICTION = 3.0           # (long spread + short spread) / short bid: reject above
+# Tunables live in gates.yaml; this block binds them to module constants.
+import gates as _gates_mod
+
+
+def _apply_gates(path=None):
+    global LONG_DTE_MIN, LONG_DTE_MAX, SHORT_DTE_MIN, SHORT_DTE_MAX
+    global LONG_DELTA_MIN, LONG_DELTA_MAX, SHORT_DELTA_MIN, SHORT_DELTA_MAX
+    global MAX_SPREAD_PCT, MIN_LONG_LIQUIDITY, MIN_SHORT_LIQUIDITY
+    global MAX_CAPITAL, MAX_FRICTION
+    G = _gates_mod.load(path)["pmcc"]
+    LONG_DTE_MIN, LONG_DTE_MAX = G["long_dte_min"], G["long_dte_max"]
+    SHORT_DTE_MIN, SHORT_DTE_MAX = G["short_dte_min"], G["short_dte_max"]
+    LONG_DELTA_MIN, LONG_DELTA_MAX = G["long_delta_min"], G["long_delta_max"]
+    SHORT_DELTA_MIN, SHORT_DELTA_MAX = G["short_delta_min"], G["short_delta_max"]
+    MAX_SPREAD_PCT = G["max_spread_pct"]
+    MIN_LONG_LIQUIDITY = G["min_long_liquidity"]
+    MIN_SHORT_LIQUIDITY = G["min_short_liquidity"]
+    MAX_CAPITAL = G["max_capital"]
+    MAX_FRICTION = G["max_friction"]
+
+
+_apply_gates()
 GREEKS_BATCH = 40            # implementation setting, not a verified service limit
 REJECT_EARNINGS = True       # earnings inside the short window rejects the pair
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
@@ -280,7 +293,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--names", default=None)
+    ap.add_argument("--config", default=None,
+                    help="path to gates.yaml (default: gates.yaml next to the script)")
     args = ap.parse_args()
+    if args.config:
+        _apply_gates(args.config)
     names = args.names.split(",") if args.names else NAMES
 
     events = {}
