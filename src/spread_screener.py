@@ -32,7 +32,9 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/bin/public-mcp")
-ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or "5OI32712"  # or: empty string must also fall back (#22)
+ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
+if not ACCT:
+    raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
 NAMES = ["T", "VZ", "BAC", "PFE", "KO", "MRK", "BMY", "SBUX", "DIS", "XOM"]
 
 # ---- screening configuration (design choices, printed in every report) ----
