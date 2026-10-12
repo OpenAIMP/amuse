@@ -153,7 +153,7 @@ def stock_section(data):
             f"<td class='sqz'>{'<span class=\"warn\">●</span>' if sqz else ''}</td>"
             f"<td class='num'>{pct(vw.get('anchored_dist_pct'))}</td>"
             f"<td>{trend_badge(st.get('trend'))}</td>"
-            f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/40</span></td>"
+            f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/37</span></td>"
             "</tr>"
         )
     table = (
@@ -183,7 +183,7 @@ def stock_section(data):
         "expansion likely &mdash; wait, do not enter. "
         "<b>vs Anchored VWAP</b> — distance from VWAP anchored at the 52-week low; "
         "regime: below it means institutional money is underwater, rejected for bullish income. "
-        "<b>Score</b> — composite 0&ndash;40 (regime + timing).</p>"
+        "<b>Score</b> — composite 0&ndash;37: base 0&ndash;30 (regime) + signals 0&ndash;7 (timing).</p>"
     )
     readout = ""
     ro = data.get("readout") or []
