@@ -748,6 +748,81 @@ def premarket_section(data, report_mode=False):
     return section("Pre-market gap screen", table + near_html + readout + fine)
 
 
+def intraday_section(data, report_mode=False):
+    """Intraday momentum screen table (#27)."""
+    if not data:
+        if report_mode:
+            return ""
+        return section("Intraday momentum screen",
+                       '<p class="empty">No data yet — run the intraday screener.</p>')
+    cands = sorted(data.get("candidates") or [],
+                   key=lambda c: -((c.get("conviction") or 0)
+                                   if isinstance(c.get("conviction"), (int, float)) else -1))
+    rows = []
+    for c in cands:
+        sig = c.get("orb_signal") or c.get("vwap_signal") or "—"
+        rows.append(
+            "<tr>"
+            f"{sym_cell(c.get('symbol'))}"
+            f"<td class='num'>{num(c.get('price'), 2)}</td>"
+            f"<td>{esc(sig)}</td>"
+            f"<td class='num'>{num(c.get('rel_vol_tp'), 2)}×</td>"
+            f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
+            f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
+            f"<td class='num'>{num(c.get('conviction'), 1)}</td>"
+            f"<td>{bias_badge(c.get('bias'))}</td>"
+            "</tr>"
+        )
+    table = (
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th title='Underlying symbol. Click for quote pages.'>Symbol</th>"
+        "<th title='Last price at screen time.'>Price</th>"
+        "<th title='Fired signal: breakout_up / breakdown_down (15-min opening range), reclaim_up / loss_down (session VWAP cross).'>Signal</th>"
+        "<th title='Today\u2019s volume so far vs 20-day average prorated by elapsed session time. Gate: at least 1.5\u00d7.'>RelVol TP</th>"
+        "<th title='Distance from the session VWAP (%).'>VWAP dist</th>"
+        "<th title='Average True Range as % of price. Gate: 1\u20138%.'>ATR%</th>"
+        "<th title='Conviction score: (|breakout distance| + 0.5) \u00d7 time-prorated rel vol.'>Conviction</th>"
+        "<th title='Bullish / bearish momentum from the fired signals. Not a prediction.'>Bias</th>"
+        "</tr></thead><tbody>"
+        + ("".join(rows) if rows else
+           '<tr><td colspan="8" class="empty">No intraday momentum candidates.</td></tr>')
+        + "</tbody></table></div>"
+    )
+    near = data.get("near_misses") or []
+    near_html = ""
+    if near:
+        nrows = []
+        for n in near:
+            missed = "; ".join(n.get("missed") or [])
+            nrows.append(
+                "<tr>"
+                f"{sym_cell(n.get('symbol'))}"
+                f"<td>{esc(n.get('signal') or '—')}</td>"
+                f"<td class='num'>{num(n.get('rel_vol_tp'), 2)}×</td>"
+                f"<td class='num'>{num(n.get('vwap_dist_pct'), 2, '%')}</td>"
+                f"<td>{esc(missed)}</td>"
+                "</tr>"
+            )
+        near_html = (
+            "<h3>Near-misses <span class='dim'>(signal fired, volume gate missed)</span></h3>"
+            '<div class="tbl-wrap"><table><thead><tr>'
+            "<th>Symbol</th><th>Signal</th><th>RelVol TP</th>"
+            "<th>VWAP dist</th><th>Missed gate</th>"
+            "</tr></thead><tbody>" + "".join(nrows) + "</tbody></table></div>"
+        )
+    settings = data.get("settings") or {}
+    fine = (
+        '<p class="fine">Signals: 15-min opening-range breakout/breakdown, '
+        'session-VWAP reclaim/loss. '
+        f"Gates: rel vol (time-prorated) ≥ {esc(settings.get('rel_vol_min', 1.5))}×, "
+        f"price ≥ ${esc(settings.get('price_min', 10))}, "
+        f"ATR% {esc(settings.get('atr_pct_min', 1))}–{esc(settings.get('atr_pct_max', 8))}. "
+        "Technical-only — check headlines before trading any candidate. "
+        "Bias is not a prediction.</p>"
+    )
+    return section("Intraday momentum screen", table + near_html + fine)
+
+
 def wing_str(wing, suffix):
     """[38, 37] + 'P' -> '38/37P'; passes through an already-formatted string."""
     if isinstance(wing, str):
@@ -825,6 +900,7 @@ def asym_condor_rows(data, asof, readout):
 REPORT_TITLES = {
     "daily": "Options Lab — Daily Screen",
     "premarket": "Options Lab — Pre-market Gap Screen",
+    "intraday": "Options Lab — Intraday Momentum Screen",
     "pmcc": "Options Lab — PMCC Screen",
 }
 
@@ -896,13 +972,19 @@ def spread_bits(spreads):
     return bits
 
 
-def build_blurb(rtype, stock, spreads, pmcc, premarket):
+def build_blurb(rtype, stock, spreads, pmcc, premarket, intraday=None):
     if rtype == "premarket":
         cands = (premarket or {}).get("candidates") or []
         if not cands:
             return "No qualifiers — quiet screen"
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
         return f"{plural(len(cands), 'gap candidate')}, {gg} with gap-and-go bias"
+    if rtype == "intraday":
+        cands = (intraday or {}).get("candidates") or []
+        if not cands:
+            return "No qualifiers — quiet screen"
+        bull = sum(1 for c in cands if ((c or {}).get("bias") or "").startswith("bullish"))
+        return f"{plural(len(cands), 'momentum candidate')}, {bull} bullish"
     if rtype == "pmcc":
         n = len((pmcc or {}).get("pairs") or {})
         return plural(n, "qualifying pair") if n else "No qualifiers — baseline"
@@ -923,12 +1005,16 @@ def build_blurb(rtype, stock, spreads, pmcc, premarket):
     return "; ".join(parts)
 
 
-def build_stats(rtype, stock, spreads, pmcc, premarket):
+def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None):
     if rtype == "premarket":
         cands = (premarket or {}).get("candidates") or []
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
         return {"candidates": len(cands), "gap_and_go": gg,
                 "screened": (premarket or {}).get("universe")}
+    if rtype == "intraday":
+        cands = (intraday or {}).get("candidates") or []
+        return {"candidates": len(cands),
+                "screened": (intraday or {}).get("universe")}
     if rtype == "pmcc":
         return {"pairs": len((pmcc or {}).get("pairs") or {})}
     res = (spreads or {}).get("results") or {}
@@ -1046,6 +1132,7 @@ PAGE = """<!DOCTYPE html>
 {stock}
 {spreads}
 {premarket}
+{intraday}
 {pmcc}
 {rejections}
 {catalyst}
@@ -1062,6 +1149,7 @@ def main():
     ap.add_argument("--spreads", default=None)
     ap.add_argument("--pmcc", default=None)
     ap.add_argument("--premarket", default=None)
+    ap.add_argument("--intraday", default=None)
     ap.add_argument("--report-id", default=None,
                     help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
     ap.add_argument("--source", default=None,
@@ -1083,6 +1171,7 @@ def main():
     spreads = load_json(args.spreads)
     pmcc = load_json(args.pmcc)
     premarket = load_json(args.premarket)
+    intraday = load_json(args.intraday)
     news = load_json(args.news)
 
     if report_mode:
@@ -1096,7 +1185,7 @@ def main():
         back_href = esc(os.path.relpath(hub, start=os.path.dirname(os.path.abspath(out))))
         backlink = f'<p class="backlink"><a href="{back_href}">← Back to hub</a></p>'
         css = CSS + BACKLINK_CSS
-        rdate = rdate or str((stock or {}).get("asof") or (premarket or {}).get("run") or "undated")
+        rdate = rdate or str((stock or {}).get("asof") or (premarket or {}).get("run") or (intraday or {}).get("run") or "undated")
     else:
         title = "Options Lab — Daily Screen"
         out = args.out or "docs/index.html"
@@ -1105,7 +1194,7 @@ def main():
         source = source_detail = None
 
     asof = (stock or {}).get("asof") or (spreads or {}).get("asof") \
-        or (pmcc or {}).get("asof") or (premarket or {}).get("run") or "unknown"
+        or (pmcc or {}).get("asof") or (premarket or {}).get("run") or (intraday or {}).get("run") or "unknown"
 
     if source:
         bits = [f"Source: <b>{esc(source_label(source))}</b>"]
@@ -1120,6 +1209,7 @@ def main():
     spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
     pmcc_html = pmcc_section(pmcc) if (pmcc or not report_mode) else ""
     premarket_html = premarket_section(premarket, report_mode) if premarket else ""
+    intraday_html = intraday_section(intraday, report_mode) if intraday else ""
     passing_syms = [p.get("symbol") for p in (stock or {}).get("passing", [])
                     if p.get("symbol")]
     catalyst_html = catalyst_section(news, passing_syms)
@@ -1134,6 +1224,7 @@ def main():
         stock=stock_html,
         spreads=spreads_html,
         premarket=premarket_html,
+        intraday=intraday_html,
         pmcc=pmcc_html,
         rejections=rejections_section(stock),
         catalyst=catalyst_html,
@@ -1146,8 +1237,8 @@ def main():
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
 
     if report_mode:
-        blurb = build_blurb(rtype, stock, spreads, pmcc, premarket)
-        stats = build_stats(rtype, stock, spreads, pmcc, premarket)
+        blurb = build_blurb(rtype, stock, spreads, pmcc, premarket, intraday)
+        stats = build_stats(rtype, stock, spreads, pmcc, premarket, intraday)
         write_meta_sidecar(out, rid, rtype, rdate,
                            f"{title} · {rdate}", blurb, stats,
                            source=source, source_detail=source_detail)
