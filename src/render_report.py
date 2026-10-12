@@ -383,9 +383,12 @@ def spread_tables(data):
             f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
             f"<td class='num'>{num(r.get('breakeven'), 2)}</td>"
             f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+            f"<td class='num'>{money(r.get('expected_value'))}</td>"
+            f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='9'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='12'>{esc(why)}</td></tr>" if why else "")
         )
     out.append("<h3>Bull put spreads <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
@@ -397,6 +400,9 @@ def spread_tables(data):
         "<th title='Net credit received per spread: short bid minus long ask (conservative fill).'>Credit</th>"
         "<th title='Maximum loss per spread: width minus credit. Gate: at most $1000.'>Max loss</th>"
         "<th title='Breakeven at expiration: short strike minus credit per share.'>Breakeven</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+        "<th title='Estimated win probability: (1 - |short delta|). A delta-based estimate, not a market fact.'>Win%</th>"
+        "<th title='Expected value: P(win)×credit − P(loss)×max loss. Delta-based estimate.'>EV$</th>"
+        "<th title='Loss multiple: max loss ÷ credit. How many times the credit you risk.'>Loss×</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr>')
@@ -422,9 +428,12 @@ def spread_tables(data):
             f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
             f"<td class='num'>{num(r.get('breakeven_put'), 2)} / {num(r.get('breakeven_call'), 2)}</td>"
             f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+            f"<td class='num'>{money(r.get('expected_value'))}</td>"
+            f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='10'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='13'>{esc(why)}</td></tr>" if why else "")
         )
     out.append("<h3>Iron condors <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
@@ -437,9 +446,12 @@ def spread_tables(data):
         "<th title='Net credit received: sum of both wing credits (short bid minus long ask each).'>Credit</th>"
         "<th title='Maximum loss: wider wing width minus credit. Gate: at most $1000.'>Max loss</th>"
         "<th title='Put breakeven / call breakeven at expiration.'>Breakevens</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+        "<th title='Estimated win probability: (1-|put delta|)×(1-|call delta|). Delta-based estimate.'>Win%</th>"
+        "<th title='Expected value: P(win)×credit − P(loss)×max loss.'>EV$</th>"
+        "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="10" class="empty">No qualifying condors.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="13" class="empty">No qualifying condors.</td></tr>')
         + "</tbody></table></div>"
     )
     # readout lines not tied to a symbol still get shown
@@ -457,6 +469,9 @@ def spread_tables(data):
             "<th title='Maximum loss: put wing width minus credit. Gate: at most $1000.'>Max loss</th>"
             "<th title='Put breakeven / call breakeven at expiration.'>Breakevens</th>"
             "<th title='Call wing distance above spot (%). Gate: at least 8%.'>Up% dist</th><th title='Return on risk: credit / max loss. A screening ratio for ranking structures — not an expected or realized return.'>RoR</th>"
+            "<th title='Estimated win probability: delta-based.'>Win%</th>"
+            "<th title='Expected value: P(win)×credit − P(loss)×max loss.'>EV$</th>"
+            "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
             "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
             "</tr></thead><tbody>"
             + "".join(ac_rows)
@@ -854,6 +869,9 @@ def norm_asym_condor(r, stock=None):
         "upside_breakeven": r.get("upside_breakeven", r.get("breakeven_call")),
         "upside_distance_pct": r.get("upside_distance_pct"),
         "return_on_risk": r.get("return_on_risk"),
+        "win_prob_est": r.get("win_prob_est"),
+        "expected_value": r.get("expected_value"),
+        "loss_multiple": r.get("loss_multiple"),
         "events": r.get("events"),
         "why_key": r.get("stock") or stock,
     }
@@ -888,9 +906,12 @@ def asym_condor_rows(data, asof, readout):
             f"<td class='num'>{num(r.get('downside_breakeven'), 2)} / {num(r.get('upside_breakeven'), 2)}</td>"
             f"<td class='num'>{pct(r.get('upside_distance_pct'))}</td>"
             f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+            f"<td class='num'>{money(r.get('expected_value'))}</td>"
+            f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='11'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='14'>{esc(why)}</td></tr>" if why else "")
         )
     return rows, [r.get("why_key") for r in ac_list if r.get("why_key")]
 
