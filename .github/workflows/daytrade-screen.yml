@@ -58,7 +58,7 @@ jobs:
           ARGS=""
           if [ -n "${{ inputs.names }}" ]; then ARGS="$ARGS --names ${{ inputs.names }}"; fi
           if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
-          python3 daytrade_screen.py $ARGS \
+          python3 src/daytrade_screen.py $ARGS \
             --json-out reports/daytrade-screen-$STAMP.json | tee reports/daytrade-screen-$STAMP.txt
 
       - name: Upload run outputs
@@ -84,9 +84,9 @@ jobs:
             SRC="sp500"
             DETAIL="503 names"
           fi
-          python3 render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
+          python3 src/render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
             --report-id daytrade-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
-          python3 render_hub.py
+          python3 src/render_hub.py
           ls docs/index.html
 
       - name: Publish dashboard to GitHub Pages
@@ -104,7 +104,7 @@ jobs:
           # conflicts, keep the remote copy — it is re-rendered from all
           # reports right below, so nothing is lost.
           git pull --rebase --strategy-option=theirs
-          python3 render_hub.py
+          python3 src/render_hub.py
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
           git push
