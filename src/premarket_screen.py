@@ -93,9 +93,9 @@ def mcp_call(tool, args):
 # ---- Universe: shared frozen constituents (see universes.py)
 try:
     from universes import UNIVERSES
-    SP500 = UNIVERSES["sp500"]
+    NASDAQ100 = UNIVERSES["nasdaq100"]
 except ImportError:  # pragma: no cover - standalone fallback
-    SP500 = []
+    NASDAQ100 = []
 
 
 def quote_for(symbol):
@@ -339,7 +339,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--names", default=None,
-                    help="comma-separated override (default: embedded S&P 500)")
+                    help="comma-separated override (default: Nasdaq-100)")
     ap.add_argument("--universe", default=None,
                     help="index universe from universes.py: sp500, sp100, nasdaq100, dow30 (--names wins)")
     ap.add_argument("--limit", type=int, default=None,
@@ -362,13 +362,13 @@ def main():
         names = list(UNIVERSES[key])
         universe_tag = key
     else:
-        names = list(SP500)
-        universe_tag = "sp500"
+        names = list(NASDAQ100)
+        universe_tag = "nasdaq100"
     if args.limit:
         names = names[:args.limit]
 
     print(f"Pre-market gap screen -- run {RUN_TS} (America/New_York)")
-    print(f"Universe: {'override' if args.names else 'S&P 500 (embedded, frozen 2026-10-11)'} "
+    print(f"Universe: {'override' if args.names else 'Nasdaq-100 (shared default)'} "
           f"({len(names)} names)")
     print("Settings: "
           f"|gap| >= {GAP_MIN_PCT}%, rel_vol >= {REL_VOL_MIN}, "
