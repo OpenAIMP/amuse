@@ -24,6 +24,7 @@ happens at runtime. Dotted symbols (BRK.B, BF.B) are used verbatim --
 verified against the API.
 """
 import argparse
+import concurrent.futures
 import json
 import math
 import os
@@ -127,6 +128,37 @@ def quote_for(symbol):
     return found[0]
 
 
+def quotes_for(symbols):
+    """Batch quotes for many symbols in ONE get_quotes call.
+
+    Returns {symbol: price}. Symbols missing from the payload are absent
+    from the map (caller treats as unknown quote, never as zero).
+    """
+    out = {}
+    q = mcp_call("get_quotes", {"symbols": list(symbols), "account_id": ACCT})
+
+    def walk(o):
+        if isinstance(o, dict):
+            s = o.get("instrument", {}).get("symbol")
+            if s in symbols and s not in out:
+                for k in ("last", "price", "mark"):
+                    v = o.get(k)
+                    try:
+                        v = float(v)
+                    except (TypeError, ValueError):
+                        continue
+                    if math.isfinite(v) and v > 0:
+                        out[s] = v
+                        break
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(q)
+    return out
+
+
 def daily_bars_for(symbol):
     """Return list of (date, close, high, low, volume), validated."""
     p = mcp_call("get_price_history",
@@ -190,8 +222,12 @@ def atr14(bars):
     return a if math.isfinite(a) and a > 0 else None
 
 
-def screen_one(symbol):
+def screen_one(symbol, quote_map=None):
     """Compute all pre-market signals. Returns (result_dict, [reasons]).
+
+    quote_map: optional {symbol: price} from a batched get_quotes call.
+    When provided, no per-symbol quote call is made (issue #14). When None,
+    falls back to the single-symbol quote_for.
 
     result_dict has metrics when computable; reasons lists rejection
     categories (empty when the name qualifies). Never raises for data
@@ -221,7 +257,10 @@ def screen_one(symbol):
         return res, ["atr uncomputable"]
 
     try:
-        price = quote_for(symbol)
+        if quote_map is not None:
+            price = quote_map.get(symbol)
+        else:
+            price = quote_for(symbol)
     except McpError as e:
         return res, [f"quote failed: {e}"]
     if price is None:
@@ -305,6 +344,8 @@ def main():
                     help="cap universe size (for tests)")
     ap.add_argument("--config", default=None,
                     help="path to gates.yaml (default: gates.yaml next to the script)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrent MCP workers (default 8; 1 = sequential)")
     args = ap.parse_args()
     if args.config:
         _apply_gates(args.config)
@@ -339,16 +380,38 @@ def main():
 
     cands, rej = [], {}
     rej_notes = {}
-    for i, sym in enumerate(names):
+
+    # One batched quote call for the whole universe (issue #14) instead of
+    # one call per name. On batch failure, screen_one falls back per-name.
+    quote_map = None
+    try:
+        quote_map = quotes_for(names)
+        print(f"batched quotes: {len(quote_map)}/{len(names)} names priced",
+              file=sys.stderr)
+    except McpError as e:
+        print(f"batched quotes failed ({e}); falling back to per-name quotes",
+              file=sys.stderr)
+
+    def safe_screen(sym):
         try:
-            res, reasons = screen_one(sym)
+            res, reasons = screen_one(sym, quote_map)
+            return (sym, res, reasons, None)
         except McpError as e:
-            rej["mcp failure"] = rej.get("mcp failure", 0) + 1
-            rej_notes.setdefault("mcp failure", []).append(f"{sym}: {e}"[:90])
-            continue
+            return (sym, None, [], f"mcp failure: {e}")
         except Exception as e:  # one bad name never kills the run
-            rej["internal error"] = rej.get("internal error", 0) + 1
-            rej_notes.setdefault("internal error", []).append(f"{sym}: {e}"[:90])
+            return (sym, None, [], f"internal error: {e}")
+
+    workers = max(1, args.workers)
+    # Merge in submission order in the main thread: no shared-state locks,
+    # deterministic output regardless of worker count.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        results = list(ex.map(safe_screen, names))
+
+    for i, (sym, res, reasons, err) in enumerate(results):
+        if err:
+            key = err.split(":")[0]
+            rej[key] = rej.get(key, 0) + 1
+            rej_notes.setdefault(key, []).append(f"{sym}: {err}"[:90])
             continue
         if reasons:
             for r in reasons:
@@ -357,7 +420,7 @@ def main():
             rej_notes[sym] = reasons
         else:
             cands.append(res)
-        if i < len(names) - 1:
+        if workers == 1 and i < len(names) - 1:
             time.sleep(PACE_S)
 
     cands.sort(key=lambda r: (r["conviction"] or 0), reverse=True)
