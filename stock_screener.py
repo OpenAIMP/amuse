@@ -179,11 +179,12 @@ def bollinger(closes):
         out["bandwidth_pct"] = width / mid * 100.0 if mid > 0 else None
     if len(closes) >= MIN_BARS_SQUEEZE and out["bandwidth_pct"] is not None:
         bws = []
+        mult = 2.0 * BB_MULT  # keep in sync with bandwidth_pct above (issue #16)
         for i in range(len(closes) - SQUEEZE_LOOKBACK, len(closes)):
             w = closes[i - BB_PERIOD + 1:i + 1]
             m = statistics.fmean(w)
             s = statistics.stdev(w)
-            bw = (4.0 * s) / m * 100.0 if m > 0 else None
+            bw = (mult * s) / m * 100.0 if m > 0 else None
             bws.append(bw)
         if all(b is not None and math.isfinite(b) for b in bws):
             out["squeeze"] = (out["bandwidth_pct"] == min(bws))
@@ -464,15 +465,20 @@ def composite(m):
 
 
 def signal_score(m):
-    """0-10 indicator-pack score: squeeze +3, %B in [0.5,0.9] +2,
-    anchored-VWAP distance 0-3% above +2 (else +1 if known), uptrend +3."""
+    """0-10 indicator-pack score: %B in [0.5,0.9] +2,
+    anchored-VWAP distance 0-3% above +2 (else +1 if known), uptrend +3.
+
+    A squeeze scores 0 by design (issue #16): the documented stance is
+    "wait or size down" — a volatility coil means premium is cheap, the
+    worst time for a premium seller to get paid. It stays ranking-only
+    (never a gate), contributing nothing rather than a reward.
+    """
     s = 0.0
     detail = {}
     ind = m.get("indicators", {})
     bb = ind.get("bollinger", {})
     if bb.get("squeeze"):
-        s += 3.0
-        detail["squeeze"] = 3.0
+        detail["squeeze"] = 0.0
     pb = bb.get("pct_b")
     if pb is not None and 0.5 <= pb <= 0.9:
         s += 2.0
@@ -677,7 +683,7 @@ def main():
           f"bandwidth min (ranking only); anchored-VWAP gate="
           f"{'yes' if REQUIRE_ABOVE_ANCHORED_VWAP else 'no'}; "
           f"downtrend reject={'yes' if REJECT_DOWNTREND else 'no'}; "
-          f"score 0-40 = base 0-30 + signals 0-10.")
+          f"score 0-37 = base 0-30 + signals 0-7.")
 
     # Thread pool over names (issue #14): screen_stock is pure per-symbol
     # work. Merge in submission order in the main thread -- no locks,
@@ -772,7 +778,7 @@ def main():
                                           "squeeze_lookback": SQUEEZE_LOOKBACK},
                            "require_above_anchored_vwap": REQUIRE_ABOVE_ANCHORED_VWAP,
                            "reject_downtrend": REJECT_DOWNTREND,
-                           "score": "0-40 = base 0-30 + signals 0-10",
+                           "score": "0-37 = base 0-30 + signals 0-7",
                            "universe": universe_tag},
                        "passing": passing,
                        "rejected": rejected,
