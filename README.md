@@ -146,6 +146,49 @@ didn't — so your job narrows to judgment: selection, sizing, confirmation.
   paper positions; live-book tracking is still on you.
 - What will the market do tomorrow? Nothing here predicts — ever.
 
+## Repository layout
+
+```
+amuse/
+├── src/                # all code: screeners, renderers, gates, ledger, exits, vol
+│   ├── universes/      # index constituent lists (sp500/sp100/nasdaq100/dow30/russell2000)
+│   ├── gates.yaml      # every tunable threshold (no code changes to retune)
+│   └── watchlist.txt   # the 20-name universe for the daily + monthly screens
+├── tests/              # stdlib unittest suite (python3 tests/test_*.py)
+├── docs/               # GitHub Pages site: index, archive, reports/
+├── bin/                # public-mcp shim (CI) + run-local.sh (local pipeline)
+├── .github/workflows/  # master + screen workflows + universe refresh
+├── Dockerfile / docker-compose.yml / .env.example
+└── README.md
+```
+
+## Running it locally
+
+**Without Docker** (needs Python 3.12 and a Public.com API key):
+
+```bash
+export PUBLIC_API_KEY=...
+bash bin/run-local.sh test      # unit suite
+bash bin/run-local.sh daytrade  # pre-market screen + report
+bash bin/run-local.sh daily     # stock + spread screens + report
+bash bin/run-local.sh monthly   # PMCC screen + report
+bash bin/run-local.sh all       # everything, then rebuild the hub
+open docs/index.html
+```
+
+**With Docker** (same commands, isolated):
+
+```bash
+cp .env.example .env   # then set PUBLIC_API_KEY inside
+docker compose run --rm test
+docker compose run --rm all
+# or run anything ad hoc:
+docker compose run --rm app python3 src/stock_screener.py --names NVDA,AMD
+```
+
+Reports land in `docs/` either way. The key never enters the image —
+it is passed at run time only.
+
 ## How value is created
 
 ### Concepts
