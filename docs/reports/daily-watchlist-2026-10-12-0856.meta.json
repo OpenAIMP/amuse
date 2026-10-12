@@ -1,0 +1,16 @@
+{
+ "id": "daily-watchlist-2026-10-12-0856",
+ "type": "daily",
+ "date": "2026-10-12-0856",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-12-0856",
+ "blurb": "NVDA 31.4 leads",
+ "stats": {
+  "stocks": 7,
+  "bull_puts": 0,
+  "iron_condors": 0,
+  "asym_condors": 0,
+  "pmcc_pairs": 0
+ },
+ "source": "watchlist",
+ "source_detail": "20 names"
+}
