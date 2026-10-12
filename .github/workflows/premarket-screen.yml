@@ -1,0 +1,97 @@
+name: Pre-market gap screen
+
+# Scans the watchlist for pre-market gap + volume candidates.
+# Runs at 9:00am ET on weekdays, before the open. Independent of master.yml.
+# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
+# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+on:
+  schedule:
+    # Weekdays 9:00am ET (13:00 UTC; drifts an hour with DST).
+    - cron: "0 13 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Comma-separated watchlist override (blank = watchlist.txt)"
+        required: false
+        default: ""
+      limit:
+        description: "Cap universe size (for tests; blank = full universe)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  premarket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Load watchlist
+        run: |
+          if [ -n "${{ inputs.names }}" ]; then
+            echo "WATCHLIST=${{ inputs.names }}" >> $GITHUB_ENV
+            echo "SRC=custom" >> $GITHUB_ENV
+          else
+            echo "WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
+            echo "SRC=watchlist" >> $GITHUB_ENV
+          fi
+          chmod +x bin/public-mcp
+          mkdir -p reports
+
+      - name: Pre-market screen
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          STAMP=$(date -u +%F-%H%M)
+          echo "STAMP=$STAMP" >> $GITHUB_ENV
+          ARGS="--names $WATCHLIST"
+          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
+          python3 src/premarket_screen.py $ARGS \
+            --json-out reports/premarket-screen-$STAMP.json | tee reports/premarket-screen-$STAMP.txt
+
+      - name: Upload run outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: premarket-screen-${{ github.run_id }}
+          path: reports/
+          retention-days: 90
+
+      - name: Render pre-market report
+        if: always()
+        run: |
+          mkdir -p docs/reports
+          STAMP=${STAMP:-$(date -u +%F-%H%M)}
+          if [ "$SRC" = "custom" ]; then
+            DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          else
+            DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"
+          fi
+          python3 src/render_report.py --premarket reports/premarket-screen-$STAMP.json \
+            --report-id premarket-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
+          python3 src/render_hub.py
+          ls docs/index.html
+
+      - name: Publish dashboard to GitHub Pages
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- bin/public-mcp 2>/dev/null || true
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: update pre-market screen"
+          git pull --rebase --strategy-option=theirs
+          python3 src/render_hub.py
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
+          git push
