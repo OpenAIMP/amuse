@@ -16,12 +16,18 @@ from datetime import date, timedelta
 import daytrade_screen as dt
 
 
-def _daily_bars(n=60, close=100.0):
+def _daily_bars(n=60, close=100.0, drift=0.0):
+    import math as _m
     base = date.today() - timedelta(days=n + 10)
-    return [{"timestamp": (base + timedelta(days=i)).isoformat(),
-             "close": close, "high": close * 1.01,
-             "low": close * 0.99, "volume": 1_000_000}
-            for i in range(n)]
+    out = []
+    for i in range(n):
+        # gentle oscillation around an uptrend: mixed up/down days keep
+        # RSI mid-range instead of pegging at 0/100
+        c = close * (1 + drift) ** i + 4.0 * _m.sin(i / 3.0)
+        out.append({"timestamp": (base + timedelta(days=i)).isoformat(),
+                    "close": c, "high": c * 1.01, "low": c * 0.99,
+                    "volume": 1_000_000})
+    return out
 
 
 def _intraday_bars(n=20, price=103.0):
@@ -229,6 +235,37 @@ class TestSpreadThreading(unittest.TestCase):
         sp.screen_spreads_sym("XOM", {"XOM": 100.0}, 5.0, {}, "/tmp/none.jsonl", True)
         self.assertNotIn("get_price_history",
                            self.fake.call_names[calls_before:])
+
+
+class TestStockRegression(unittest.TestCase):
+    """Issue #15: rsi local shadowed rsi() -> UnboundLocalError on every name.
+
+    screen_stock with a mocked mcp_call must never return an
+    "evaluation error" reason.
+    """
+
+    def test_screen_stock_no_evaluation_error(self):
+        import stock_screener as st
+        real = st.mcp_call
+
+        def fake(tool, args):
+            if args.get("aggregation") == "ONE_DAY":
+                return {"regularMarket": {"bars": _daily_bars(210, drift=0.001)}}
+            return {"regularMarket": {
+                "bars": _intraday_bars(), "expectedBars": 78}}
+
+        st.mcp_call = fake
+        try:
+            sym, ok, metrics, reasons = st.screen_stock("AAA")
+        finally:
+            st.mcp_call = real
+        for r in reasons:
+            self.assertFalse(r.startswith("evaluation error"),
+                             f"regression: {r}")
+        # mock data is constructed to pass the gates
+        self.assertTrue(ok, reasons)
+        self.assertIn("rsi14", metrics)
+        self.assertIn("score", metrics)
 
 
 if __name__ == "__main__":
