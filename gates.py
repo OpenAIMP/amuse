@@ -40,6 +40,9 @@ DEFAULTS = {
         "require_above_anchored_vwap": True,
         "reject_downtrend": True,
         "pivot_n": 5, "swing_lookback_bars": 126,
+        "ema_fast": 50, "ema_slow": 200,
+        "macd_fast": 12, "macd_slow": 26, "macd_signal": 9,
+        "cross_lookback": 20, "reject_death_cross": True,
     },
     "daytrade": {
         "gap_min_pct": 2.0, "rel_vol_min": 1.5, "price_min": 10.0,
