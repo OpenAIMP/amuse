@@ -1,0 +1,14 @@
+{
+ "id": "daytrade-sp500-2026-10-12",
+ "type": "daytrade",
+ "date": "2026-10-12",
+ "title": "Options Lab \u2014 Day-Trade Screen \u00b7 2026-10-12",
+ "blurb": "No qualifiers \u2014 quiet screen",
+ "stats": {
+  "candidates": 0,
+  "gap_and_go": 0,
+  "screened": 503
+ },
+ "source": "sp500",
+ "source_detail": "503 names"
+}
