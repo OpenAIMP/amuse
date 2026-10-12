@@ -138,11 +138,78 @@ didn't — so your job narrows to judgment: selection, sizing, confirmation.
 **Questions it doesn't answer.**
 
 - Will this trade make money? Probabilities are market-implied, not forecasts.
-- How many contracts? No sizing calculator yet (roadmap).
+- How many contracts? `ledger.py` sizes from the 2%-max-loss rule — but you
+  still confirm before anything is real.
 - When do I exit? Bull put spreads now have a defined exit policy (below);
   other structures still need theirs.
-- Is my book within risk limits? No heat tracker yet (roadmap).
+- Is my book within risk limits? `ledger.py` enforces the 35% heat cap on
+  paper positions; live-book tracking is still on you.
 - What will the market do tomorrow? Nothing here predicts — ever.
+
+## How value is created
+
+### Concepts
+
+The domain ideas the system is built on. Each one is implemented somewhere,
+not just described:
+
+- **Defined risk** — every structure has a known max loss before it is shown
+  to you. No naked legs, ever.
+- **Net credit** — premium collected up front; the trade wins if the structure
+  decays or the underlying stays put.
+- **Delta as market-implied probability** — short strikes at 0.10–0.20Δ use
+  the market's estimate, never a forecast.
+- **Return on risk** — credit ÷ max loss; how structures are ranked.
+- **Friction** — (bid/ask spreads) ÷ credit. Wide markets eat the edge, so it
+  is capped at 3×.
+- **Regime / timing / strikes** — the operating loop's separation of concerns:
+  where it is safe, when to enter, how to structure.
+- **Expectancy** — win rate × average win − loss rate × average loss, net of
+  fees. The only number that decides whether this is income-generating
+  (issue #12).
+- **Heat** — total max loss across open positions, capped at 35% of account.
+
+### Capabilities
+
+What the system does, end to end:
+
+1. Screens stocks for regime and timing (RSI, %B, VWAP, ATR, pivots).
+2. Prices defined-risk income structures with conservative fills.
+3. Scans pre-market for day-trade momentum setups.
+4. Ranks PMCC pairs monthly and watches them daily for exceptions.
+5. Applies exit rules (profit / stop / time / no-assignment) to open positions.
+6. Tracks every paper position in a ledger with realized P&L net of fees.
+7. Sizes positions from the 2% rule and enforces the heat cap.
+8. Publishes every run to a permanent, timestamped archive.
+
+### Competencies — what it is good at
+
+- **Veto-based selection.** Most of the value comes from rejecting bad trades
+  (downtrend, extended, earnings inside the window), not from picking winners.
+- **Honest fills.** Short-bid-minus-long-ask: the credits shown are collectible.
+- **Reproducibility.** Every threshold in `gates.yaml`; every run archived with
+  its inputs. Any result can be re-derived.
+- **No prediction.** Bias labels and probabilities are market-implied; the
+  system never forecasts direction.
+
+### Value proposition
+
+For a trader learning to run an options book like a portfolio manager: it
+replaces gut feel with a repeatable daily process — screen, filter, price,
+size, exit, review — where every step is defined, tested, and logged. The
+product is not picks; it is the discipline.
+
+### Value chain
+
+Raw market data → **screen** (find) → **regime/timing gates** (qualify) →
+**structure pricing** (price) → **exit policy** (manage) → **ledger**
+(track) → **sizing/heat** (protect) → **archive/review** (learn).
+
+Each stage adds value only if the previous one held: pricing means nothing
+without the regime veto; exits mean nothing without the ledger measuring
+them; the ledger means nothing without out-of-sample proof (issue #11). The
+chain is only as strong as its weakest documented link — which is why code,
+config, docs, and tests change together.
 
 ## Screeners
 
@@ -210,9 +277,9 @@ made by you, reading both tables — see the overlap note below.
 
 Reporting (`render_report.py`, `render_hub.py`), frozen data
 (`universes.py`), orchestration (`scan_loop.py`), and monitoring
-(`pmcc_watch.py`) round out the system. Not built: a backtester, a trade
-journal, a sizing calculator, and anything that touches orders — Size and
-Preflight stay human.
+(`pmcc_watch.py`) round out the system. Position tracking and sizing live in
+`ledger.py` (paper only). Not built: a backtester, a trade journal, and
+anything that touches orders — Size and Preflight stay human.
 
 ## Signal packs
 
@@ -305,6 +372,18 @@ Priority: assignment risk > time exit > profit target > stop loss > hold.
 These are starting values to be validated out-of-sample (issue #11), not
 proven optima. Other structures still need their policies.
 
+### Position ledger and sizing (issue #10)
+
+`ledger.py` records every position with its fill assumptions and closes it
+with a reason, computing realized P&L net of fees. Before opening, two gates:
+
+- **Per-trade:** one spread's max loss ≤ 2% of account (→ contracts).
+- **Heat cap:** total open max loss ≤ 35% of account.
+
+Tuned in `gates.yaml` under `ledger:` (`max_loss_pct`, `heat_cap_pct`,
+`fee_per_contract`). `test_ledger.py` includes end-to-end lifecycle tests:
+entry → exit signal → ledger close → realized P&L, using the real gate values.
+
 ### What the system measures today
 
 | Metric | How it's used |
@@ -346,9 +425,10 @@ structure level; the book level is human.
 - **Request/response API, not streaming.** No tick-level Greeks or intraday
   risk updates.
 
-Several of these are already on the [roadmap](#roadmap) (backtester, heat
-tracker, catalyst calendar, sizing calculator); the vol-valuation layer and
-portfolio Greeks are added there too.
+Several of these are already on the [roadmap](#roadmap) (backtester, live heat
+tracker, catalyst calendar); the vol-valuation layer and portfolio Greeks
+are added there too. Paper sizing and heat caps are implemented in
+`ledger.py` (issues #9/#10).
 
 ## Pipeline and dashboard
 
