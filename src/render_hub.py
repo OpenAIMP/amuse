@@ -26,10 +26,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from render_report import (BACKLINK_CSS, CSS, WORKFLOW, esc, resolve_docs_dir,
                            source_label, workflow_strip)
 
-TYPE_ORDER = ["daily", "daytrade", "pmcc"]
+TYPE_ORDER = ["daily", "premarket", "intraday", "pmcc"]
 TYPE_LABELS = {
     "daily": "Daily screen",
-    "daytrade": "Pre-market day-trade",
+    "premarket": "Pre-market gap",
+    "daytrade": "Pre-market gap (legacy)",
     "pmcc": "Monthly PMCC",
 }
 # preferred source order inside each type group; unknown keys go alphabetical
