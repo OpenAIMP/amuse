@@ -10,7 +10,8 @@ Usage:
     python3 render_hub.py [--docs docs]
 
 Docs dir auto-detects: ./repo/docs locally, ./docs in CI.
-Stdlib-only, inline CSS, no external assets, no JavaScript.
+Stdlib-only, inline CSS, no external assets. One inline script powers the
+market-news live refresh widget (with a baked-in fallback).
 """
 from __future__ import annotations
 
@@ -49,6 +50,11 @@ padding:12px 14px;margin:10px 0}
 padding:2px 10px;color:var(--dim);font-variant-numeric:tabular-nums}
 .srcgroup{margin:14px 0 4px}
 .srcgroup > h3{margin:14px 0 4px}
+.news-list{margin:8px 0;padding-left:20px}
+.news-list li{margin:5px 0;font-size:.9rem}
+.refresh-btn{background:#161b22;border:1px solid var(--border);border-radius:6px;
+color:var(--dim);cursor:pointer;font-size:.85rem;padding:1px 8px;margin-left:8px}
+.refresh-btn:hover{color:var(--blue);border-color:var(--blue)}
 """
 
 
@@ -116,6 +122,82 @@ def type_section(rtype, by_source, limit=None):
     return f'<section class="card"><h2>{esc(type_label(rtype))}</h2>{groups}</section>'
 
 
+def news_section(docs_dir):
+    """Market news card for the hub (issue #21).
+
+    Bakes in the morning's headlines from docs/news.json as the always-present
+    fallback; a small inline script then tries a live refresh via the rss2json
+    CORS proxy on page load. If the live fetch fails, the morning snapshot
+    stays with an explanatory note. Manual retry via the refresh button.
+    """
+    heads, fetched = [], ""
+    try:
+        with open(os.path.join(docs_dir, "news.json")) as f:
+            data = json.load(f)
+        heads = data.get("headlines") or []
+        fetched = (data.get("fetched_at") or "")[:16].replace("T", " ")
+    except (OSError, ValueError):
+        pass
+    if heads:
+        items = "".join(
+            f"<li><a href=\"{esc(h['link'])}\" target=\"_blank\" rel=\"noopener\">"
+            f"{esc(h['title'])}</a>"
+            f"<span class=\"dim\"> — {esc(h.get('source') or '')}</span></li>"
+            for h in heads[:8]
+        )
+        fallback_note = f"Morning snapshot ({esc(fetched)} UTC)"
+    else:
+        items = "<li class=\"dim\">No headlines yet — the next scheduled run fetches them.</li>"
+        fallback_note = "No snapshot yet"
+    return f"""
+<section class="card"><h2>Market news</h2>
+<p class="dim"><span id="news-status">{fallback_note}</span>
+<button id="news-refresh" class="refresh-btn" title="Refresh headlines now">↻</button></p>
+<ul id="news-live-list" class="news-list">{items}</ul>
+<script>
+(function() {{
+  var list = document.getElementById('news-live-list');
+  var status = document.getElementById('news-status');
+  if (!list || !status) return;
+  function esc(s) {{
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {{
+      return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[c];
+    }});
+  }}
+  function render(items, label) {{
+    list.innerHTML = items.map(function(h) {{
+      var t = h.title || '';
+      var dash = t.lastIndexOf(' - ');
+      if (dash > 0) t = t.slice(0, dash);
+      return '<li><a href="' + esc(h.link) + '" target="_blank" rel="noopener">'
+        + esc(t) + '</a></li>';
+    }}).join('');
+    status.textContent = label;
+  }}
+  function load() {{
+    status.textContent = 'Refreshing headlines…';
+    var q = encodeURIComponent('S&P 500 stock market');
+    var rss = encodeURIComponent('https://news.google.com/rss/search?q=' + q
+      + '&hl=en-US&gl=US&ceid=US:en');
+    fetch('https://api.rss2json.com/v1/api.json?rss_url=' + rss)
+      .then(function(r) {{ return r.json(); }})
+      .then(function(d) {{
+        if (d && d.status === 'ok' && d.items && d.items.length)
+          render(d.items.slice(0, 8),
+                 'Live · updated ' + new Date().toLocaleTimeString());
+        else throw new Error('bad payload');
+      }})
+      .catch(function() {{
+        status.textContent = 'Live refresh unavailable — showing morning snapshot.';
+      }});
+  }}
+  document.getElementById('news-refresh').addEventListener('click', load);
+  load();
+}})();
+</script>
+</section>"""
+
+
 def build_page(title, subtitle, sections, backlink=""):
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -179,7 +261,7 @@ def main():
         ("The most recent run of each screen. "
          f'<a href="archive.html">Full archive →</a> '
          f"({n} reports, {n_groups} screens)"),
-        latest_sections,
+        news_section(docs_dir) + latest_sections,
     )
     out = os.path.join(docs_dir, "index.html")
     os.makedirs(docs_dir, exist_ok=True)
