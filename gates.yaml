@@ -45,6 +45,13 @@ stock:
   reject_downtrend: true    # gate: reject downtrend pivot structure
   pivot_n: 5                # fractal pivot: extreme of n bars each side
   swing_lookback_bars: 126  # ~6 months for the reference swing
+  ema_fast: 50
+  ema_slow: 200
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  cross_lookback: 20        # golden/death cross: SMA50 x SMA200 within N sessions
+  reject_death_cross: true  # gate: reject recent death cross
 
 daytrade:
   gap_min_pct: 2.0          # |gap| must be at least 2%
