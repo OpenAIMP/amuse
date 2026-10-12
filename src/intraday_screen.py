@@ -291,7 +291,9 @@ def screen_one(symbol, quote_map=None, now_et=None):
     if not ibars:
         return res, ["no intraday bars (market closed or no data)"]
 
-    # --- opening range ---
+    # --- opening range: session-aware "broke out and holding" ---
+    # Old logic asked "is it breaking out THIS MINUTE" -- too narrow.
+    # New: did it break the OR at any point today, and is it holding?
     or_end_min = MARKET_OPEN_MIN + OR_MINUTES
     or_bars = [b for b in ibars
                if b[0].hour * 60 + b[0].minute < or_end_min]
@@ -301,20 +303,56 @@ def screen_one(symbol, quote_map=None, now_et=None):
     orb_low = min(b[3] for b in or_bars)
     res["orb_high"], res["orb_low"] = orb_high, orb_low
     buf = BREAKOUT_BUFFER_PCT / 100.0
-    if price > orb_high * (1 + buf):
-        res["orb_signal"] = "breakout_up"
-    elif price < orb_low * (1 - buf):
-        res["orb_signal"] = "breakdown_down"
+    post_or = [b for b in ibars
+               if b[0].hour * 60 + b[0].minute >= or_end_min]
+    # holding tolerance: allow pullback up to 0.25x ATR inside the OR
+    hold_tol = (0.25 * atr / orb_high) if orb_high > 0 else 0
+    broke_up = any(b[2] > orb_high * (1 + buf) for b in post_or)
+    holding_up = price > orb_high * (1 - hold_tol)
+    broke_down = any(b[3] < orb_low * (1 - buf) for b in post_or)
+    holding_down = price < orb_low * (1 + hold_tol)
+    res["orb_broke_up"] = broke_up
+    res["orb_broke_down"] = broke_down
+    if broke_up and holding_up:
+        res["orb_signal"] = "breakout_up_hold"
+    elif broke_down and holding_down:
+        res["orb_signal"] = "breakdown_down_hold"
+    elif broke_up:
+        res["orb_signal"] = "breakout_up_faded"
+    elif broke_down:
+        res["orb_signal"] = "breakdown_down_faded"
 
-    # --- session VWAP and cross ---
+    # --- session VWAP: sustained position, not just the cross moment ---
+    # Old logic only saw crosses in the last 30 min. New: what fraction of
+    # the session has price held above/below the developing VWAP?
     vwap = session_vwap(ibars)
     res["vwap"] = vwap
     if vwap and vwap > 0:
         res["vwap_dist_pct"] = (price / vwap - 1) * 100.0
-        # cross detection: compare current position vs N bars ago
+        # rolling VWAP position across post-OR bars
+        above_ct = below_ct = 0
+        num = den = 0.0
+        for b in post_or:
+            tp = (b[2] + b[3] + b[4]) / 3.0
+            num += tp * b[5]
+            den += b[5]
+            rv = num / den if den > 0 else None
+            if rv and rv > 0:
+                if b[4] > rv:
+                    above_ct += 1
+                elif b[4] < rv:
+                    below_ct += 1
+        total = above_ct + below_ct
+        res["vwap_above_pct"] = (100.0 * above_ct / total) if total else None
+        if total >= 6:  # need a meaningful sample
+            if above_ct / total >= 0.70:
+                res["vwap_signal"] = "sustained_above"
+            elif below_ct / total >= 0.70:
+                res["vwap_signal"] = "sustained_below"
+        # keep the cross signal too for fresh moves
         lookback = ibars[-VWAP_LOOKBACK_BARS:] if len(ibars) >= VWAP_LOOKBACK_BARS else ibars
         vw_early = session_vwap(lookback[:-1]) if len(lookback) > 1 else None
-        if vw_early:
+        if vw_early and not res["vwap_signal"]:
             was_below = lookback[0][4] < vw_early
             now_above = price > vwap
             was_above = lookback[0][4] > vw_early
@@ -342,24 +380,41 @@ def screen_one(symbol, quote_map=None, now_et=None):
     elif rel_vol_tp < REL_VOL_MIN:
         reasons.append("volume too thin (time-prorated)")
 
-    # --- signal gate: need at least one directional signal ---
-    if not res["orb_signal"] and not res["vwap_signal"]:
-        reasons.append("no ORB breakout or VWAP cross")
+    # --- signal gate: session-aware, with momentum-watch fallback ---
+    # Strict: ORB breakout-and-hold or sustained VWAP position.
+    # Fallback: strong volume + directional drift still earns a
+    # "momentum_watch" row -- an intraday screen should never be blank.
+    has_strict = bool(res["orb_signal"] in ("breakout_up_hold", "breakdown_down_hold")
+                      or res["vwap_signal"] in ("sustained_above", "sustained_below",
+                                                "reclaim_up", "loss_down"))
+    if not has_strict:
+        # fallback: notable volume with a clear directional drift
+        drift = (res["vwap_dist_pct"] or 0)
+        if (rel_vol_tp is not None and rel_vol_tp >= REL_VOL_MIN
+                and abs(drift) >= 0.5):
+            res["orb_signal"] = res["orb_signal"] or "momentum_watch"
+            res["bias"] = ("bullish drift" if drift > 0
+                           else "bearish drift")
+            res["conviction"] = abs(drift) * rel_vol_tp
+        else:
+            reasons.append("no session momentum signal")
 
     # --- bias and conviction ---
     sigs = [s for s in (res["orb_signal"], res["vwap_signal"]) if s]
-    if sigs:
-        up = sum(1 for s in sigs if s.endswith("_up"))
-        dn = sum(1 for s in sigs if s.endswith("_down"))
-        res["bias"] = "bullish momentum" if up > dn else "bearish momentum" if dn > up else "mixed"
-        dist = 0.0
-        if res["orb_signal"] == "breakout_up":
-            dist = (price / orb_high - 1) * 100.0
-        elif res["orb_signal"] == "breakdown_down":
-            dist = (orb_low / price - 1) * 100.0
+    if sigs and not res.get("conviction"):
+        up = sum(1 for s in sigs if "up" in s or "above" in s)
+        dn = sum(1 for s in sigs if "down" in s or "below" in s)
+        if not res.get("bias"):
+            res["bias"] = ("bullish momentum" if up > dn
+                           else "bearish momentum" if dn > up else "mixed")
+        dist = abs(res["vwap_dist_pct"] or 0)
+        if res["orb_signal"] in ("breakout_up_hold", "breakout_up_faded"):
+            dist = max(dist, (price / orb_high - 1) * 100.0)
+        elif res["orb_signal"] in ("breakdown_down_hold", "breakdown_down_faded"):
+            dist = max(dist, (orb_low / price - 1) * 100.0)
         res["conviction"] = (abs(dist) + 0.5) * (rel_vol_tp or 0)
-    else:
-        res["bias"] = "no signal"
+    elif not sigs:
+        res["bias"] = res.get("bias") or "no signal"
     return res, reasons
 
 
