@@ -142,7 +142,17 @@ def stock_section(data):
         bb = ind.get("bollinger") or {}
         vw = ind.get("vwap") or {}
         st = ind.get("structure") or {}
+        tr = ind.get("trend") or {}
+        mc = ind.get("macd") or {}
         sqz = "●" if bb.get("squeeze") else ""
+        cross = tr.get("cross")
+        cross_cell = (f'<span class="badge good">GC</span>' if cross == "golden"
+                      else (f'<span class="badge bad">DC</span>' if cross == "death"
+                            else '<span class="na">—</span>'))
+        mh = mc.get("hist")
+        mh_cell = (f"<span class='num {\"good\" if mh > 0 else \"bad\"}'>"
+                   f"{mh:+.2f}</span>" if mh is not None
+                   else '<span class="na">—</span>')
         rows.append(
             "<tr>"
             f"<td class='sym'>{esc(p.get('symbol'))}</td>"
@@ -153,7 +163,9 @@ def stock_section(data):
             f"<td class='sqz'>{'<span class=\"warn\">●</span>' if sqz else ''}</td>"
             f"<td class='num'>{pct(vw.get('anchored_dist_pct'))}</td>"
             f"<td>{trend_badge(st.get('trend'))}</td>"
-            f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/37</span></td>"
+            f"<td>{cross_cell}</td>"
+            f"<td>{mh_cell}</td>"
+            f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/40</span></td>"
             "</tr>"
         )
     table = (
@@ -171,19 +183,49 @@ def stock_section(data):
         "<th title='Distance from VWAP anchored at the 52-week low. Regime use: "
         "negative = institutional money underwater — rejected for bullish "
         "premium selling.'>vs Anchored VWAP</th>"
-        "<th>Trend</th><th>Score</th>"
+        "<th>Trend</th>"
+        "<th title='Golden/death cross: SMA50 crossed SMA200 within the last "
+        "20 sessions. GC = golden cross (bullish regime, +2 score); "
+        "DC = death cross (bearish, rejected).'>Cross</th>"
+        "<th title='MACD histogram (12,26,9): MACD line minus signal line. "
+        "Positive = bullish momentum (+1 score); negative = bearish.'>MACD hist</th>"
+        "<th>Score</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifiers this run.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="11" class="empty">No qualifiers this run.</td></tr>')
         + "</tbody></table></div>"
-        '<p class="fine"><b>Column guide.</b> '
-        "<b>%B</b> — price position inside Bollinger Bands (0 lower, 1 upper); "
-        "timing: &gt;1.0 is extended, rejected. "
-        "<b>Band width</b> — band width as % of the middle band; low reads as compression. "
-        "<b>Squeeze \u25cf</b> — bandwidth at its 125-day low: volatility is coiled, "
-        "expansion likely &mdash; wait, do not enter. "
-        "<b>vs Anchored VWAP</b> — distance from VWAP anchored at the 52-week low; "
-        "regime: below it means institutional money is underwater, rejected for bullish income. "
-        "<b>Score</b> — composite 0&ndash;37: base 0&ndash;30 (regime) + signals 0&ndash;7 (timing).</p>"
+        '<details><summary><b>Column guide — what each value means for decisions</b></summary>'
+        '<ul class="guide">'
+        "<li><b>Price</b> ($10&ndash;500 gate): names outside the band are rejected — "
+        "too cheap = wide spreads, too dear = capital-heavy.</li>"
+        "<li><b>RSI(14)</b> (0&ndash;100, gate 30&ndash;70): &lt;30 washed out, "
+        "&gt;70 overheated — both rejected. 50&ndash;65 is the sweet spot "
+        "(full 10/10 base points): momentum with room to run.</li>"
+        "<li><b>%B</b> (position inside Bollinger Bands): &lt;0 below the lower band, "
+        "0&ndash;1 inside, &gt;1.0 above the upper band = extended, rejected "
+        "(don't chase). 0.5&ndash;0.9 earns +2 timing points: riding the band, not stretched.</li>"
+        "<li><b>Band width</b> (% of middle band): no gate — context. Low = compression, "
+        "high = expansion already underway.</li>"
+        "<li><b>Squeeze \u25cf</b>: bandwidth at its 125-day minimum — volatility is coiled, "
+        "expansion likely. Design stance: <i>wait</i> (scores 0; premium is cheap here, "
+        "the worst time for a seller to get paid).</li>"
+        "<li><b>vs Anchored VWAP</b> (% from VWAP anchored at the 52-week low): must be "
+        "&ge;0. Negative = institutional money underwater — rejected for bullish income. "
+        "0&ndash;3% above earns +2 timing points (tight to institutional support).</li>"
+        "<li><b>Trend</b> (pivot structure): <b>UP</b> = rising swing highs <i>and</i> lows "
+        "— authorizes selling puts. <b>RNG</b> = no structure — condor territory, harvest "
+        "range premium. <b>DN</b> = falling highs and lows — bullish premium selling "
+        "rejected. Uptrend earns +3 timing points.</li>"
+        "<li><b>Cross</b>: <b>GC</b> = golden cross (SMA50 crossed above SMA200 within "
+        "20 sessions): bullish regime confirmation, +2. <b>DC</b> = death cross: bearish, "
+        "rejected. &mdash; = no cross in window.</li>"
+        "<li><b>MACD hist</b> (12,26,9): MACD line minus signal. Positive (green) = bullish "
+        "momentum, +1. Negative (red) = bearish momentum.</li>"
+        "<li><b>Score</b> (0&ndash;40): base 0&ndash;30 (regime: SMA position 10 + RSI "
+        "sweet spot 10 + volume expansion 10) + signals 0&ndash;10 (timing: %B 2 + "
+        "anchored VWAP 2 + trend 3 + golden cross 2 + MACD 1; squeeze 0). A pure "
+        "ranking device — higher = more gates passed with better timing, not a "
+        "probability or expected return.</li>"
+        "</ul></details>"
     )
     readout = ""
     ro = data.get("readout") or []
@@ -330,7 +372,11 @@ def method_section(config_path=None):
         ("Timing OK", "not chasing, not dead",
          f"RSI {st['rsi_min']:.0f}&ndash;{st['rsi_max']:.0f}, %B within "
          f"{st['bb_pctb_min']:.0f}&ndash;{st['bb_pctb_max']:.0f} "
-         f"(%B&gt;1 = extended, reject), no {st['squeeze_lookback']}-day squeeze"),
+         f"(%B&gt;1 = extended, reject), no {st['squeeze_lookback']}-day squeeze, "
+         f"MACD hist &gt; 0, no death cross"),
+        ("Golden cross", "bullish regime confirmation",
+         f"SMA{st['sma_fast']} crossed above SMA{st['sma_slow']} within "
+         f"{st['cross_lookback']:.0f} sessions (+2 timing)"),
         ("Day-trade momentum", "abnormal morning move",
          f"|gap| &ge; {dt['gap_min_pct']:.0f}%, rel volume &ge; {dt['rel_vol_min']:.1f}&times;, "
          "developing-VWAP side sets gap-and-go vs fade bias"),
@@ -727,6 +773,8 @@ padding:12px 16px;margin:16px 0 4px}
 .whyrow td{white-space:normal!important;font-size:.8rem;color:var(--dim);
 border-bottom:1px solid var(--border);padding:4px 12px 10px 28px!important;font-style:italic}
 .fine{font-size:.78rem;color:var(--dim);margin:10px 0 0}
+ul.guide{columns:2;column-gap:32px;font-size:.82rem;list-style:none;margin:10px 0 0;padding:0}
+ul.guide li{margin:0 0 8px;break-inside:avoid}
 details{border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:#0d1117}
 summary{cursor:pointer;font-weight:600}
 ul.rej{columns:2;column-gap:32px;font-size:.85rem}
