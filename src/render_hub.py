@@ -253,6 +253,27 @@ between the breakevens), not payout ratio.</p>
 <p>Max loss + credit always equals the wing width ($358 + $142 = $500 on a
 5-point wing). Max loss below credit would need RoR over 100% — the market never
 prices liquid spreads that way; if you see it, it's a bad quote.</p>
+<h3>Win%, EV$, Loss× — reading the odds</h3>
+<p>Three newer columns estimate what RoR alone doesn't say:</p>
+<ul>
+<li><b>Win%</b> — estimated probability the trade wins (keeps some credit).
+For a bull put: 1 − |short delta|. For an iron condor:
+(1 − |put delta|) × (1 − |call delta|). Delta approximates the market's
+pricing of exercise probability, so this is a <i>model estimate</i>, not a
+market fact. A 72% Win% means the options market prices roughly 72% odds the
+short legs expire worthless.</li>
+<li><b>EV$</b> — expected dollar value: Win% × credit − (1 − Win%) × max loss.
+Positive EV means the trade is priced in your favor <i>if</i> the delta-based
+odds hold. Negative EV doesn't mean "don't trade" — it means you're paying for
+the defined risk, which is the point of spreads.</li>
+<li><b>Loss×</b> — loss multiple: max loss ÷ credit. A 2.5× means you risk
+$2.50 for every $1 of credit. Higher Loss× needs higher Win% to break even —
+the two columns read together.</li>
+</ul>
+<p><b>Best / worst / optimal price ranges.</b> Best case: price stays between the
+breakevens through expiration — you keep the full credit. Worst case: price blows
+through a long strike — you lose the max. Optimal: price pins near the short
+strikes, maximizing time decay. The breakeven column shows the exact boundaries.</p>
 <h3>Reading the legs</h3>
 <p>First strike = <b>short (sell)</b>, second = <b>long (buy)</b>.
 210/205P means sell the 210 put, buy the 205 put. 245/250C means sell the 245
