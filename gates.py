@@ -62,6 +62,10 @@ DEFAULTS = {
             "no_assignment": True,
         },
     },
+    "ledger": {
+        "max_loss_pct": 0.02, "heat_cap_pct": 0.35,
+        "fee_per_contract": 0.65,
+    },
 }
 
 
