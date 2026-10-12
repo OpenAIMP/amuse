@@ -41,7 +41,8 @@ jobs:
         run: |
           chmod +x bin/public-mcp
           mkdir -p reports
-          STAMP=$(date +%F)
+          STAMP=$(date -u +%F-%H%M)
+          echo "STAMP=$STAMP" >> $GITHUB_ENV
           if [ -n "${{ inputs.names }}" ]; then
             WATCHLIST="${{ inputs.names }}"
           else
@@ -61,7 +62,7 @@ jobs:
         if: always()
         run: |
           mkdir -p docs/reports
-          STAMP=$(date +%F)
+          STAMP=${STAMP:-$(date -u +%F-%H%M)}
           if [ -n "${{ inputs.names }}" ]; then
             SRC="custom"
             DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
@@ -70,7 +71,7 @@ jobs:
             DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           fi
           python3 render_report.py --pmcc reports/pmcc-quality-$STAMP.json \
-            --report-id pmcc-$SRC-$(date +%Y-%m) --source "$SRC" --source-detail "$DETAIL"
+            --report-id pmcc-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
           python3 render_hub.py
           ls docs/index.html
 

@@ -123,7 +123,7 @@ jobs:
         if: always()
         run: |
           mkdir -p docs/reports
-          STAMP=$(date +%F)
+          STAMP=$(date -u +%F-%H%M)
           if [ "$SRC" = "custom" ]; then
             DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
           elif [ "$SRC" = "watchlist" ]; then
