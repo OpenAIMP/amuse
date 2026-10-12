@@ -49,6 +49,8 @@ jobs:
         with:
           path: state/
           key: screen-state
+          restore-keys: |
+            screen-state-
 
       - name: Load watchlist
         run: |
@@ -90,9 +92,11 @@ jobs:
         run: |
           if [ -n "$UNIVERSE" ]; then
             python3 src/spread_screener.py --universe "$UNIVERSE" \
+              --iv-history state/iv_history.jsonl \
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           else
             python3 src/spread_screener.py --names "$WATCHLIST" \
+              --iv-history state/iv_history.jsonl \
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           fi
 
@@ -103,6 +107,11 @@ jobs:
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
           python3 src/pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
+
+      - name: Fetch market news
+        run: |
+          python3 src/fetch_news.py --names "$WATCHLIST" \
+            --out reports/news.json --market-out docs/news.json || true
 
       - name: Save watch state
         uses: actions/cache/save@v4
@@ -133,6 +142,7 @@ jobs:
           fi
           python3 src/render_report.py --stock reports/stock-screen.json \
             --spreads reports/spread-screen.json \
+            --news reports/news.json \
             --report-id daily-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
           python3 src/render_hub.py
           ls docs/index.html
