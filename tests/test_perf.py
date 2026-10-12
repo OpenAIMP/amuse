@@ -3,7 +3,7 @@
 Every screener funnels MCP traffic through one mcp_call(tool, args)
 function. These tests monkeypatch it with a canned fake that counts calls,
 proving:
-  - daytrade quotes are batched (one get_quotes for N names, not N calls)
+  - premarket quotes are batched (one get_quotes for N names, not N calls)
   - screen_one honors a provided quote_map (zero quote calls)
   - threaded fan-out returns results identical to sequential runs
 """
@@ -21,7 +21,7 @@ import json
 import unittest
 from datetime import date, timedelta
 
-import daytrade_screen as dt
+import premarket_screen as dt
 
 
 def _daily_bars(n=60, close=100.0, drift=0.0):
