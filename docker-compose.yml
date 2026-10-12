@@ -1,0 +1,51 @@
+# amuse local runs. Copy .env.example to .env and set PUBLIC_API_KEY first.
+#
+#   docker compose run --rm test                 # full unit suite
+#   docker compose run --rm daytrade             # pre-market gap screen + report
+#   docker compose run --rm daily                # stock + spread screens + report
+#   docker compose run --rm monthly              # PMCC quality screen + report
+#   docker compose run --rm all                  # everything, then rebuild the hub
+#   docker compose run --rm app python3 src/stock_screener.py --names NVDA,AMD
+#
+# Reports land in ./docs (mounted), so open docs/index.html when done.
+# The API key never lands in the image: it is passed at run time only.
+
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    environment:
+      PUBLIC_MCP_CLI: /app/bin/public-mcp
+    volumes:
+      - ./docs:/app/docs
+      - ./reports:/app/reports
+    working_dir: /app
+
+  test:
+    extends: app
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+    entrypoint: ["bash", "bin/run-local.sh"]
+    command: ["test"]
+
+  daytrade:
+    extends: app
+    entrypoint: ["bash", "bin/run-local.sh"]
+    command: ["daytrade"]
+
+  daily:
+    extends: app
+    entrypoint: ["bash", "bin/run-local.sh"]
+    command: ["daily"]
+
+  monthly:
+    extends: app
+    entrypoint: ["bash", "bin/run-local.sh"]
+    command: ["monthly"]
+
+  all:
+    extends: app
+    entrypoint: ["bash", "bin/run-local.sh"]
+    command: ["all"]
