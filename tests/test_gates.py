@@ -62,7 +62,7 @@ class TestLoad(unittest.TestCase):
 
     def test_missing_file_uses_defaults(self):
         g = gates.load("/tmp/definitely-not-here-12345.yaml")
-        self.assertEqual(g["daytrade"]["top_n"], 20)
+        self.assertEqual(g["premarket"]["top_n"], 20)
 
     def test_ledger_section(self):
         g = gates.load()
