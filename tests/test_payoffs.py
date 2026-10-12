@@ -8,6 +8,9 @@ import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                                   "..", "src"))
+# Screener modules require PUBLIC_ACCOUNT_ID at import time (#23); unit
+# tests never hit the API, so a dummy value suffices.
+_os.environ.setdefault("PUBLIC_ACCOUNT_ID", "TEST")
 
 
 import unittest
