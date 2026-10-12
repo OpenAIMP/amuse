@@ -250,7 +250,10 @@ def bollinger(closes):
             bw = (mult * s) / m * 100.0 if m > 0 else None
             bws.append(bw)
         if all(b is not None and math.isfinite(b) for b in bws):
-            out["squeeze"] = (out["bandwidth_pct"] == min(bws))
+            # bws[-1] is today's bandwidth on the same formula as the rest,
+            # so == is exact here (issue #16: comparing against the separately
+            # computed bandwidth_pct could miss by 1 ulp).
+            out["squeeze"] = (bws[-1] == min(bws))
     return out
 
 
