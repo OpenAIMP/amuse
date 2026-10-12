@@ -3,11 +3,13 @@ name: Refresh index universes
 # Rebuilds src/universes/*.txt from upstream sources (Wikipedia constituent
 # tables, iShares IWM holdings) and commits only genuine changes.
 # The Dow 30 list is curated inside the script and verified annually.
+
 on:
-  # Scheduled runs are owned by master.yml (which calls this workflow on the 1st).
-  # Manual runs use workflow_dispatch below.
+  schedule:
+    # First Sunday of each month, 06:00 UTC (constituent churn is slow).
+    - cron: "0 6 1-7 * 0"
   workflow_call:
-  workflow_dispatch:
+  workflow_dispatch:  
 
 permissions:
   contents: write
