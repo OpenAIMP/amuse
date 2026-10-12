@@ -180,14 +180,30 @@ open docs/index.html
 
 ```bash
 cp .env.example .env   # then set PUBLIC_API_KEY inside
-docker compose run --rm test
-docker compose run --rm all
+docker compose build              # first time only; stdlib-only, no pip
+docker compose run --rm test      # unit suite
+docker compose run --rm all       # everything, then rebuild the hub
 # or run anything ad hoc:
 docker compose run --rm app python3 src/stock_screener.py --names NVDA,AMD
+open docs/index.html
 ```
 
-Reports land in `docs/` either way. The key never enters the image —
-it is passed at run time only.
+Reports land in `docs/` either way (mounted from the host), so open
+`docs/index.html` when done. The key never enters the image — it is read
+from `.env` at run time only. Never commit `.env`. `bin/run-local.sh` is
+the same pipeline the compose services call, so Docker and non-Docker runs
+stay identical by construction.
+
+### Clickable symbols
+
+Every ticker in the reports is a link: clicking goes straight to its
+Google Finance quote. The ▾ dropdown next to each symbol opens a clicklist
+of research destinations — Yahoo Finance, Nasdaq, MarketWatch, CNBC,
+Public (your broker), TradingView, Finviz, Fintel (institutional
+ownership), WhaleWisdom (13F filings), Seeking Alpha, Zacks (rank +
+earnings calendar), and SEC EDGAR filings. To add or remove a destination,
+edit the `QUOTE_LINKS` table at the top of `src/render_report.py` — one
+line per site, `{s}` for the uppercase symbol, `{sl}` for lowercase.
 
 ## How value is created
 
@@ -335,9 +351,18 @@ anything that touches orders — Size and Preflight stay human.
 | Session VWAP | Timing | Last completed session; distance reported, never a reject on missing data |
 | Fractal pivots (n=5) + Fib 38.2/50/61.8% | Strikes | Short strikes go below the 61.8% retracement or last swing low |
 | HH/HL trend structure | Regime | Downtrend = rejection; only uptrends get full bullish treatment |
+| Gap (open vs prior close) | Tape | ±2%+ = gap up/down (overnight news — check catalyst); smaller = no gap |
+| Momentum (RSI state) | Tape | Oversold <30, overbought >70, else neutral. State label, not a signal |
+| Value (52-week range %) | Tape | ≤25% beaten-down / ≥75% priced-at-top. Chart position, NOT fundamental value |
+| Bias (6-vote composite) | Regime | price>SMA50, price>SMA200, SMA50>SMA200, MACD>0, RSI>50, pivot UP. 4+ = bullish, ≤2 = bearish |
 
 Deliberately **not** automated: Elliott Wave counting — too subjective; pivots
 and Fibs capture the objective machinery underneath it.
+
+The Gap/Momentum/Value/Bias columns are *readouts*, not gates — they describe
+the tape but never reject a name. Value is explicitly a technical 52-week-range
+proxy: the data feed has no fundamentals (no earnings, P/E, or balance-sheet
+data), so it must never be read as intrinsic-value analysis.
 
 ### Day-trade screener (`daytrade_screen.py`) — intraday momentum
 
@@ -597,34 +622,32 @@ Google Drive folder holds everything around the code:
 ```bash
 export PUBLIC_MCP_CLI="$PWD/bin/public-mcp"
 export PUBLIC_API_KEY="your-key"          # or point PUBLIC_MCP_CLI at a vault-backed CLI
-cd ~/workspace/options-lab
-
 # 1. Screen → JSON (--names overrides --universe)
-python3 stock_screener.py --names T,VZ,XOM --json-out /tmp/stock.json
-python3 spread_screener.py --names T,VZ,XOM --json-out /tmp/spreads.json
+python3 src/stock_screener.py --names T,VZ,XOM --json-out /tmp/stock.json
+python3 src/spread_screener.py --names T,VZ,XOM --json-out /tmp/spreads.json
 
 # 2. Render the dated report
-python3 render_report.py --stock /tmp/stock.json --spreads /tmp/spreads.json \
+python3 src/render_report.py --stock /tmp/stock.json --spreads /tmp/spreads.json \
   --report-id daily-custom-2026-10-11 --source custom --source-detail "3 names"
 
 # 3. Rebuild the archive, then open repo/docs/index.html in a browser
-python3 render_hub.py
+python3 src/render_hub.py
 ```
 
 Variations — other universes, other report kinds:
 
 ```bash
-python3 stock_screener.py --universe nasdaq100 --json-out /tmp/stock.json
-python3 scan_loop.py --screener stock_screener.py --universes sp100,nasdaq100
-python3 daytrade_screen.py --limit 20 --json-out /tmp/dt.json
-python3 render_report.py --daytrade /tmp/dt.json \
+python3 src/stock_screener.py --universe nasdaq100 --json-out /tmp/stock.json
+python3 src/stock_screener.py --screener stock_screener.py --universes sp100,nasdaq100
+python3 src/daytrade_screen.py --limit 20 --json-out /tmp/dt.json
+python3 src/render_report.py --daytrade /tmp/dt.json \
   --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
-python3 pmcc_quality.py --names T,VZ,XOM --json-out /tmp/pmcc.json
-python3 render_report.py --pmcc /tmp/pmcc.json \
+python3 src/pmcc_quality.py --names T,VZ,XOM --json-out /tmp/pmcc.json
+python3 src/render_report.py --pmcc /tmp/pmcc.json \
   --report-id pmcc-custom-2026-10 --source custom --source-detail "3 names"
 ```
 
-`render_report.py` writes to `repo/docs/` locally and `./docs/` in CI; all
+`render_report.py` resolves `docs/` from the repo root; all
 links are relative, so the pages work from `file://` and from Pages
 identically.
 
