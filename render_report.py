@@ -150,9 +150,11 @@ def stock_section(data):
                       else (f'<span class="badge bad">DC</span>' if cross == "death"
                             else '<span class="na">—</span>'))
         mh = mc.get("hist")
-        mh_cell = (f"<span class='num {\"good\" if mh > 0 else \"bad\"}'>"
-                   f"{mh:+.2f}</span>" if mh is not None
-                   else '<span class="na">—</span>')
+        if mh is None:
+            mh_cell = '<span class="na">—</span>'
+        else:
+            cls = "good" if mh > 0 else "bad"
+            mh_cell = f"<span class='num {cls}'>{mh:+.2f}</span>"
         rows.append(
             "<tr>"
             f"<td class='sym'>{esc(p.get('symbol'))}</td>"
