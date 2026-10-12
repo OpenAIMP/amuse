@@ -48,7 +48,7 @@ jobs:
           else
             WATCHLIST=$(grep -v '^#' watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
           fi
-          python3 pmcc_quality.py --names "$WATCHLIST" --json-out reports/pmcc-quality-$STAMP.json | tee reports/pmcc-quality-$STAMP.txt
+          python3 src/pmcc_quality.py --names "$WATCHLIST" --json-out reports/pmcc-quality-$STAMP.json | tee reports/pmcc-quality-$STAMP.txt
 
       - name: Upload run outputs
         uses: actions/upload-artifact@v4
@@ -70,9 +70,9 @@ jobs:
             SRC="watchlist"
             DETAIL="$(grep -v '^#' watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           fi
-          python3 render_report.py --pmcc reports/pmcc-quality-$STAMP.json \
+          python3 src/render_report.py --pmcc reports/pmcc-quality-$STAMP.json \
             --report-id pmcc-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
-          python3 render_hub.py
+          python3 src/render_hub.py
           ls docs/index.html
 
       - name: Publish dashboard to GitHub Pages
