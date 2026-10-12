@@ -11,6 +11,7 @@ scan). Pair it with a universe filter (e.g. a thinkScript scan) upstream.
 Gates are module constants and are printed in every report.
 """
 import argparse
+import concurrent.futures
 import json
 import os
 import math
@@ -608,6 +609,31 @@ def narrate_stock(passing, rejected, names):
     return lines
 
 
+def screen_stock(sym):
+    """Fetch + evaluate one name. Returns (sym, ok, metrics, reasons).
+
+    metrics is None when bars could not be fetched/evaluated at all.
+    Pure per-symbol work; safe to run in a thread pool (issue #14).
+    """
+    try:
+        bars = bars_for(sym)
+    except McpError as e:
+        return (sym, False, None, [f"data error: {e}"])
+    except Exception as e:  # never let one ticker kill the run
+        return (sym, False, None, [f"unexpected error: {type(e).__name__}"])
+    try:
+        ok, metrics, reasons = evaluate(sym, bars)
+    except Exception as e:
+        return (sym, False, None, [f"evaluation error: {type(e).__name__}"])
+    if ok:
+        base = composite(metrics)
+        sig, detail = signal_score(metrics)
+        metrics["score"] = round(base + sig, 1)
+        metrics["score_breakdown"] = {"base": base, "signals": sig,
+                                      "detail": detail}
+        metrics["symbol"] = sym
+    return (sym, ok, metrics, reasons)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", default=None,
@@ -618,6 +644,8 @@ def main():
                     help="write machine-readable ranked results to FILE")
     ap.add_argument("--config", default=None,
                     help="path to gates.yaml (default: gates.yaml next to the script)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="concurrent MCP workers (default 8; 1 = sequential)")
     args = ap.parse_args()
     if args.config:
         _apply_gates(args.config)
@@ -651,30 +679,17 @@ def main():
           f"downtrend reject={'yes' if REJECT_DOWNTREND else 'no'}; "
           f"score 0-40 = base 0-30 + signals 0-10.")
 
+    # Thread pool over names (issue #14): screen_stock is pure per-symbol
+    # work. Merge in submission order in the main thread -- no locks,
+    # deterministic output regardless of worker count.
     passing, rejected = [], {}
-    for sym in names:
-        try:
-            bars = bars_for(sym)
-        except McpError as e:
-            rejected[sym] = {"reasons": [f"data error: {e}"], "indicators": None}
-            continue
-        except Exception as e:  # never let one ticker kill the run
-            rejected[sym] = {"reasons": [f"unexpected error: {type(e).__name__}"],
-                             "indicators": None}
-            continue
-        try:
-            ok, metrics, reasons = evaluate(sym, bars)
-        except Exception as e:
-            rejected[sym] = {"reasons": [f"evaluation error: {type(e).__name__}"],
-                             "indicators": None}
-            continue
-        if ok:
-            base = composite(metrics)
-            sig, detail = signal_score(metrics)
-            metrics["score"] = round(base + sig, 1)
-            metrics["score_breakdown"] = {"base": base, "signals": sig,
-                                          "detail": detail}
-            metrics["symbol"] = sym
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(1, args.workers)) as ex:
+        results = list(ex.map(screen_stock, names))
+    for sym, ok, metrics, reasons in results:
+        if metrics is None:
+            rejected[sym] = {"reasons": reasons, "indicators": None}
+        elif ok:
             passing.append(metrics)
         else:
             rejected[sym] = {"reasons": reasons,
