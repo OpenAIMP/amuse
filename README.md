@@ -441,6 +441,15 @@ the full tables.
 - Contracts assumed standard 100-share deliverables (not validated).
 - **These scripts screen and monitor only. They never place orders.**
 
+### Tuning the gates
+
+Every threshold lives in **`gates.yaml`** — delta bands, DTE windows, spread
+widths, liquidity floors, max-loss caps, friction caps, gap/volume/ATR cutoffs,
+RSI/SMA/Bollinger/pivot lookbacks. Edit values there, not code; each screener
+also accepts `--config PATH` for a different file. Missing keys fall back to
+built-in defaults, so a partial file can't break a run. Looser gates produce
+more candidates, not more edge — see the honest limitations below.
+
 ## Honest limitations
 
 - The MCP has no fundamentals (no P/E, market cap, earnings dates) and no
