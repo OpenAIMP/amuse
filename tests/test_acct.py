@@ -15,8 +15,8 @@ import sys
 import unittest
 
 
-MODULES = ["spread_screener", "premarket_screen", "pmcc_quality",
-           "stock_screener"]
+MODULES = ["spread_screener", "premarket_screen", "intraday_screen",
+           "pmcc_quality", "stock_screener"]
 SRC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                         "..", "src")
 
