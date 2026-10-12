@@ -33,7 +33,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/bin/public-mcp")
-ACCT = os.environ.get("PUBLIC_ACCOUNT_ID", "5OI32712")
+ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or "5OI32712"  # or: empty string must also fall back (#22)
 NAMES = ["KO", "DIS", "MRK", "XOM", "INTC", "QCOM",
          "T", "VZ", "BAC", "PFE",
          "SBUX", "BMY", "DUK", "SO", "MET", "KMB", "GIS"]
