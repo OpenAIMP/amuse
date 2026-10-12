@@ -47,7 +47,7 @@ DEFAULTS = {
         "value_under_max_pct": 25.0, "value_over_min_pct": 75.0,
         "bias_bull_min": 4, "bias_bear_max": 2,
     },
-    "daytrade": {
+    "premarket": {
         "gap_min_pct": 2.0, "rel_vol_min": 1.5, "price_min": 10.0,
         "atr_pct_min": 1.0, "atr_pct_max": 8.0,
         "top_n": 20, "min_daily_bars": 30,
