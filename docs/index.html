@@ -88,6 +88,11 @@ padding:12px 14px;margin:10px 0}
 padding:2px 10px;color:var(--dim);font-variant-numeric:tabular-nums}
 .srcgroup{margin:14px 0 4px}
 .srcgroup > h3{margin:14px 0 4px}
+.news-list{margin:8px 0;padding-left:20px}
+.news-list li{margin:5px 0;font-size:.9rem}
+.refresh-btn{background:#161b22;border:1px solid var(--border);border-radius:6px;
+color:var(--dim);cursor:pointer;font-size:.85rem;padding:1px 8px;margin-left:8px}
+.refresh-btn:hover{color:var(--blue);border-color:var(--blue)}
 </style>
 </head>
 <body>
@@ -95,11 +100,57 @@ padding:2px 10px;color:var(--dim);font-variant-numeric:tabular-nums}
 
 <header>
 <h1>Options Lab — Latest Reports</h1>
-<p class="sub">The most recent run of each screen. <a href="archive.html">Full archive →</a> (21 reports, 3 screens)</p>
+<p class="sub">The most recent run of each screen. <a href="archive.html">Full archive →</a> (22 reports, 3 screens)</p>
 </header>
 <section class="card"><h2>How a trade gets made</h2><div class="flow"><div class="flow-step"><div class="flow-name">1. Screen</div><div class="flow-desc">Find candidates across the watchlist or universe.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">2. Regime</div><div class="flow-desc">Trend structure + anchored VWAP pick the strategy family.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">3. Timing</div><div class="flow-desc">%B, RSI and squeeze confirm — or veto — the entry now.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">4. Strikes</div><div class="flow-desc">Fib levels and swing pivots place short strikes behind structure.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">5. Size</div><div class="flow-desc">1–2% max loss per trade; total heat under 40%.</div></div><div class="flow-arrow">→</div><div class="flow-step"><div class="flow-name">6. Preflight</div><div class="flow-desc">Buying power, events, fees — then your confirmation.</div></div></div></section>
-<section class="card"><h2>Daily screen</h2><div class="srcgroup"><h3>Watchlist</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1250</span><span class="src-chip">Watchlist</span><a href="reports/daily-watchlist-2026-10-12-1250.html">Open report →</a></div><div class="repitem-blurb">NVDA 32.4 leads</div><div class="chips"><span class="chip">stocks: 7</span><span class="chip">bull puts: 0</span><span class="chip">iron condors: 0</span><span class="chip">asym condors: 0</span><span class="chip">pmcc pairs: 0</span></div></div></div></section><section class="card"><h2>Pre-market day-trade</h2><div class="srcgroup"><h3>S&amp;P 500</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1248</span><span class="src-chip">S&amp;P 500</span><a href="reports/daytrade-sp500-2026-10-12-1248.html">Open report →</a></div><div class="repitem-blurb">No qualifiers — quiet screen</div><div class="chips"><span class="chip">candidates: 0</span><span class="chip">gap and go: 0</span><span class="chip">screened: 502</span></div></div></div></section><section class="card"><h2>Monthly PMCC</h2><div class="srcgroup"><h3>Watchlist</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1248</span><span class="src-chip">Watchlist</span><a href="reports/pmcc-watchlist-2026-10-12-1248.html">Open report →</a></div><div class="repitem-blurb">No qualifiers — baseline</div><div class="chips"><span class="chip">pairs: 0</span></div></div></div></section>
-<footer>Regenerated 2026-10-12 12:50 UTC · screeners never place orders.</footer>
+
+<section class="card"><h2>Market news</h2>
+<p class="dim"><span id="news-status">No snapshot yet</span>
+<button id="news-refresh" class="refresh-btn" title="Refresh headlines now">↻</button></p>
+<ul id="news-live-list" class="news-list"><li class="dim">No headlines yet — the next scheduled run fetches them.</li></ul>
+<script>
+(function() {
+  var list = document.getElementById('news-live-list');
+  var status = document.getElementById('news-status');
+  if (!list || !status) return;
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function render(items, label) {
+    list.innerHTML = items.map(function(h) {
+      var t = h.title || '';
+      var dash = t.lastIndexOf(' - ');
+      if (dash > 0) t = t.slice(0, dash);
+      return '<li><a href="' + esc(h.link) + '" target="_blank" rel="noopener">'
+        + esc(t) + '</a></li>';
+    }).join('');
+    status.textContent = label;
+  }
+  function load() {
+    status.textContent = 'Refreshing headlines…';
+    var q = encodeURIComponent('S&P 500 stock market');
+    var rss = encodeURIComponent('https://news.google.com/rss/search?q=' + q
+      + '&hl=en-US&gl=US&ceid=US:en');
+    fetch('https://api.rss2json.com/v1/api.json?rss_url=' + rss)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.status === 'ok' && d.items && d.items.length)
+          render(d.items.slice(0, 8),
+                 'Live · updated ' + new Date().toLocaleTimeString());
+        else throw new Error('bad payload');
+      })
+      .catch(function() {
+        status.textContent = 'Live refresh unavailable — showing morning snapshot.';
+      });
+  }
+  document.getElementById('news-refresh').addEventListener('click', load);
+  load();
+})();
+</script>
+</section><section class="card"><h2>Daily screen</h2><div class="srcgroup"><h3>Watchlist</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1250</span><span class="src-chip">Watchlist</span><a href="reports/daily-watchlist-2026-10-12-1250.html">Open report →</a></div><div class="repitem-blurb">NVDA 32.4 leads</div><div class="chips"><span class="chip">stocks: 7</span><span class="chip">bull puts: 0</span><span class="chip">iron condors: 0</span><span class="chip">asym condors: 0</span><span class="chip">pmcc pairs: 0</span></div></div></div></section><section class="card"><h2>Pre-market day-trade</h2><div class="srcgroup"><h3>S&amp;P 500</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1248</span><span class="src-chip">S&amp;P 500</span><a href="reports/daytrade-sp500-2026-10-12-1248.html">Open report →</a></div><div class="repitem-blurb">No qualifiers — quiet screen</div><div class="chips"><span class="chip">candidates: 0</span><span class="chip">gap and go: 0</span><span class="chip">screened: 502</span></div></div></div></section><section class="card"><h2>Monthly PMCC</h2><div class="srcgroup"><h3>Watchlist</h3><div class="repitem"><div class="repitem-top"><span class="d">2026-10-12-1327</span><span class="src-chip">Watchlist</span><a href="reports/pmcc-watchlist-2026-10-12-1327.html">Open report →</a></div><div class="repitem-blurb">No qualifiers — baseline</div><div class="chips"><span class="chip">pairs: 0</span></div></div></div></section>
+<footer>Regenerated 2026-10-12 13:27 UTC · screeners never place orders.</footer>
 </div>
 </body>
 </html>
