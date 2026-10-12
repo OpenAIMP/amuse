@@ -39,6 +39,8 @@ def _apply_gates(path=None):
     global BB_PERIOD, BB_MULT, BB_PCTB_MIN, BB_PCTB_MAX
     global SQUEEZE_LOOKBACK, MIN_BARS_SQUEEZE, REQUIRE_ABOVE_ANCHORED_VWAP
     global REJECT_DOWNTREND, PIVOT_N, SWING_LOOKBACK_BARS
+    global EMA_FAST, EMA_SLOW, MACD_FAST, MACD_SLOW, MACD_SIGNAL
+    global CROSS_LOOKBACK, REJECT_DEATH_CROSS
     G = _gates_mod.load(path)["stock"]
     PRICE_MIN, PRICE_MAX = G["price_min"], G["price_max"]
     RSI_PERIOD = G["rsi_period"]
@@ -58,6 +60,10 @@ def _apply_gates(path=None):
     REJECT_DOWNTREND = G["reject_downtrend"]
     PIVOT_N = G["pivot_n"]
     SWING_LOOKBACK_BARS = G["swing_lookback_bars"]
+    EMA_FAST, EMA_SLOW = G["ema_fast"], G["ema_slow"]
+    MACD_FAST, MACD_SLOW, MACD_SIGNAL = G["macd_fast"], G["macd_slow"], G["macd_signal"]
+    CROSS_LOOKBACK = G["cross_lookback"]
+    REJECT_DEATH_CROSS = G["reject_death_cross"]
 
 
 _apply_gates()
@@ -121,6 +127,63 @@ def bars_for(symbol):
 
 def sma(vals, n):
     return sum(vals[-n:]) / n
+
+
+def ema(vals, n):
+    """Exponential moving average over the last n values (seeded with SMA)."""
+    if len(vals) < n:
+        return None
+    k = 2.0 / (n + 1.0)
+    e = sum(vals[:n]) / n
+    for v in vals[n:]:
+        e = v * k + e * (1.0 - k)
+    return e
+
+
+def macd(closes, fast=12, slow=26, signal=9):
+    """MACD line, signal line, histogram. Returns (None, None, None) if
+    insufficient data. Standard 12/26/9, tunable via gates."""
+    if len(closes) < slow + signal:
+        return None, None, None
+    k_fast, k_slow = 2.0 / (fast + 1.0), 2.0 / (slow + 1.0)
+    ef = sum(closes[:fast]) / fast
+    es = sum(closes[:slow]) / slow
+    macd_line = None
+    hist = []
+    for v in closes[slow:]:
+        ef = v * k_fast + ef * (1.0 - k_fast)
+        es = v * k_slow + es * (1.0 - k_slow)
+        macd_line = ef - es
+        hist.append(macd_line)
+    if len(hist) < signal:
+        return macd_line, None, None
+    k_sig = 2.0 / (signal + 1.0)
+    sig = sum(hist[:signal]) / signal
+    for m in hist[signal:]:
+        sig = m * k_sig + sig * (1.0 - k_sig)
+    return macd_line, sig, macd_line - sig
+
+
+def sma_cross(closes, fast_n, slow_n, lookback):
+    """Detect SMA fast/slow cross within the last `lookback` sessions.
+
+    Returns "golden" (fast crossed above slow), "death" (fast crossed
+    below slow), or None. Classic trend-regime event.
+    """
+    if len(closes) < slow_n + lookback:
+        return None
+    prev = None
+    for i in range(len(closes) - lookback, len(closes)):
+        w = closes[:i + 1]
+        f, s = sma(w, fast_n), sma(w, slow_n)
+        cur = "above" if f > s else ("below" if f < s else "even")
+        if prev == "below" and cur == "above":
+            return "golden"
+        if prev == "above" and cur == "below":
+            return "death"
+        if cur != "even":
+            prev = cur
+    return None
 
 
 def rsi(closes, period=14):
@@ -417,6 +480,19 @@ def evaluate(sym, bars):
     elif REJECT_DOWNTREND and struct["trend"] == "DN":
         reasons.append("downtrend structure")
 
+    # ---- trend pack: EMA, golden/death cross, MACD ----
+    ema_fast_v = ema(closes, EMA_FAST)
+    ema_slow_v = ema(closes, EMA_SLOW)
+    cross = sma_cross(closes, SMA_FAST, SMA_SLOW, CROSS_LOOKBACK)
+    if cross == "death" and REJECT_DEATH_CROSS:
+        reasons.append("death cross (SMA50<SMA200)")
+    elif cross is None:
+        flags.append("cross unknown")
+    macd_line, macd_sig, macd_hist = macd(closes, MACD_FAST, MACD_SLOW,
+                                          MACD_SIGNAL)
+    if macd_hist is None:
+        flags.append("macd unknown")
+
     def ret(n):
         return (price / closes[-n - 1] - 1) * 100 if len(closes) > n else 0.0
 
@@ -436,6 +512,16 @@ def evaluate(sym, bars):
             "anchored_dist_pct": r1(avwap_dist),
         },
         "structure": struct,
+        "trend": {
+            "ema50": r2(ema_fast_v),
+            "ema200": r2(ema_slow_v),
+            "cross": cross,  # "golden" | "death" | None
+        },
+        "macd": {
+            "line": r2(macd_line),
+            "signal": r2(macd_sig),
+            "hist": r2(macd_hist),
+        },
     }
     metrics = {
         "price": round(price, 2), "rsi14": round(rsi14, 1),
@@ -466,7 +552,8 @@ def composite(m):
 
 def signal_score(m):
     """0-10 indicator-pack score: %B in [0.5,0.9] +2,
-    anchored-VWAP distance 0-3% above +2 (else +1 if known), uptrend +3.
+    anchored-VWAP distance 0-3% above +2 (else +1 if known), uptrend +3,
+    golden cross +2, MACD histogram positive +1.
 
     A squeeze scores 0 by design (issue #16): the documented stance is
     "wait or size down" — a volatility coil means premium is cheap, the
@@ -491,6 +578,13 @@ def signal_score(m):
     if ind.get("structure", {}).get("trend") == "UP":
         s += 3.0
         detail["uptrend"] = 3.0
+    if ind.get("trend", {}).get("cross") == "golden":
+        s += 2.0
+        detail["golden_cross"] = 2.0
+    mh = ind.get("macd", {}).get("hist")
+    if mh is not None and mh > 0:
+        s += 1.0
+        detail["macd_bullish"] = 1.0
     return round(s, 1), detail
 
 
@@ -683,7 +777,7 @@ def main():
           f"bandwidth min (ranking only); anchored-VWAP gate="
           f"{'yes' if REQUIRE_ABOVE_ANCHORED_VWAP else 'no'}; "
           f"downtrend reject={'yes' if REJECT_DOWNTREND else 'no'}; "
-          f"score 0-37 = base 0-30 + signals 0-7.")
+          f"score 0-40 = base 0-30 + signals 0-10.")
 
     # Thread pool over names (issue #14): screen_stock is pure per-symbol
     # work. Merge in submission order in the main thread -- no locks,
@@ -778,7 +872,7 @@ def main():
                                           "squeeze_lookback": SQUEEZE_LOOKBACK},
                            "require_above_anchored_vwap": REQUIRE_ABOVE_ANCHORED_VWAP,
                            "reject_downtrend": REJECT_DOWNTREND,
-                           "score": "0-37 = base 0-30 + signals 0-7",
+                           "score": "0-40 = base 0-30 + signals 0-10",
                            "universe": universe_tag},
                        "passing": passing,
                        "rejected": rejected,
