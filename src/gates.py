@@ -43,6 +43,9 @@ DEFAULTS = {
         "ema_fast": 50, "ema_slow": 200,
         "macd_fast": 12, "macd_slow": 26, "macd_signal": 9,
         "cross_lookback": 20, "reject_death_cross": True,
+        "gap_label_abs_pct": 2.0, "rsi_oversold": 30.0, "rsi_overbought": 70.0,
+        "value_under_max_pct": 25.0, "value_over_min_pct": 75.0,
+        "bias_bull_min": 4, "bias_bear_max": 2,
     },
     "daytrade": {
         "gap_min_pct": 2.0, "rel_vol_min": 1.5, "price_min": 10.0,
