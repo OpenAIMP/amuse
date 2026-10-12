@@ -15,11 +15,11 @@ on:
         required: false
         default: ""
       universe:
-        description: "Universe override for the daily screen (blank = watchlist.txt)"
+        description: "Universe override for the daytrade + daily screens (blank = defaults)"
         required: false
         default: ""
       limit:
-        description: "Cap for the day-trade universe (blank = full S&P 500)"
+        description: "Cap for the day-trade universe (blank = full universe)"
         required: false
         default: ""
 
@@ -41,6 +41,7 @@ jobs:
     with:
       names: ${{ inputs.names }}
       limit: ${{ inputs.limit }}
+      universe: ${{ inputs.universe }}
     secrets: inherit
 
   daily:
@@ -58,4 +59,12 @@ jobs:
     uses: ./.github/workflows/monthly-screen.yml
     with:
       names: ${{ inputs.names }}
+    secrets: inherit
+
+  universes:
+    needs: setup
+    # Refresh index constituents on the 1st of each month;
+    # a manual master run always includes it.
+    if: needs.setup.outputs.day == '01' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/build-universes.yml
     secrets: inherit
