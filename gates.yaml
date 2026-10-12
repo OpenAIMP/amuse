@@ -82,3 +82,10 @@ ledger:
   max_loss_pct: 0.02   # one trade's max loss <= 2% of account
   heat_cap_pct: 0.35   # total open max loss <= 35% of account
   fee_per_contract: 0.65  # all-in per-contract fee assumption, each side
+
+vol:
+  hv_short: 20        # short HV window (trading days)
+  hv_long: 60         # long HV window (trading days)
+  ivr_sell: 50        # IV rank above this + IV > HV -> sell premium
+  ivr_stand_down: 25  # IV rank below this -> stand down (premium too cheap)
+  min_iv_history: 30  # snapshots needed before IV rank is trusted
