@@ -359,6 +359,56 @@ def stock_section(data):
     return section("Stock screen", table + readout)
 
 
+def considered_table(res, asof):
+    """Issue #38: qualify-don't-filter. Every structure the screener
+    evaluated, accepted or rejected, with its reasons. Proves the screen
+    ran and shows what it looked at."""
+    rows = []
+    for sym in sorted(res):
+        r = res[sym] or {}
+        for c in r.get("considered") or []:
+            c = c or {}
+            qual = c.get("qualification") or ""
+            qcls = "good" if qual == "accepted" else "bad" if qual == "rejected" else ""
+            reasons = c.get("reasons") or []
+            wings = (c.get("diagnostics") or {}).get("wings")
+            strikes = wings or (
+                f"{num(c.get('short_strike'), 0)}/{num(c.get('long_strike'), 0)}"
+            )
+            dte = dte_between(asof, c.get("expiration"))
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td>{esc(c.get('structure') or '')}</td>"
+                f"<td class='num'>{esc(c.get('expiration') or '')}</td>"
+                f"<td class='num'>{esc(strikes)}</td>"
+                f"<td class='num'>{dte if dte is not None else '—'}</td>"
+                f"<td class='{qcls}'>{esc(qual)}</td>"
+                f"<td>{esc('; '.join(reasons) if reasons else '—')}</td>"
+                "</tr>"
+            )
+    if not rows:
+        return ""
+    n_acc = sum(1 for sym in res for c in ((res[sym] or {}).get("considered") or [])
+                if (c or {}).get("qualification") == "accepted")
+    n_rej = len(rows) - n_acc
+    return (
+        "<h3>Considered structures "
+        f"<span class='dim'>({len(rows)} evaluated: {n_acc} accepted, {n_rej} rejected)</span></h3>"
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th title='Underlying symbol.'>Sym</th>"
+        "<th title='Structure type evaluated.'>Structure</th>"
+        "<th title='Option expiration date.'>Exp</th>"
+        "<th title='Strikes evaluated (short/long).'>Strikes</th>"
+        "<th title='Days to expiration.'>DTE</th>"
+        "<th title='Whether the structure passed all gates.'>Qualification</th>"
+        "<th title='Why a rejected structure failed. Empty means it passed.'>Reasons</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+    )
+
+
 def spread_tables(data):
     if not data:
         return section("Spread opportunities", '<p class="empty">No data yet — run the spread screener.</p>')
@@ -507,6 +557,9 @@ def spread_tables(data):
     if rest:
         lines = "".join(f"<li>{esc(l)}</li>" for l in rest)
         out.append(f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>')
+    considered_html = considered_table(res, asof)
+    if considered_html:
+        out.append(considered_html)
     out.append('<p class="fine">Return on risk = credit ÷ max loss: a screening ratio, not an expected return. '
                'Credits use conservative short-bid minus long-ask fills.</p>')
     return section("Spread opportunities", "".join(out))
