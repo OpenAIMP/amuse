@@ -675,25 +675,32 @@ The archive is published at **https://amuse.openaimp.com** — a custom domain
 on the GitHub Pages site, configured by the repo's `CNAME` file (Pages serves
 `/docs`).
 
-| Workflow | Schedule | Scripts it runs, in order | Publishes |
+| Workflow | UTC schedule | Scripts it runs, in order | Publishes |
 |---|---|---|---|
-| `master.yml` | Weekdays 9:45am ET | Calls `daily-watch` → `monthly-sch` → `monthly-screen` (on the 3rd) | (via the called workflows) |
-| `daily-watch.yml` | Called by `master.yml`; manual via Actions tab | `stock_screener` → `spread_screener` → `decision_engine` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` with decision and risk-input availability |
-| `premarket-screen.yml` | Own cron (9:00am ET weekdays); manual via Actions tab | `premarket_screen` → `render_report` → `render_hub` | `docs/reports/premarket-<source>-<date>.html` |
-| `intraday-screen.yml` | Own crons (11am + 2pm ET weekdays); manual via Actions tab | `intraday_screen` → `render_report` → `render_hub` | `docs/reports/intraday-<source>-<date>.html` |
-| `monthly-screen.yml` | Called by `master.yml` on the 3rd; manual via Actions tab | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
+| `master.yml` | Weekdays `13:45`; first-Sunday candidate `06:00` | Weekday chain: premarket → daily → intraday → leverage, plus monthly on the 3rd; first-Sunday universe refresh | Via called workflows |
+| `daily-watch.yml` | Weekdays `13:45` | `stock_screener` → `spread_screener` → `decision_engine` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
+| `premarket-screen.yml` | Weekdays `13:00` | `premarket_screen` → `render_report` → `render_hub` | `docs/reports/premarket-<source>-<date>.html` |
+| `intraday-screen.yml` | Weekdays `15:00` and `18:00` | `intraday_screen` → `render_report` → `render_hub` | `docs/reports/intraday-<source>-<date>.html` |
+| `leverage-screen.yml` | Weekdays `14:30` | `stock_screener` → `spread_screener` → `render_report` → `render_hub` for the leveraged ETF universe | `docs/reports/leverage-<source>-<date>.html` |
+| `monthly-screen.yml` | Day 3 monthly, `13:30` | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
+| `build-universes.yml` | First-Sunday candidate `06:00` | Date gate → `build_universes.py` → commit changed constituent lists | `src/universes/*.txt` |
 
-`master.yml` calls the other three as reusable workflows (`workflow_call`) —
-no logic is duplicated. Inputs (`names`, `universe`, `limit`) flow through
-from the master run, and `secrets: inherit` passes the API key. The individual
-workflows keep no schedules of their own, so nothing runs twice; their
-`workflow_dispatch` triggers remain for one-off manual runs.
+Every execution workflow supports direct `workflow_dispatch`; the screen workflows
+also expose `workflow_call`, so `master.yml` composes the same implementations
+without duplicating screener logic. The master can run all screens or select one
+workflow, and forwards `names`, `universe`, and `limit` where supported. The
+standalone child schedules are retained alongside the master schedule as
+requested, so some reports may be produced by both paths. Cron expressions are
+UTC and do not adjust for daylight saving time; local ET execution therefore
+moves by one hour seasonally. GitHub cron cannot directly select the first
+Sunday, so the `1-7`/Sunday cron is filtered by an ET date gate before refreshing
+constituents. The legacy `daytrade-screen.yml` entry point now
+forwards to the canonical `premarket-screen.yml` implementation.
 
-`daily-watch.yml` accepts `names` and `universe` inputs on manual runs;
-`premarket-screen.yml` / `intraday-screen.yml` accept `names` and `limit`; `monthly-screen.yml`
-accepts `names`. Run outputs are kept as workflow artifacts for 90 days.
-Publish steps do `git pull --rebase` before pushing, so the three workflows
-never clobber each other's commits.
+Workflow publish steps rebase before pushing and rebuild the report hub after
+integrating concurrent dashboard updates. Child workflows are ordered in the
+master run to reduce simultaneous writes; standalone and master schedules can
+still overlap by design. Run artifacts are retained for 90 days.
 
 Enable Pages under Settings → Pages → Deploy from branch → `main` → `/docs`;
 `.nojekyll` is present so it's served as plain static HTML, no Jekyll. Each

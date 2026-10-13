@@ -2,8 +2,9 @@ name: Monthly PMCC screen
 
 # Full pair-quality re-rank on the 3rd of each month, with JSON + report artifacts.
 on:
-  # Scheduled runs are owned by master.yml (which calls this workflow on the 3rd).
-  # Manual runs use workflow_dispatch below.
+  schedule:
+    # Run on the 3rd monthly; master.yml also invokes it during its monthly batch.
+    - cron: "30 13 3 * *"
   workflow_call:
     inputs:
       names:
@@ -15,6 +16,7 @@ on:
     inputs:
       names:
         description: "Comma-separated watchlist override (blank = use watchlist.txt)"
+        type: string
         required: false
         default: ""
 
@@ -35,6 +37,7 @@ jobs:
 
       - name: PMCC quality screen
         env:
+          INPUT_NAMES: ${{ inputs.names }}
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
@@ -45,8 +48,9 @@ jobs:
           mkdir -p reports
           STAMP=$(date -u +%F-%H%M)
           echo "STAMP=$STAMP" >> $GITHUB_ENV
-          if [ -n "${{ inputs.names }}" ]; then
-            WATCHLIST="${{ inputs.names }}"
+          if [ -n "$INPUT_NAMES" ]; then
+            [[ "$INPUT_NAMES" =~ ^[A-Za-z0-9.,_-]+$ ]] || { echo "Invalid symbol list" >&2; exit 2; }
+            WATCHLIST="$INPUT_NAMES"
           else
             WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')
           fi
@@ -62,12 +66,14 @@ jobs:
 
       - name: Render PMCC report
         if: always()
+        env:
+          INPUT_NAMES: ${{ inputs.names }}
         run: |
           mkdir -p docs/reports
           STAMP=${STAMP:-$(date -u +%F-%H%M)}
-          if [ -n "${{ inputs.names }}" ]; then
+          if [ -n "$INPUT_NAMES" ]; then
             SRC="custom"
-            DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
+            DETAIL="$(echo "$INPUT_NAMES" | tr ',' '\n' | grep -c . | tr -d ' ') names"
           else
             SRC="watchlist"
             DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"

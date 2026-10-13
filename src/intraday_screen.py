@@ -282,6 +282,8 @@ def main():
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--names", default=None,
                     help="comma-separated override (default: Nasdaq-100)")
+    ap.add_argument("--universe", default=None,
+                    help="shared index universe (ignored when --names is set)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap universe size (for tests)")
     ap.add_argument("--config", default=None,
@@ -294,7 +296,15 @@ def main():
     if args.names:
         names = args.names.split(",")
         universe_tag = "custom"
+    elif args.universe:
+        from universes import UNIVERSES
+        key = args.universe.strip().lower()
+        if key not in UNIVERSES:
+            raise SystemExit(f"unknown universe {key!r}; choose from {sorted(UNIVERSES)}")
+        names = list(UNIVERSES[key])
+        universe_tag = key
     else:
+        from universes import NASDAQ100
         names = list(NASDAQ100)
         universe_tag = "nasdaq100"
     if args.limit:

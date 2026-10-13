@@ -4,8 +4,9 @@ name: Daily screen watch
 # technical stock screen, bull-put/iron-condor opportunities, PMCC watch.
 # Reports only material changes. Artifacts keep 90 days of run history.
 on:
-  # Scheduled runs are owned by master.yml (which calls this workflow).
-  # Manual runs use workflow_dispatch below.
+  schedule:
+    # Weekdays 9:45 ET during daylight time / 8:45 ET during standard time.
+    - cron: "45 13 * * 1-5"
   workflow_call:
     inputs:
       names:
@@ -22,10 +23,12 @@ on:
     inputs:
       names:
         description: "Comma-separated watchlist override (blank = use watchlist.txt)"
+        type: string
         required: false
         default: ""
       universe:
         description: "Index universe override (blank = use watchlist.txt)"
+        type: string
         required: false
         default: ""
 
@@ -53,15 +56,20 @@ jobs:
             screen-state-
 
       - name: Load watchlist
+        env:
+          INPUT_NAMES: ${{ inputs.names }}
+          INPUT_UNIVERSE: ${{ inputs.universe }}
         run: |
-          if [ -n "${{ inputs.names }}" ]; then
-            echo "WATCHLIST=${{ inputs.names }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_NAMES" ]; then
+            [[ "$INPUT_NAMES" =~ ^[A-Za-z0-9.,_-]+$ ]] || { echo "Invalid symbol list" >&2; exit 2; }
+            echo "WATCHLIST=$INPUT_NAMES" >> "$GITHUB_ENV"
             echo "UNIVERSE=" >> $GITHUB_ENV
             echo "SRC=custom" >> $GITHUB_ENV
-          elif [ -n "${{ inputs.universe }}" ]; then
-            echo "UNIVERSE=${{ inputs.universe }}" >> $GITHUB_ENV
-            echo "WATCHLIST=" >> $GITHUB_ENV
-            echo "SRC=${{ inputs.universe }}" >> $GITHUB_ENV
+          elif [ -n "$INPUT_UNIVERSE" ]; then
+            [[ "$INPUT_UNIVERSE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid universe name" >&2; exit 2; }
+            echo "UNIVERSE=$INPUT_UNIVERSE" >> "$GITHUB_ENV"
+            echo "WATCHLIST=" >> "$GITHUB_ENV"
+            echo "SRC=$INPUT_UNIVERSE" >> "$GITHUB_ENV"
           else
             echo "WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
             echo "UNIVERSE=" >> $GITHUB_ENV
