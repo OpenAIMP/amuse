@@ -224,7 +224,7 @@ def main():
 
             long_cands, diag_l = [], {}
             for exp in long_exps:
-                contracts, d = parse_chain(sym, exp, ACCT, MIN_LONG_LIQUIDITY,
+                contracts, d, _ = parse_chain(sym, exp, ACCT, MIN_LONG_LIQUIDITY,
                                    MAX_SPREAD_PCT, "calls")
                 for k, v in d.items():
                     diag_l[k] = diag_l.get(k, 0) + v
@@ -242,7 +242,7 @@ def main():
 
             short_cands, diag_s = [], {}
             for exp in short_exps:
-                contracts, d = parse_chain(sym, exp, ACCT, MIN_SHORT_LIQUIDITY,
+                contracts, d, _ = parse_chain(sym, exp, ACCT, MIN_SHORT_LIQUIDITY,
                                    MAX_SPREAD_PCT, "calls")
                 for k, v in d.items():
                     diag_s[k] = diag_s.get(k, 0) + v
