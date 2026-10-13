@@ -2,14 +2,90 @@
 
 **Implementation review:** 2026-10-13
 **Code reviewed:** `origin/main` at `2d060e9`
-**Overall estimate:** **about 45% implemented**
 
-This is the framework and its implementation assessment in one place. The
-percentage is a qualitative estimate of breadth and integration, not a count
-of checklist items. Amuse is strongest at technical screening, defined-risk
-structure pricing, and paper sizing. Portfolio-wide risk, a unified decision
-engine, independent pricing, and performance validation remain substantial
-gaps.
+This document begins with the framework blueprint reconstructed from the
+nine-part description supplied in chat, then assesses how much of each part
+Amuse implements. The linked Google Doc itself is not accessible in this
+session, so this is a structured restatement rather than a verbatim import.
+The framework is a target specification; its thresholds and methods are not
+claims of proven trading edge.
+
+## Framework blueprint
+
+### 1. Technical analysis and opportunity lenses
+
+Summarize chart and price patterns and indicator families, then evaluate the
+broader lenses: order flow, market regime, sentiment/crowding, catalysts,
+cross-asset relationships, statistical measures, options-derived signals,
+and execution quality. Use the lenses to answer distinct questions rather
+than treating any one indicator as a trade instruction.
+
+### 2. Analysis disciplines and synthesis
+
+Bring the 15 analysis disciplines into one decision view organized around six
+questions: **Value, Timing, Crowding, Regime, Risk, and Execution**. Keep the
+evidence for each question visible so conflicting signals can be resolved
+before selecting a trade.
+
+### 3. PM decision guidebook
+
+Provide 12 universal pre-trade questions, a time-horizon matrix, a nine-step
+sequential decision workflow, and fixed-fractional risk-sizing rules. The
+workflow should carry a candidate from thesis and market context through
+structure selection, risk, execution, exits, and review.
+
+### 4. Option optimization and risk categories
+
+Explain how net credit relates to maximum profit, breakeven, and maximum loss
+for spreads. Compare defined-risk structures with undefined-risk exposure,
+and set out active management choices such as taking profit, stopping out,
+adjusting, rolling, or closing ahead of assignment risk.
+
+### 5. Quantitative formulas and scoring
+
+Define Black–Scholes inputs and valuation; portfolio Greeks; expected move
+(`S × IV × √(DTE / 365)`); IV Rank; volatility risk premium (`IV − HV`);
+expected value; and fractional Kelly position sizing. State the units,
+assumptions, data source, and limitations for each measure.
+
+### 6. Entry, exit, and volatility triggers
+
+State measurable entry criteria: IV Rank in the 30–50 range as specified by
+the source framework and short-leg absolute delta from 0.10 to 0.20. Define
+mechanical exits: close at 50% of maximum profit, stop at a buyback cost of 2×
+the opening credit, and use a 21-DTE time stop, with assignment and event risk
+handled explicitly. Thresholds are proposed rules that require validation.
+
+### 7. Objective function and market economics
+
+Express portfolio selection as maximizing expected return against risk
+(`E[R] − Risk`) subject to portfolio constraints. Define order-flow imbalance
+(OFI) and repricing-cycle triggers, and show how they affect the decision
+rather than using them as unexplained scores.
+
+### 8. Multi-leg valuation and portfolio stress
+
+Use a common signed-leg valuation (`Vₚ = Σ(qᵢ × Vᵢ)`), aggregate portfolio
+Greeks across positions, and calculate a five-scenario stress matrix. Include
+underlying and volatility shocks, including examples of ±10% underlying and
+±50% implied volatility, and show the portfolio P&L under each case.
+
+### 9. Overall master decision framework
+
+Combine the analysis into a six-step master decision algorithm that qualifies
+the regime, establishes thesis and horizon, assesses timing and volatility,
+selects and prices the structure, applies portfolio risk and event limits,
+and defines execution, exits, and review. Finish with a quick-reference table
+for formulas, entry/exit criteria, and risk parameters, clearly labeling what
+is implemented, proposed, or unvalidated.
+
+## Implementation status assessment
+
+**Overall estimate: about 45% implemented.** This is a qualitative estimate
+of breadth and integration, not a count of checklist items. Amuse is strongest
+at technical screening, defined-risk structure pricing, and paper sizing.
+Portfolio-wide risk, a unified decision engine, independent pricing, and
+performance validation remain substantial gaps.
 
 ## Status key
 
