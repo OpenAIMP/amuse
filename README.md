@@ -93,7 +93,7 @@ rationale, threshold differences, and prioritized remaining work, see the
 
 ```
 amuse/
-├── src/                # all code: screeners, renderers, gates, ledger, exits, vol
+├── src/                # screeners, renderers, gates, ledger, exits, position manager, vol
 │   ├── mcp_client.py   # the single MCP funnel: mcp_call + McpError (issue #36)
 │   ├── market_data.py  # canonical bar dicts: daily_bars, intraday_bars, quotes (issue #36)
 │   ├── indicators.py   # SMA/EMA/MACD/RSI/ATR/Bollinger/VWAP/pivots/gaps (issue #36)
@@ -189,7 +189,7 @@ End-to-end capabilities (each implemented in code, not just described):
 2. Prices defined-risk income structures with conservative fills.
 3. Scans pre-market for gap momentum setups and intraday for opening-range breakouts.
 4. Ranks PMCC pairs monthly and watches them daily for exceptions.
-5. Applies exit rules (profit / stop / time / no-assignment) to open positions.
+5. Applies bull-put exit rules locally to open positions when fresh marks are supplied; no orders are placed.
 6. Tracks every paper position in a ledger with realized P&L net of fees.
 7. Sizes positions from the risk rule and enforces the heat cap.
 8. Publishes every run to a permanent, timestamped archive.
@@ -467,6 +467,32 @@ When an optional portfolio-risk report is supplied, it also displays Greeks,
 scenario P&L, freshness and priced-leg coverage; when it is not supplied, the
 dashboard says so explicitly. In Actions, no account ledger or live snapshot
 is fabricated, so portfolio risk remains unavailable there by default.
+
+### Local open-position review
+
+`src/position_manager.py` applies the configured bull-put policy in
+`gates.yaml` to open ledger positions using a separate, explicit mark snapshot.
+The snapshot must identify its source and UTC as-of time; each ledger position
+needs a current buy-to-close ask, short-leg moneyness, and its own UTC
+timestamp. Include DTE, which is cross-checked against the ledger expiry and
+mark time. Marks older than 30 minutes are unavailable by
+default. Missing, stale, or invalid marks never become a `HOLD`
+recommendation. Other strategies are reported as unsupported instead of
+silently skipped.
+
+```sh
+bash bin/manage-positions.sh ledger.json position-marks.json
+```
+
+The report is written under the ignored `reports/` directory as JSON and
+Markdown. It recommends `HOLD`, `TAKE_PROFIT`, `STOP_LOSS`, `TIME_EXIT`, or
+`EXPIRATION_RISK`; a person must review and execute any close. Example input
+shape: [`examples/position-marks.sample.json`](examples/position-marks.sample.json).
+The marks must represent an executable ask for closing the complete spread,
+not a midpoint or theoretical model value. Position identifiers, symbols, and
+actions stay in local reports; do not commit them or copy them into public
+GitHub Pages artifacts. The dashboard's workflow guide explains this private
+review path without exposing an account's positions.
 
 `src/decision_engine.py` consumes the daily stock and spread-screen JSON and
 outputs a six-step advisory decision (regime, horizon/catalysts, timing,
