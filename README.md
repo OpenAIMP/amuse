@@ -85,6 +85,11 @@ Workflow: `daily-watch` priced both; the archive keeps the report.
 ## Where the strategy lives
 > Strategy, P&L philosophy, and operating discipline live in the [Trading Playbook](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N) (Google Doc). This README documents the system technically: code, gates, workflows, and data.
 
+For a code-backed comparison against the broader options framework, see the
+[implementation status assessment](docs/implementation-status.md). It records
+the review date, current coverage, material threshold differences, and the
+largest remaining gaps.
+
 ## Repository layout
 
 ```
@@ -325,8 +330,9 @@ data), so it must never be read as intrinsic-value analysis.
 | ATR-implied range position | Timing | Where price sits inside today's expected range |
 | Price | Screen | ≥ $10 |
 
-Ranked by |gap| × relative volume. No news/catalyst feed — gaps are
-technical-only.
+Ranked by |gap| × relative volume. This screener does not consume news; the
+separate headline fetch and report card can provide context, but gap
+classification remains technical-only.
 
 ### Intraday screener (`intraday_screen.py`) — opening-range breakouts
 
@@ -425,7 +431,7 @@ Exit rules, the position ledger, and sizing discipline are documented in the Tra
 | Delta | Strike-selection gates (0.10–0.20 shorts, 0.80–0.95 LEAPS); net delta reported per structure |
 | Gamma / Vega / Theta | Fetched and reported — not used in any gate or decision |
 | Open interest / volume | Liquidity gates only (≥10 per leg, ≥25 for PMCC long legs) |
-| Implied volatility | Vol framework (`vol.py`): IV Rank, IV-vs-HV, skew, term structure; not yet wired into screener gates |
+| Implied volatility | Vol framework (`vol.py`): IV Rank, IV-vs-HV, skew, term structure; consumed by `spread_screener.py`, not yet by `pmcc_quality.py` |
 | Max loss / credit / breakeven | Gates (≤$1,000 per spread, ≤$10,000 per PMCC pair) + reported; structures ranked by return-on-risk |
 | Realized volatility | ATR% as a stock-screen gate; formal 20/60-day HV in `vol.py` |
 
@@ -475,7 +481,9 @@ does not give us — and how the system copes:
   no intraday option quotes or Greeks for exit timing.
 - **No market-wide discovery.** All screening is watchlist-driven; the
   thinkScript scan is the stage-one discovery outside this repo.
-- **No news/catalyst feed.** Gaps are technical-only.
+- **News headlines are not a structured catalyst feed.** Reports can show
+  fetched headlines, but premarket gap classification is technical-only and
+  there is no dependable earnings/dividend/catalyst calendar wired into gates.
 - **Request/response, not streaming.** No tick-level Greeks or intraday risk
   updates; everything is a scheduled snapshot.
 - **Quote staleness.** Closed-market quotes come back bad/wide — the reason
@@ -626,8 +634,9 @@ more candidates, not more edge — see the honest limitations below.
 
 ## Honest limitations
 
-- The MCP has no fundamentals (no P/E, market cap, earnings dates) and no
-  news/catalyst feed — gaps are technical-only; earnings come from outside data.
+- The MCP has no fundamentals (no P/E, market cap, earnings dates). News
+  headlines can be fetched separately for reports, but premarket gap signals
+  remain technical-only and earnings dates still rely on outside data.
 - Request/response API, not streaming: scheduled scans, not tick-level real-time.
 - A full S&P 500 stock screen is ~1,000 API calls and takes ~20 minutes; the
   spread screener on 500 names takes an hour-plus — these are scheduled jobs,
