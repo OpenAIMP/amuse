@@ -304,8 +304,14 @@ def main():
         if near:
             print("- Closest near-misses:")
             for n in near[:5]:
-                print(f"  {n['symbol']}: gap {n['gap_pct']:+.2f}%, "
-                      f"vol {n['rel_vol']:.1f}x — missed: "
+                gap_pct = n.get("gap_pct")
+                rel_vol = n.get("rel_vol")
+                gap_text = (f"{gap_pct:+.2f}%" if isinstance(gap_pct, (int, float))
+                            else "n/a")
+                volume_text = (f"{rel_vol:.1f}x" if isinstance(rel_vol, (int, float))
+                               else "n/a")
+                print(f"  {n['symbol']}: gap {gap_text}, "
+                      f"vol {volume_text} — missed: "
                       f"{'; '.join(n['missed'])}")
     else:
         ups = [r for r in cands if r["gap_pct"] > 0]
