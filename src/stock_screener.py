@@ -15,13 +15,11 @@ import concurrent.futures
 import json
 import os
 import math
-import statistics
-import subprocess
 import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/bin/public-mcp")
+
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
 if not ACCT:
     raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
@@ -32,6 +30,13 @@ DEFAULT_NAMES = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO",
 # ---- screening configuration (design choices, printed in every report) ----
 # Tunables live in gates.yaml; this block binds them to module constants.
 import gates as _gates_mod
+from mcp_client import McpError
+from market_data import daily_bars, intraday_bars
+from indicators import sma, ema, macd, sma_cross, rsi
+from indicators import atr_pct, bollinger, anchored_vwap
+from indicators import find_pivots
+from indicators import gap_pct as calc_gap_pct
+from indicators import vwap as calc_vwap
 
 
 def _apply_gates(path=None):
@@ -86,242 +91,25 @@ RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
 
 
-class McpError(RuntimeError):
-    pass
-
-
-def mcp_call(tool, args):
-    try:
-        proc = subprocess.run([CLI, "call", tool, json.dumps(args)],
-                              capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired as e:
-        raise McpError(f"{tool}: CLI timed out: {e}")
-    if proc.returncode != 0:
-        raise McpError(f"{tool}: CLI failed: {proc.stderr[:300]}")
-    try:
-        d = json.loads(proc.stdout)
-    except json.JSONDecodeError as e:
-        raise McpError(f"{tool}: CLI returned non-JSON output: {e}")
-    if not isinstance(d, dict) or "content" not in d or not d["content"]:
-        raise McpError(f"{tool}: unexpected response shape")
-    if d.get("isError"):
-        raise McpError(f"{tool}: {json.dumps(d)[:300]}")
-    try:
-        return json.loads(d["content"][0]["text"])
-    except (json.JSONDecodeError, KeyError, TypeError, IndexError) as e:
-        raise McpError(f"{tool}: unparseable content payload: {e}")
-
-
-def bars_for(symbol):
-    """Return list of (close, high, low, volume, open), validated finite/positive.
-    open may be None when the feed omits it (gap is then unknown)."""
-    p = mcp_call("get_price_history",
-                 {"symbol": symbol, "account_id": ACCT,
-                  "period": PERIOD, "aggregation": "ONE_DAY"})
-    if not isinstance(p, dict):
-        raise McpError(f"get_price_history: expected object payload for {symbol}")
-    raw = p.get("regularMarket", {}).get("bars", [])
-    bars = []
-    for b in raw:
-        try:
-            c, h, l, v = (float(b["close"]), float(b["high"]),
-                          float(b["low"]), float(b["volume"]))
-            o = float(b["open"]) if b.get("open") is not None else None
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not all(math.isfinite(x) for x in (c, h, l, v)):
-            continue
-        if c <= 0 or h <= 0 or l <= 0 or v < 0:
-            continue
-        if o is not None and (not math.isfinite(o) or o <= 0):
-            o = None
-        bars.append((c, h, l, v, o))
-    return bars
-
-
-def sma(vals, n):
-    return sum(vals[-n:]) / n
-
-
-def ema(vals, n):
-    """Exponential moving average over the last n values (seeded with SMA)."""
-    if len(vals) < n:
-        return None
-    k = 2.0 / (n + 1.0)
-    e = sum(vals[:n]) / n
-    for v in vals[n:]:
-        e = v * k + e * (1.0 - k)
-    return e
-
-
-def macd(closes, fast=12, slow=26, signal=9):
-    """MACD line, signal line, histogram. Returns (None, None, None) if
-    insufficient data. Standard 12/26/9, tunable via gates."""
-    if len(closes) < slow + signal:
-        return None, None, None
-    k_fast, k_slow = 2.0 / (fast + 1.0), 2.0 / (slow + 1.0)
-    ef = sum(closes[:fast]) / fast
-    es = sum(closes[:slow]) / slow
-    macd_line = None
-    hist = []
-    for v in closes[slow:]:
-        ef = v * k_fast + ef * (1.0 - k_fast)
-        es = v * k_slow + es * (1.0 - k_slow)
-        macd_line = ef - es
-        hist.append(macd_line)
-    if len(hist) < signal:
-        return macd_line, None, None
-    k_sig = 2.0 / (signal + 1.0)
-    sig = sum(hist[:signal]) / signal
-    for m in hist[signal:]:
-        sig = m * k_sig + sig * (1.0 - k_sig)
-    return macd_line, sig, macd_line - sig
-
-
-def sma_cross(closes, fast_n, slow_n, lookback):
-    """Detect SMA fast/slow cross within the last `lookback` sessions.
-
-    Returns "golden" (fast crossed above slow), "death" (fast crossed
-    below slow), or None. Classic trend-regime event.
-    """
-    if len(closes) < slow_n + lookback:
-        return None
-    prev = None
-    for i in range(len(closes) - lookback, len(closes)):
-        w = closes[:i + 1]
-        f, s = sma(w, fast_n), sma(w, slow_n)
-        cur = "above" if f > s else ("below" if f < s else "even")
-        if prev == "below" and cur == "above":
-            return "golden"
-        if prev == "above" and cur == "below":
-            return "death"
-        if cur != "even":
-            prev = cur
-    return None
-
-
-def rsi(closes, period=14):
-    """Wilder's RSI. Returns None if insufficient data."""
-    if len(closes) < period + 1:
-        return None
-    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
-    gains = [max(d, 0.0) for d in deltas]
-    losses = [max(-d, 0.0) for d in deltas]
-    ag = sum(gains[:period]) / period
-    al = sum(losses[:period]) / period
-    for g, l in zip(gains[period:], losses[period:]):
-        ag = (ag * (period - 1) + g) / period
-        al = (al * (period - 1) + l) / period
-    if al == 0:
-        return 100.0
-    return 100.0 - 100.0 / (1.0 + ag / al)
-
-
-def atr14_pct(bars, price):
-    """Wilder's ATR(14) as % of price. Returns None if insufficient data."""
-    if len(bars) < 15:
-        return None
-    trs = []
-    for i in range(1, len(bars)):
-        h, l, _c = bars[i][1], bars[i][2], bars[i][0]
-        pc = bars[i - 1][0]
-        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
-    atr = sum(trs[:14]) / 14
-    for tr in trs[14:]:
-        atr = (atr * 13 + tr) / 14
-    return atr / price * 100.0
-
-
-# ---------------- indicator pack: Bollinger / VWAP / pivots ----------------
-
-def bollinger(closes):
-    """Return dict with pct_b, bandwidth_pct, squeeze (or None fields).
-
-    squeeze is True when current bandwidth is the 125-day minimum; it needs
-    MIN_BARS_SQUEEZE bars, otherwise squeeze is None (unknown, never a gate).
-    """
-    out = {"pct_b": None, "bandwidth_pct": None, "squeeze": None,
-           "upper": None, "middle": None, "lower": None}
-    if len(closes) < BB_PERIOD:
-        return out
-    window = closes[-BB_PERIOD:]
-    mid = statistics.fmean(window)
-    sd = statistics.stdev(window)  # sample stdev
-    upper, lower = mid + BB_MULT * sd, mid - BB_MULT * sd
-    out.update({"upper": upper, "middle": mid, "lower": lower})
-    width = upper - lower
-    if width > 0 and math.isfinite(width):
-        close = closes[-1]
-        out["pct_b"] = (close - lower) / width
-        out["bandwidth_pct"] = width / mid * 100.0 if mid > 0 else None
-    if len(closes) >= MIN_BARS_SQUEEZE and out["bandwidth_pct"] is not None:
-        bws = []
-        mult = 2.0 * BB_MULT  # keep in sync with bandwidth_pct above (issue #16)
-        for i in range(len(closes) - SQUEEZE_LOOKBACK, len(closes)):
-            w = closes[i - BB_PERIOD + 1:i + 1]
-            m = statistics.fmean(w)
-            s = statistics.stdev(w)
-            bw = (mult * s) / m * 100.0 if m > 0 else None
-            bws.append(bw)
-        if all(b is not None and math.isfinite(b) for b in bws):
-            # bws[-1] is today's bandwidth on the same formula as the rest,
-            # so == is exact here (issue #16: comparing against the separately
-            # computed bandwidth_pct could miss by 1 ulp).
-            out["squeeze"] = (bws[-1] == min(bws))
-    return out
-
-
-def intraday_bars_for(symbol):
-    """Return (bars, expected_bars) for the DAY session, or raise McpError.
-
-    bars: list of (date, open, high, low, close, volume), validated.
-    """
-    p = mcp_call("get_price_history",
-                 {"symbol": symbol, "account_id": ACCT,
-                  "period": INTRADAY_PERIOD, "aggregation": INTRADAY_AGG,
-                  "trading_session_toggle": "REGULAR_HOURS"})
-    if not isinstance(p, dict):
-        raise McpError(f"get_price_history intraday: bad payload for {symbol}")
-    rm = p.get("regularMarket", {})
-    expected = rm.get("expectedBars")
-    bars = []
-    for b in rm.get("bars", []):
-        try:
-            ts = b["timestamp"]
-            o, h, l, c = (float(b["open"]), float(b["high"]),
-                          float(b["low"]), float(b["close"]))
-            v = float(b["volume"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not all(math.isfinite(x) for x in (o, h, l, c, v)):
-            continue
-        if o <= 0 or h <= 0 or l <= 0 or c <= 0 or v < 0:
-            continue
-        try:
-            day = datetime.fromisoformat(ts).date()
-        except ValueError:
-            continue
-        bars.append((day, o, h, l, c, v))
-    return bars, expected
-
-
 def session_vwap(symbol):
     """Return dict with session VWAP info, or all-None on any problem.
 
     Uses the last COMPLETED regular session: if the newest bars belong to an
     in-progress today, they are dropped in favour of the prior session.
     Never raises for data problems (caller treats unknown as a flag).
+    MCP plumbing lives in market_data; session-selection logic stays here.
     """
     out = {"vwap": None, "dist_pct": None, "session": None, "note": "unknown"}
     try:
-        bars, expected = intraday_bars_for(symbol)
+        bars, expected = intraday_bars(symbol, ACCT, INTRADAY_PERIOD,
+                                       INTRADAY_AGG, "REGULAR_HOURS")
     except McpError:
         return out
     if not bars:
         return out
     by_day = {}
     for b in bars:
-        by_day.setdefault(b[0], []).append(b)
+        by_day.setdefault(b["ts"].date(), []).append(b)
     days = sorted(by_day)
     use = days[-1]
     today = datetime.now(ZoneInfo("America/New_York")).date()
@@ -336,16 +124,11 @@ def session_vwap(symbol):
             out["note"] = "complete"
     else:
         out["note"] = "complete"
-    num = den = 0.0
-    for (_d, o, h, l, c, v) in by_day[use]:
-        tp = (h + l + c) / 3.0
-        num += tp * v
-        den += v
-    if den <= 0:
+    vwap = calc_vwap(by_day[use])
+    if vwap is None:
         return out
-    vwap = num / den
     try:
-        last_close = by_day[use][-1][4]
+        last_close = by_day[use][-1]["close"]
         dist = (last_close / vwap - 1) * 100.0
     except (IndexError, ZeroDivisionError):
         return out
@@ -355,53 +138,11 @@ def session_vwap(symbol):
     return out
 
 
-def anchored_vwap(bars):
-    """VWAP anchored at the 52-week-low bar. Returns (vwap, dist_pct) or Nones."""
-    n = min(252, len(bars))
-    if n < 2:
-        return None, None
-    window = bars[-n:]
-    anchor = min(range(n), key=lambda i: window[i][2])  # lowest low
-    num = den = 0.0
-    for (c, h, l, v, _o) in window[anchor:]:
-        tp = (h + l + c) / 3.0
-        num += tp * v
-        den += v
-    if den <= 0:
-        return None, None
-    vwap = num / den
-    close = bars[-1][0]
-    if not (math.isfinite(vwap) and vwap > 0):
-        return None, None
-    return vwap, (close / vwap - 1) * 100.0
-
-
-def find_pivots(bars):
-    """Fractal pivots: bar i is a swing high if high[i] strictly exceeds the
-    PIVOT_N bars on each side (swing low analogously). Returns two lists of
-    (index, price), oldest first."""
-    highs, lows = [], []
-    n = PIVOT_N
-    for i in range(n, len(bars) - n):
-        h, l = bars[i][1], bars[i][2]
-        if all(h > bars[j][1] for j in range(i - n, i + n + 1) if j != i):
-            highs.append((i, h))
-        if all(l < bars[j][2] for j in range(i - n, i + n + 1) if j != i):
-            lows.append((i, l))
-    return highs, lows
-
-
-# ---- issue #18: gap / momentum / value / bias readouts ----
-# Labels, not gates: they describe the tape; they never reject a name.
-
 def gap_pct(bars):
     """Overnight gap: (open_t / close_{t-1} - 1) * 100. None if open missing."""
     if len(bars) < 2:
         return None
-    o, prev_c = bars[-1][4], bars[-2][0]
-    if o is None or prev_c <= 0:
-        return None
-    return (o / prev_c - 1) * 100
+    return calc_gap_pct(bars[-2]["close"], bars[-1]["open"])
 
 
 def gap_label(g):
@@ -470,7 +211,8 @@ def market_structure(bars):
     """Pivot/Fib structure. Returns dict; trend None when indeterminable."""
     out = {"trend": None, "ref_high": None, "ref_low": None,
            "fib_levels": {}, "nearest_fib": None, "nearest_fib_dist_pct": None}
-    highs, lows = find_pivots(bars)
+    highs, lows = find_pivots([b["high"] for b in bars],
+                                [b["low"] for b in bars], PIVOT_N)
     # trend from the last 3 swing highs/lows
     if len(highs) >= 3 and len(lows) >= 3:
         h3 = [p for _, p in highs[-3:]]
@@ -503,7 +245,7 @@ def market_structure(bars):
         levels = {f: lo_px + f * rng for f in FIB_LEVELS}
     out["fib_levels"] = {f"{f * 100:.1f}%": round(px, 2)
                          for f, px in levels.items()}
-    close = bars[-1][0]
+    close = bars[-1]["close"]
     name, px = min(levels.items(), key=lambda kv: abs(close - kv[1]))
     if px > 0 and math.isfinite(px):
         out["nearest_fib"] = f"{name * 100:.1f}%"
@@ -522,7 +264,7 @@ def evaluate(sym, bars):
     flags = []
     if len(bars) < MIN_BARS:
         return False, {}, ["insufficient history"]
-    closes = [b[0] for b in bars]
+    closes = [b["close"] for b in bars]
     price = closes[-1]
     if not (PRICE_MIN <= price <= PRICE_MAX):
         reasons.append("price out of range")
@@ -536,22 +278,24 @@ def evaluate(sym, bars):
         reasons.append("below 50-day SMA")
     if REQUIRE_ABOVE_SMA_SLOW and price < s200:
         reasons.append("below 200-day SMA")
-    atrp = atr14_pct(bars, price)
+    atrp = atr_pct([b["high"] for b in bars],
+                   [b["low"] for b in bars], closes, price)
     if atrp is None or not (ATR_PCT_MIN <= atrp <= ATR_PCT_MAX):
         reasons.append("ATR% out of range")
-    vol20 = sum(b[3] for b in bars[-20:]) / 20
-    vol60 = sum(b[3] for b in bars[-60:]) / 60
+    vol20 = sum(b["volume"] for b in bars[-20:]) / 20
+    vol60 = sum(b["volume"] for b in bars[-60:]) / 60
     vratio = vol20 / vol60 if vol60 > 0 else 0.0
     if vratio < VOL_RATIO_MIN:
         reasons.append("volume trend weak")
-    hi52 = max(b[1] for b in bars)
-    lo52 = min(b[2] for b in bars)
+    hi52 = max(b["high"] for b in bars)
+    lo52 = min(b["low"] for b in bars)
     off_hi = (price / hi52 - 1) * 100
     if off_hi < -MAX_OFF_HIGH_PCT:
         reasons.append("too far below 52w high")
 
     # ---- indicator pack ----
-    bb = bollinger(closes)
+    bb = bollinger(closes, BB_PERIOD, BB_MULT,
+                   SQUEEZE_LOOKBACK, MIN_BARS_SQUEEZE)
     if bb["pct_b"] is None:
         flags.append("bollinger unknown")
     elif not (BB_PCTB_MIN <= bb["pct_b"] <= BB_PCTB_MAX):
@@ -823,7 +567,7 @@ def screen_stock(sym):
     Pure per-symbol work; safe to run in a thread pool (issue #14).
     """
     try:
-        bars = bars_for(sym)
+        bars = daily_bars(sym, ACCT, PERIOD)
     except McpError as e:
         return (sym, False, None, [f"data error: {e}"])
     except Exception as e:  # never let one ticker kill the run
