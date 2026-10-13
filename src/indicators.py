@@ -101,6 +101,59 @@ def stochastic(bars, period=14, smooth=3):
     return {"k": ks[-1], "d": sum(ks[-smooth:]) / smooth}
 
 
+def _ema_series(values, period):
+    if len(values) < period:
+        return []
+    alpha = 2.0 / (period + 1.0)
+    result = [sum(values[:period]) / period]
+    for value in values[period:]:
+        result.append(alpha * value + (1.0 - alpha) * result[-1])
+    return result
+
+
+def smi(bars, period=13, smooth=3, signal=3):
+    """Stochastic Momentum Index (13,3,3), scaled -100 to +100."""
+    if len(bars) < period + 2 * (smooth - 1) + signal - 1:
+        return None
+    relative, ranges = [], []
+    for end in range(period, len(bars) + 1):
+        window = bars[end - period:end]
+        high = max(b["high"] for b in window)
+        low = min(b["low"] for b in window)
+        relative.append(bars[end - 1]["close"] - (high + low) / 2.0)
+        ranges.append(high - low)
+    numerator = _ema_series(_ema_series(relative, smooth), smooth)
+    denominator = _ema_series(_ema_series(ranges, smooth), smooth)
+    values = [200.0 * n / d if d else 0.0
+              for n, d in zip(numerator, denominator)]
+    signal_values = _ema_series(values, signal)
+    if not values or not signal_values:
+        return None
+    return {"value": values[-1], "signal": signal_values[-1],
+            "histogram": values[-1] - signal_values[-1]}
+
+
+def cci(bars, period=20):
+    """Commodity Channel Index using typical price and mean deviation."""
+    if len(bars) < period:
+        return None
+    typical = [(b["high"] + b["low"] + b["close"]) / 3.0
+               for b in bars[-period:]]
+    mean = sum(typical) / period
+    deviation = sum(abs(value - mean) for value in typical) / period
+    return (typical[-1] - mean) / (0.015 * deviation) if deviation else 0.0
+
+
+def williams_r(bars, period=14):
+    """Williams %R, bounded from -100 (range low) to 0 (range high)."""
+    if len(bars) < period:
+        return None
+    window = bars[-period:]
+    high = max(b["high"] for b in window)
+    low = min(b["low"] for b in window)
+    return 100.0 * (high - bars[-1]["close"]) / (high - low) if high > low else -50.0
+
+
 def volume_confirmations(bars, period=14, lookback=20):
     """MFI(14) and 20-day OBV / Accumulation-Distribution directions."""
     if len(bars) < max(period + 1, lookback + 1):

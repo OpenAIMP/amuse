@@ -313,15 +313,23 @@ anything that touches orders — Size and Preflight stay human.
 Deliberately **not** automated: Elliott Wave counting — too subjective; pivots
 and Fibs capture the objective machinery underneath it.
 
-The report's confirmation context includes ADX/+DI/-DI, slow Stochastic(14,3),
-MFI(14), and 20-day OBV and Accumulation/Distribution directions. They are
-diagnostic only: they do not change qualification, score, or trade decisions.
-ADX measures trend strength, not direction. RSI and Stochastic extremes can
-persist during strong trends, while volume divergences are warnings rather than
-proof of reversal. These indicator categories and interpretations follow
-Fidelity's [*Understanding Indicators in Technical Analysis* guide](https://www.fidelity.com/bin-public/060_www_fidelity_com/documents/learning-center/Understanding-Indicators-TA.pdf).
-The guide does not validate this system's thresholds or establish trading edge;
-it also cautions that technical analysis is only one approach and past
+The report and Timing step also show a supplemental confirmation pack:
+Stochastic Momentum Index (SMI 13,3,3), CCI(20), Williams %R(14),
+ADX/+DI/-DI, slow Stochastic(14,3), MFI(14), and 20-day OBV and
+Accumulation/Distribution direction. The SMI, CCI, and Williams %R add other
+views of momentum, but are correlated with RSI and Stochastic; they should be
+read together as context, not counted as independent votes. None changes
+qualification, score, or trade recommendations. ADX measures trend strength,
+not direction. Oscillator extremes can persist during strong trends, and
+volume divergences are warnings rather than proof of reversal.
+
+The categories and interpretations follow Fidelity's
+[*Understanding Indicators in Technical Analysis*](https://www.fidelity.com/bin-public/060_www_fidelity_com/documents/learning-center/Understanding-Indicators-TA.pdf)
+and [Charting Library Indicator Guide](https://www.fidelity.com/webcontent/ap130058-research-experience-content/23.01/chartGuide/indicators.pdf).
+SMI measures the close against the midpoint of its recent high-low range and
+uses double exponential smoothing; see the [thinkorswim SMI reference](https://toslc.thinkorswim.com/center/reference/Tech-Indicators/studies-library/R-S/StochasticMomentumIndex).
+These references do not validate this system's thresholds or establish trading
+edge; Fidelity cautions that technical analysis is one approach and past
 performance does not guarantee future results.
 
 The Gap/Momentum/Value/Bias columns are *readouts*, not gates — they describe

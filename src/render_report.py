@@ -225,6 +225,7 @@ def stock_section(data):
         confirms = ind.get("confirmations") or {}
         adx_read = confirms.get("adx14") or {}
         stochastic = confirms.get("stochastic_14_3") or {}
+        smi_read = confirms.get("smi_13_3_3") or {}
         volume = confirms.get("volume") or {}
         sqz = "●" if bb.get("squeeze") else ""
         cross = tr.get("cross")
@@ -238,8 +239,11 @@ def stock_section(data):
             cls = "good" if mh > 0 else "bad"
             mh_cell = f"<span class='num {cls}'>{mh:+.2f}</span>"
         confirmation_cell = (
-            f"ADX {num(adx_read.get('adx'))}; "
+            f"ADX {num(adx_read.get('adx'))} "
+            f"(+DI/-DI {num(adx_read.get('plus_di'))}/{num(adx_read.get('minus_di'))}); "
             f"Stoch {num(stochastic.get('k'))}/{num(stochastic.get('d'))}; "
+            f"SMI {num(smi_read.get('value'))}/{num(smi_read.get('signal'))}; "
+            f"CCI {num(confirms.get('cci20'))}; %R {num(confirms.get('williams_r14'))}; "
             f"MFI {num(volume.get('mfi14'))}; "
             f"OBV {esc(volume.get('obv_direction_20d') or '—')}; "
             f"A/D {esc(volume.get('ad_direction_20d') or '—')}")
@@ -330,7 +334,7 @@ def stock_section(data):
         "DC = death cross (bearish, rejected).'>Cross</th>"
         "<th title='MACD histogram (12,26,9): MACD line minus signal line. "
         "Positive = bullish momentum (+1 score); negative = bearish.'>MACD hist</th>"
-        "<th title='ADX measures trend strength, not direction; Stochastic and MFI are bounded oscillators; OBV and A/D show 20-day volume-flow direction. Confirmation context only; does not affect gates or score.'>Confirm*</th>"
+        "<th title='ADX measures trend strength, not direction. SMI, Stochastic, CCI, Williams %R, and MFI are momentum context; OBV and A/D show volume flow. Read the measures together; this column does not affect gates or score.'>Confirm*</th>"
         "<th title='Overnight gap: (open / prior close − 1). ±2% or more labels "
         "gap up / gap down; smaller = no gap.'>Gap</th>"
         "<th title='RSI(14) state: oversold below 30, overbought above 70, "
@@ -387,8 +391,9 @@ def stock_section(data):
         "<li><b>MACD hist</b> (12,26,9): MACD line minus signal. Positive (green) = bullish "
         "momentum, +1. Negative (red) = bearish momentum.</li>"
         "<li><b>Confirm*</b>: ADX measures trend strength, not direction; +DI/-DI provide directional context. "
-        "Stochastic and MFI can stay overbought or oversold during strong trends. OBV and A/D direction "
-        "are volume warnings, not reversal signals. These readings add context only and do not affect "
+        "SMI, Stochastic, CCI, Williams %R, and MFI are related momentum measures; extremes can persist "
+        "during strong trends. OBV and A/D direction are volume warnings, not reversal signals. These "
+        "readings add context only and do not affect "
         "the score or qualification gates.</li>"
         "<li><b>Gap</b> (overnight, open vs prior close): &ge;+2% gap up (green), "
         "&le;&minus;2% gap down (red). Large gaps mean overnight news — check the "
