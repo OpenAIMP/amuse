@@ -1,0 +1,16 @@
+{
+ "id": "daily-watchlist-2026-10-13-0759",
+ "type": "daily",
+ "date": "2026-10-13-0759",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-13-0759",
+ "blurb": "AMGN 30.0 leads; 21 bull puts, 12 condors, 12 asym condors",
+ "stats": {
+  "stocks": 9,
+  "bull_puts": 21,
+  "iron_condors": 12,
+  "asym_condors": 12,
+  "pmcc_pairs": 0
+ },
+ "source": "watchlist",
+ "source_detail": "101 names"
+}
