@@ -38,6 +38,7 @@ from indicators import find_pivots
 from indicators import gap_pct as calc_gap_pct
 from indicators import vwap as calc_vwap
 from indicators import adx, stochastic, volume_confirmations
+from indicators import smi, cci, williams_r
 
 
 def _apply_gates(path=None):
@@ -333,6 +334,9 @@ def evaluate(sym, bars):
     adx_read = adx(bars)
     stoch_read = stochastic(bars)
     volume_read = volume_confirmations(bars)
+    smi_read = smi(bars)
+    cci_read = cci(bars)
+    williams_read = williams_r(bars)
 
     def ret(n):
         return (price / closes[-n - 1] - 1) * 100 if len(closes) > n else 0.0
@@ -369,6 +373,10 @@ def evaluate(sym, bars):
                        if adx_read else None),
             "stochastic_14_3": ({k: r1(v) for k, v in stoch_read.items()}
                                  if stoch_read else None),
+            "smi_13_3_3": ({k: r1(v) for k, v in smi_read.items()}
+                            if smi_read else None),
+            "cci20": r1(cci_read),
+            "williams_r14": r1(williams_read),
             "volume": ({"mfi14": r1(volume_read["mfi"]),
                         "obv_direction_20d": volume_read["obv_direction"],
                         "ad_direction_20d": volume_read["ad_direction"]}
