@@ -632,10 +632,10 @@ Screening, monitoring, and order *staging* are automated; the final submit is al
 
 1. Repository secret `PUBLIC_API_KEY` (Settings → Secrets and variables →
    Actions): your Public.com API key.
-2. Optional repository secret `PUBLIC_ACCOUNT_ID` in the same settings. All
-   GitHub Actions workflows read the account ID from this secret and fall back
-   to `5OI32712` when it is unset; they do not read it from repository
-   variables.
+2. Required repository secret `PUBLIC_ACCOUNT_ID` in the same settings. Every
+   GitHub Actions workflow reads the account ID only from this secret, fails
+   with a clear message when it is unset, and does not use a public fallback
+   or repository variable.
 3. `bin/public-mcp` is the Actions-compatible MCP client (same CLI interface as
    the local one; reads the key from env instead of a vault).
 

@@ -74,8 +74,10 @@ jobs:
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           if [ -n "$UNIVERSE" ]; then
             python3 src/stock_screener.py --universe "$UNIVERSE" \
               --json-out reports/stock-screen.json | tee reports/stock-screen.txt
@@ -88,8 +90,10 @@ jobs:
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           if [ -n "$UNIVERSE" ]; then
             python3 src/spread_screener.py --universe "$UNIVERSE" \
               --iv-history state/iv_history.jsonl \
@@ -114,11 +118,14 @@ jobs:
           fi
 
       - name: PMCC exception watch
+        if: always()
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           python3 src/pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
 
       - name: Fetch market news

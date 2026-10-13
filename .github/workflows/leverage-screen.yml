@@ -60,8 +60,10 @@ jobs:
         env:
           PUBLIC_API_KEY: <redacted>
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           python3 src/stock_screener.py $ARGS \
             --json-out reports/stock-levetf.json | tee reports/stock-levetf.txt
 
@@ -69,8 +71,10 @@ jobs:
         env:
           PUBLIC_API_KEY: <redacted>
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           python3 src/spread_screener.py $ARGS \
             --iv-history state/iv_history.jsonl \
             --json-out reports/spread-levetf.json | tee reports/spread-levetf.txt
