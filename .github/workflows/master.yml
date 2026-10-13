@@ -4,8 +4,9 @@ name: Master - all screens
 # point; overlapping central/standalone runs are intentional.
 on:
   schedule:
-    # Weekdays 9:45 ET during daylight time / 8:45 ET during standard time.
+    # Pair UTC triggers so the active weekday run stays near 9:45am ET year-round.
     - cron: "45 13 * * 1-5"
+    - cron: "45 14 * * 1-5"
     # First Sunday refresh: UTC schedule because index constituents change slowly.
     - cron: "0 6 1-7 * 0"
   workflow_dispatch:
@@ -48,6 +49,7 @@ jobs:
     outputs:
       day: ${{ steps.date.outputs.day }}
       first_sunday: ${{ steps.date.outputs.first_sunday }}
+      market_run: ${{ steps.date.outputs.market_run }}
     steps:
       - id: date
         name: Resolve schedule date in Eastern time
@@ -57,12 +59,16 @@ jobs:
           weekday=$(TZ=America/New_York date +%u)
           first_sunday=false
           if [ "$weekday" = "7" ] && [ "$day" -le 7 ]; then first_sunday=true; fi
+          local_hm=$(TZ=America/New_York date +%-H%M)
+          market_run=false
+          if [ "$local_hm" -ge 0935 ] && [ "$local_hm" -le 1030 ]; then market_run=true; fi
           echo "day=$day" >> "$GITHUB_OUTPUT"
           echo "first_sunday=$first_sunday" >> "$GITHUB_OUTPUT"
+          echo "market_run=$market_run" >> "$GITHUB_OUTPUT"
 
   premarket:
     needs: setup
-    if: ${{ (github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'premarket' }}
+    if: ${{ (github.event_name == 'schedule' && needs.setup.outputs.market_run == 'true' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5')) || inputs.screen == 'all' || inputs.screen == 'premarket' }}
     uses: ./.github/workflows/premarket-screen.yml
     with:
       names: ${{ inputs.names }}
@@ -72,7 +78,7 @@ jobs:
 
   daily:
     needs: [setup, premarket]
-    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'daily') }}
+    if: ${{ always() && ((github.event_name == 'schedule' && needs.setup.outputs.market_run == 'true' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5')) || inputs.screen == 'all' || inputs.screen == 'daily') }}
     uses: ./.github/workflows/daily-watch.yml
     with:
       names: ${{ inputs.names }}
@@ -81,7 +87,7 @@ jobs:
 
   intraday:
     needs: [setup, daily]
-    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'intraday') }}
+    if: ${{ always() && ((github.event_name == 'schedule' && needs.setup.outputs.market_run == 'true' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5')) || inputs.screen == 'all' || inputs.screen == 'intraday') }}
     uses: ./.github/workflows/intraday-screen.yml
     with:
       names: ${{ inputs.names }}
@@ -91,7 +97,7 @@ jobs:
 
   leverage:
     needs: [setup, intraday]
-    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'leverage') }}
+    if: ${{ always() && ((github.event_name == 'schedule' && needs.setup.outputs.market_run == 'true' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5')) || inputs.screen == 'all' || inputs.screen == 'leverage') }}
     uses: ./.github/workflows/leverage-screen.yml
     with:
       names: ${{ inputs.names }}
@@ -99,7 +105,7 @@ jobs:
 
   monthly:
     needs: [setup, leverage]
-    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5' && needs.setup.outputs.day == '03') || (github.event_name == 'workflow_dispatch' && (inputs.screen == 'all' || inputs.screen == 'monthly'))) }}
+    if: ${{ always() && ((github.event_name == 'schedule' && needs.setup.outputs.market_run == 'true' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5') && needs.setup.outputs.day == '03') || (github.event_name == 'workflow_dispatch' && (inputs.screen == 'all' || inputs.screen == 'monthly'))) }}
     uses: ./.github/workflows/monthly-screen.yml
     with:
       names: ${{ inputs.names }}

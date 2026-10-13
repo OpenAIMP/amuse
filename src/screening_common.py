@@ -6,7 +6,9 @@ STATUS_ORDER = {status: rank for rank, status in enumerate(QUALIFICATION_STATUSE
 INCOMPLETE_REASON_PREFIXES = (
     "daily bars failed", "insufficient daily history", "insufficient history",
     "atr uncomputable", "quote failed", "no quote", "intraday bars failed",
-    "no intraday bars", "opening range not yet formed", "volume baseline unknown",
+    "no intraday bars", "no premarket bars", "no regular-session bars",
+    "opening range not yet formed", "volume baseline unknown",
+    "no reported premarket volume", "no reported regular-session volume",
     "data error:", "missing or invalid underlying quote",
 )
 ERROR_REASON_PREFIXES = ("internal error:", "unexpected error:", "evaluation error:",

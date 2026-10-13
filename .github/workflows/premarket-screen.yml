@@ -1,7 +1,8 @@
-name: Pre-market gap screen
+name: Pre-market and opening-range gap screen
 
-# Scans the watchlist for pre-market gap + volume candidates.
-# Runs at 9:00am ET on weekdays, before the open. Independent of master.yml.
+# Scans premarket gaps before 9:30 ET and confirms them with time-normalized
+# regular-session volume when invoked after the open (e.g. by master.yml).
+# Runs independently at 9:00am ET on weekdays and remains dispatchable.
 on:
   schedule:
     # Weekdays 9:00am ET (13:00 UTC; drifts an hour with DST).
@@ -53,6 +54,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Restore same-time premarket volume history
+        uses: actions/cache/restore@v4
+        with:
+          path: state/premarket_volume_history.json
+          key: premarket-volume-history-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            premarket-volume-history-${{ github.ref_name }}-
+
       - name: Load watchlist
         env:
           INPUT_NAMES: ${{ inputs.names }}
@@ -94,6 +103,13 @@ jobs:
           fi
           python3 src/premarket_screen.py "${ARGS[@]}" \
             --json-out reports/premarket-screen-$STAMP.json | tee reports/premarket-screen-$STAMP.txt
+
+      - name: Save same-time premarket volume history
+        uses: actions/cache/save@v4
+        if: always() && hashFiles('state/premarket_volume_history.json') != ''
+        with:
+          path: state/premarket_volume_history.json
+          key: premarket-volume-history-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload run outputs
         uses: actions/upload-artifact@v4

@@ -31,6 +31,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import math
 import os
 import re
 import sys
@@ -1064,6 +1065,25 @@ def premarket_section(data, report_mode=False):
         return section("Pre-market gap screen", '<p class="empty">No data yet — run the pre-market screener.</p>')
     all_rows = data.get("screened")
     has_full_universe = isinstance(all_rows, list)
+    mode = data.get("mode") or next(
+        (row.get("mode") for row in all_rows or [] if row.get("mode")),
+        "premarket")
+    opening_mode = mode == "opening_range"
+
+    def shares(value):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return '<span class="na">—</span>'
+        if not math.isfinite(value):
+            return '<span class="na">—</span>'
+        return f"{value:,.0f}"
+
+    def share_pair(value, benchmark):
+        value_text = shares(value)
+        benchmark_text = shares(benchmark)
+        return f"{value_text} / {benchmark_text}"
+
     if has_full_universe:
         cands = sort_evaluations(all_rows, "conviction")
     else:
@@ -1077,6 +1097,8 @@ def premarket_section(data, report_mode=False):
         qualification = c.get("qualification_status", "qualified")
         reasons = c.get("qualification_reasons") or c.get("missed") or []
         details = "; ".join(str(reason) for reason in reasons) or "Passed all configured gates"
+        if c.get("volume_note"):
+            details += "; " + str(c["volume_note"])
         rows.append(
             "<tr>"
             f"{sym_cell(c.get('symbol'))}"
@@ -1085,11 +1107,14 @@ def premarket_section(data, report_mode=False):
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
             f"<td class='num'>{num(c.get('prior_close'), 2)}</td>"
             f"<td class='num'>{num(c.get('gap_pct'), 2, '%')}</td>"
-            f"<td class='num'>{num(c.get('rel_vol'), 1)}×</td>"
+            f"<td class='num'>{share_pair(c.get('premarket_volume'), c.get('premarket_baseline_volume'))}</td>"
+            f"<td class='num'>{num(c.get('premarket_rel_vol'), 2, '×')}</td>"
+            f"<td class='num'>{share_pair(c.get('regular_volume'), c.get('expected_regular_volume'))}</td>"
+            f"<td class='num'>{num(c.get('regular_rel_vol'), 2, '×')}</td>"
             f"<td>{esc(c.get('session') or '—')}</td>"
             f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
             f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
-            f"<td class='num'>{num(c.get('range_atr'), 2)}</td>"
+            f"<td class='num'>{num(c.get('gap_atr', c.get('range_atr')), 2)}</td>"
             f"<td class='num'>{num(c.get('conviction'), 1)}</td>"
             f"<td>{bias_badge(c.get('bias'))}</td>"
             f"<td>{esc(details)}</td>"
@@ -1107,16 +1132,19 @@ def premarket_section(data, report_mode=False):
         "<th title='Last price at screen time.'>Price</th>"
         "<th>Prior close</th>"
         "<th title='Overnight gap: (open / prior close − 1). Gate: at least 2% in either direction.'>Gap%</th>"
-        "<th title='Pre-market volume vs its recent average. Gate: at least 1.5×.'>RelVol</th>"
+        "<th title='Cumulative premarket shares / same-time average premarket shares, when available.'>PM Vol / Base</th>"
+        "<th title='Premarket volume relative to the same time bucket over prior sessions.'>PM RVOL</th>"
+        "<th title='Cumulative regular-session shares / expected shares from average daily volume prorated by elapsed minutes / 390.'>RTH Vol / Expected</th>"
+        "<th title='Regular-session volume divided by expected volume through this time.'>RTH RVOL</th>"
         "<th>Session data</th>"
-        "<th title='Distance from the developing session VWAP (%). Sets gap-and-go vs fade bias.'>VWAP dist</th>"
+        f"<th title='Distance from {('premarket' if not opening_mode else 'regular-session')} VWAP (%). Sets gap-and-go vs fade bias.'>{'PM' if not opening_mode else 'Regular'} VWAP dist</th>"
         "<th title='Average True Range as % of price. Gate: 1–8%.'>ATR%</th>"
-        "<th>Range / ATR</th><th>Conviction</th>"
+        "<th title='Absolute gap divided by ATR percentage.'>Gap / ATR</th><th>Conviction</th>"
         "<th title='Gap-and-go vs fade bias from the developing-VWAP side. Not a prediction.'>Bias</th>"
         "<th>Qualification details</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
-           f'<tr><td colspan="14" class="empty">No symbols evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
+           f'<tr><td colspan="17" class="empty">No symbols evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
         + "</tbody></table></div>"
     )
     # Near-misses: rejected but close — explains an empty table (#26)
@@ -1126,12 +1154,17 @@ def premarket_section(data, report_mode=False):
         nrows = []
         for n in near:
             missed = "; ".join(n.get("missed") or [])
+            if n.get("volume_note"):
+                missed = (missed + "; " if missed else "") + str(n["volume_note"])
             nrows.append(
                 "<tr>"
                 f"{sym_cell(n.get('symbol'))}"
                 f"<td class='num'>{num(n.get('price'), 2)}</td>"
                 f"<td class='num'>{num(n.get('gap_pct'), 2, '%')}</td>"
-                f"<td class='num'>{num(n.get('rel_vol'), 1)}×</td>"
+                f"<td class='num'>{share_pair(n.get('premarket_volume'), n.get('premarket_baseline_volume'))}</td>"
+                f"<td class='num'>{num(n.get('premarket_rel_vol'), 2, '×')}</td>"
+                f"<td class='num'>{share_pair(n.get('regular_volume'), n.get('expected_regular_volume'))}</td>"
+                f"<td class='num'>{num(n.get('regular_rel_vol'), 2, '×')}</td>"
                 f"<td class='num'>{num(n.get('atr_pct'), 2, '%')}</td>"
                 f"<td>{esc(missed)}</td>"
                 "</tr>"
@@ -1139,7 +1172,8 @@ def premarket_section(data, report_mode=False):
         near_html = (
             "<h3>Near-misses <span class='dim'>(rejected but close — what almost qualified)</span></h3>"
             '<div class="tbl-wrap"><table><thead><tr>'
-            "<th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th>"
+            "<th>Symbol</th><th>Price</th><th>Gap%</th><th>PM Vol / Base</th>"
+            "<th>PM RVOL</th><th>RTH Vol / Expected</th><th>RTH RVOL</th>"
             "<th>ATR%</th><th>Missed gate</th>"
             "</tr></thead><tbody>" + "".join(nrows) + "</tbody></table></div>"
         )
@@ -1149,16 +1183,37 @@ def premarket_section(data, report_mode=False):
         lines = "".join(f"<li>{esc(l)}</li>" for l in ro if isinstance(l, str))
         readout = f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>'
     settings = data.get("settings") or {}
-    fine = (
-        '<p class="fine">Ranked by conviction = |gap| × relative volume. '
-        f"Gates: gap ≥ {esc(settings.get('gap_min_pct', 2))}%, "
-        f"rel vol ≥ {esc(settings.get('rel_vol_min', 1.5))}×, "
+    common_gates = (
+        f"gap ≥ {esc(settings.get('gap_min_pct', 2))}%, "
         f"price ≥ ${esc(settings.get('price_min', 10))}, "
-        f"ATR% {esc(settings.get('atr_pct_min', 1))}–{esc(settings.get('atr_pct_max', 8))}. "
+        f"ATR% {esc(settings.get('atr_pct_min', 1))}–{esc(settings.get('atr_pct_max', 8))}"
+    )
+    if opening_mode:
+        score_note = "Ranked by (|gap| / ATR%) × time-normalized regular-session RVOL. "
+        volume_note = (
+            f"Regular-session volume gate: RVOL ≥ {esc(settings.get('rel_vol_min', 1.5))}×, "
+            "where expected volume is average daily volume × elapsed regular-session minutes / 390. "
+            "Premarket same-time RVOL is contextual. VWAP is regular-session only. "
+        )
+        title = "Opening-range gap confirmation"
+    else:
+        score_note = ("Ranked by |gap| / ATR%; when the same-time premarket baseline is ready, "
+                      "the score is multiplied by premarket RVOL. ")
+        volume_note = (
+            f"When {esc(settings.get('premarket_rel_vol_lookback_sessions', 20))} "
+            f"same-time samples in the {esc(settings.get('premarket_rel_vol_bucket_minutes', 15))}-minute bucket "
+            f"are available, same-time premarket RVOL must be ≥ {esc(settings.get('rel_vol_min', 1.5))}×. "
+            "Until then the volume gate is disabled and the score falls back to gap/ATR. "
+            "VWAP is premarket only. "
+        )
+        title = "Pre-market gap screen"
+    fine = (
+        f'<p class="fine">Mode: {esc(mode)}. {score_note}'
+        f"Gates: {common_gates}. {volume_note}"
         "Technical-only — check headlines before trading any candidate. "
         "Bias is not a prediction.</p>"
     )
-    return section("Pre-market gap screen", summary_html + table + near_html + readout + fine)
+    return section(title, summary_html + table + near_html + readout + fine)
 
 
 def intraday_section(data, report_mode=False):
@@ -1685,6 +1740,8 @@ def main():
         source = args.source or id_source
         source_detail = args.source_detail
         title = REPORT_TITLES.get(rtype, "Options Lab — Screen")
+        if rtype == "premarket" and (premarket or {}).get("mode") == "opening_range":
+            title = "Options Lab — Opening-range Gap Confirmation"
         out = args.out or os.path.join(docs_dir, "reports", rid + ".html")
         hub = os.path.join(docs_dir, "index.html")
         back_href = esc(os.path.relpath(hub, start=os.path.dirname(os.path.abspath(out))))
