@@ -34,6 +34,7 @@ import json
 import os
 import re
 import sys
+from screening_common import qualification_counts, sort_evaluations
 
 # ---------------------------------------------------------------- helpers
 
@@ -99,6 +100,65 @@ def num(v, places=1, suffix=""):
     if f != f or f in (float("inf"), float("-inf")):
         return '<span class="na">—</span>'
     return f"{f:.{places}f}{suffix}"
+
+
+QUALIFICATION_LABELS = {
+    "qualified": "QUALIFIED", "rejected": "REJECTED",
+    "incomplete_data": "INCOMPLETE DATA", "error": "ERROR",
+}
+
+
+def qualification_badge(status):
+    """Shared status display for symbol-universe screener reports."""
+    label = QUALIFICATION_LABELS.get(status, str(status or "unknown").upper())
+    cls = ("good" if status == "qualified" else
+           "warn" if status in ("incomplete_data", "error") else "bad")
+    return f'<span class="badge {cls}">{esc(label)}</span>'
+
+
+def selection_badge(row, default_selected=False):
+    status = row.get("qualification_status", "qualified")
+    if status != "qualified":
+        return '<span class="na">—</span>'
+    selected = row.get("selected", default_selected)
+    rank = row.get("candidate_rank")
+    rank_label = f" #{rank}" if isinstance(rank, int) else ""
+    label = (f"SELECTED{rank_label}" if selected else
+             f"QUALIFIED · NOT SELECTED{rank_label}")
+    return f'<span class="badge {"good" if selected else "warn"}">{esc(label)}</span>'
+
+
+def evaluation_summary(rows, include_selection=False):
+    """Shared full-universe totals for symbol-universe screener reports."""
+    counts = qualification_counts(rows)
+    parts = [f"{len(rows)} symbols evaluated"]
+    if include_selection:
+        parts.append(f"{sum(1 for row in rows if row.get('selected'))} selected")
+    parts.extend((f"{counts['qualified']} qualified", f"{counts['rejected']} rejected",
+                  f"{counts['incomplete_data']} incomplete data", f"{counts['error']} errors"))
+    return f'<p class="fine">{esc(" · ".join(parts))}</p>'
+
+
+def screened_universe_table(rows, detail_key):
+    """Reusable per-underlying audit table for option-structure screeners."""
+    if not isinstance(rows, list):
+        return ""
+    body = []
+    for row in rows:
+        reasons = row.get("qualification_reasons") or row.get("diagnostics") or []
+        if not isinstance(reasons, list):
+            reasons = [str(reasons)]
+        body.append(
+            "<tr>" + sym_cell(row.get("symbol"))
+            + f"<td>{qualification_badge(row.get('qualification_status'))}</td>"
+            + f"<td class='num'>{esc(row.get(detail_key, 0))}</td>"
+            + f"<td class='wrap-cell'>{esc('; '.join(str(x) for x in reasons) or 'At least one structure passed all gates')}</td>"
+            + "</tr>")
+    return (evaluation_summary(rows)
+            + '<div class="tbl-wrap"><table><thead><tr><th>Underlying</th>'
+            + '<th>Qualification</th><th>Accepted</th><th>Evaluation details</th></tr></thead><tbody>'
+            + ("".join(body) or '<tr><td colspan="4" class="empty">No underlyings evaluated.</td></tr>')
+            + '</tbody></table></div>')
 
 
 def money(v):
@@ -189,24 +249,32 @@ def stock_section(data):
     VERDICT_RANK = {"Go for it": 0, "Watch": 1, "Pass": 2}
     passing = data.get("passing", []) or []
     rejected = data.get("rejected", {}) or {}
+    screened = data.get("screened")
     all_rows = []
-    for p in passing:
-        all_rows.append((p, None))
-    for sym, info in rejected.items():
-        info = info or {}
-        # Build a minimal row for rejected names; indicators may be partial/None.
-        row = {"symbol": sym,
-               "verdict": "Pass",
-               "verdict_reason": "; ".join(info.get("reasons", [])),
-               "indicators": info.get("indicators"),
-               "_rejected": True}
-        # Copy through scalar fields saved at the top level of the rejected entry.
-        for k in ("price", "rsi14", "vs_sma50_pct", "vs_sma200_pct",
-                  "atr_pct", "vol_ratio", "off_52w_high_pct",
-                  "ret_1m_pct", "ret_3m_pct", "score"):
-            if info.get(k) is not None:
-                row[k] = info[k]
-        all_rows.append((row, info.get("reasons", [])))
+    if isinstance(screened, list):
+        for evaluation in screened:
+            row = dict(evaluation)
+            reasons = row.get("qualification_reasons") or []
+            if row.get("qualification_status") != "qualified":
+                row.update({"verdict": "Pass",
+                            "verdict_reason": "; ".join(reasons),
+                            "_rejected": True})
+            all_rows.append((row, reasons))
+    else:
+        for p in passing:
+            all_rows.append((p, None))
+        for sym, info in rejected.items():
+            info = info or {}
+            # Legacy payloads saved only selected scalar metrics for rejects.
+            row = {"symbol": sym, "verdict": "Pass",
+                   "verdict_reason": "; ".join(info.get("reasons", [])),
+                   "indicators": info.get("indicators"), "_rejected": True}
+            for k in ("price", "rsi14", "vs_sma50_pct", "vs_sma200_pct",
+                      "atr_pct", "vol_ratio", "off_52w_high_pct",
+                      "ret_1m_pct", "ret_3m_pct", "score"):
+                if info.get(k) is not None:
+                    row[k] = info[k]
+            all_rows.append((row, info.get("reasons", [])))
     def _sort_key(item):
         p, _ = item
         v = p.get("verdict") or "Pass"
@@ -280,6 +348,7 @@ def stock_section(data):
         rows.append(
             "<tr>"
             f"{sym_cell(p.get('symbol'))}"
+            f"<td>{qualification_badge(p.get('qualification_status', 'rejected' if p.get('_rejected') else 'qualified'))}</td>"
             f"<td class='num'>{num(p.get('price'), 2)}</td>"
             f"<td class='num'>{num(p.get('rsi14'))}</td>"
             f"<td class='num'>{pct(p.get('vs_sma50_pct'))}</td>"
@@ -302,9 +371,10 @@ def stock_section(data):
             f"<td title='{esc(p.get('verdict_reason') or '')}'>{verdict_badge(p.get('verdict'))}</td>"
             "</tr>"
         )
+    summary = evaluation_summary(screened) if isinstance(screened, list) else ""
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
-        "<th title='Underlying symbol. Click for quote pages.'>Symbol</th><th title='Last price at screen time.'>Price</th>"
+        "<th title='Underlying symbol. Click for quote pages.'>Symbol</th><th>Qualification</th><th title='Last price at screen time.'>Price</th>"
         "<th title='RSI(14): momentum oscillator 0-100. Gate keeps 30-70; "
         "below 30 = washed out, above 70 = overheated.'>RSI(14)</th>"
         "<th title='Distance above the 50-day SMA (%). Regime use: the base score "
@@ -351,7 +421,7 @@ def stock_section(data):
         "Watch = decent but missing a Go criterion; Pass = below threshold or failed gates. "
         "Hover for the reason.'>Verdict</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="21" class="empty">No qualifiers this run.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="22" class="empty">No qualifiers (no symbols evaluated this run).</td></tr>')
         + "</tbody></table></div>"
         '<details><summary><b>Column guide — what each value means for decisions</b></summary>'
         '<ul class="guide">'
@@ -420,7 +490,7 @@ def stock_section(data):
     if ro:
         lines = "".join(f"<li>{esc(l)}</li>" for l in ro if isinstance(l, str))
         readout = f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>'
-    return section("Stock screen", table + readout)
+    return section("Stock screen", summary + table + readout)
 
 
 def considered_table(res, asof):
@@ -504,7 +574,7 @@ def chain_table(res, asof):
                 f"<td class='num'>{pct((spread_pct or 0) * 100) if spread_pct is not None else '—'}</td>"
                 f"<td class='num'>{c.get('open_interest') if c.get('open_interest') is not None else '—'}</td>"
                 f"<td class='num'>{c.get('volume') if c.get('volume') is not None else '—'}</td>"
-                f"<td class='bad'>{esc(c.get('gate') or '')}</td>"
+                f"<td class='{'good' if str(c.get('gate') or '').startswith('passed') else 'bad'}'>{esc(c.get('gate') or '')}</td>"
                 "</tr>"
             )
     if not rows:
@@ -677,14 +747,20 @@ def spread_tables(data):
     if rest:
         lines = "".join(f"<li>{esc(l)}</li>" for l in rest)
         out.append(f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>')
-    considered_html = considered_table(res, asof)
+    # Full structure-level diagnostics are kept separate from the compact
+    # best-per-symbol opportunity tables so ranking never hides evaluations.
+    diagnostic_rows = data.get("diagnostics") or res
+    considered_html = considered_table(diagnostic_rows, asof)
     if considered_html:
         out.append(considered_html)
-    chain_html = chain_table(res, asof)
+    chain_html = chain_table(diagnostic_rows, asof)
     if chain_html:
         out.append(chain_html)
     out.append('<p class="fine">Return on risk = credit ÷ max loss: a screening ratio, not an expected return. '
                'Credits use conservative short-bid minus long-ask fills.</p>')
+    universe_html = screened_universe_table(data.get("screened"), "accepted_structures")
+    if universe_html:
+        out.insert(0, universe_html)
     return section("Spread opportunities", "".join(out))
 
 
@@ -706,7 +782,30 @@ def pmcc_section(data):
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
         )
+    eval_rows = []
+    evaluated_pairs = data.get("evaluated_pairs") or {}
+    for sym in sorted(evaluated_pairs):
+        for r in evaluated_pairs[sym] or []:
+            reasons = r.get("qualification_reasons") or []
+            status = r.get("qualification_status")
+            eval_rows.append(
+                "<tr>" + sym_cell(sym)
+                + f"<td>{esc(r.get('long_exp') or '')} / {esc(r.get('short_exp') or '')}</td>"
+                + f"<td class='num'>{num(r.get('long_strike'), 2)}C / {num(r.get('short_strike'), 2)}C</td>"
+                + f"<td class='num'>{num(r.get('premium_to_debit_30d'), 2)}%</td>"
+                + f"<td>{qualification_badge(status)}</td>"
+                + f"<td class='wrap-cell'>{esc('; '.join(str(x) for x in reasons) or 'Passed all pair gates')}</td></tr>")
+    pair_audit = (
+        '<h3>Evaluated PMCC pairs</h3><div class="tbl-wrap"><table><thead><tr>'
+        '<th>Underlying</th><th>Long / short expiry</th><th>Long / short strike</th>'
+        '<th>P/D 30d</th><th>Qualification</th><th>Reasons</th></tr></thead><tbody>'
+        + ("".join(eval_rows) or '<tr><td colspan="6" class="empty">No pair combinations evaluated.</td></tr>')
+        + '</tbody></table></div>'
+    ) if "evaluated_pairs" in data else ""
     body = (
+        screened_universe_table(data.get("screened"), "accepted_pairs")
+        + pair_audit
+        + '<h3>Best PMCC pair by underlying</h3>'
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th title='Underlying symbol. Click for quote pages.'>Sym</th>"
         "<th title='LEAPS long-call strike / short-call strike.'>Long / Short</th>"
@@ -966,13 +1065,7 @@ def premarket_section(data, report_mode=False):
     all_rows = data.get("screened")
     has_full_universe = isinstance(all_rows, list)
     if has_full_universe:
-        status_order = {"qualified": 0, "rejected": 1,
-                        "incomplete_data": 2, "error": 3}
-        cands = sorted(all_rows, key=lambda c: (
-            status_order.get(c.get("qualification_status"), 4),
-            -((c.get("conviction") or 0)
-              if isinstance(c.get("conviction"), (int, float)) else -1),
-            str(c.get("symbol") or "")))
+        cands = sort_evaluations(all_rows, "conviction")
     else:
         # Older reports only persisted selected candidates and a capped list
         # of near-misses, so they cannot show the full screened universe.
@@ -982,28 +1075,13 @@ def premarket_section(data, report_mode=False):
     rows = []
     for c in cands:
         qualification = c.get("qualification_status", "qualified")
-        selected = c.get("selected", qualification == "qualified")
-        rank = c.get("candidate_rank")
-        rank_label = f" #{rank}" if isinstance(rank, int) else ""
-        if qualification == "qualified":
-            selection_label = (f"SELECTED{rank_label}" if selected else
-                               f"QUALIFIED · NOT SELECTED{rank_label}")
-            selection_class = "good" if selected else "warn"
-        else:
-            selection_label = "—"
-            selection_class = ""
-        status_label = {"qualified": "QUALIFIED", "rejected": "REJECTED",
-                        "incomplete_data": "INCOMPLETE DATA", "error": "ERROR"}.get(
-                            qualification, str(qualification).upper())
-        status_class = ("good" if qualification == "qualified" else
-                        "warn" if qualification in ("incomplete_data", "error") else "bad")
         reasons = c.get("qualification_reasons") or c.get("missed") or []
         details = "; ".join(str(reason) for reason in reasons) or "Passed all configured gates"
         rows.append(
             "<tr>"
             f"{sym_cell(c.get('symbol'))}"
-            f"<td><span class='badge {status_class}'>{esc(status_label)}</span></td>"
-            f"<td><span class='badge {selection_class}'>{esc(selection_label)}</span></td>"
+            f"<td>{qualification_badge(qualification)}</td>"
+            f"<td>{selection_badge(c, default_selected=not has_full_universe)}</td>"
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
             f"<td class='num'>{num(c.get('prior_close'), 2)}</td>"
             f"<td class='num'>{num(c.get('gap_pct'), 2, '%')}</td>"
@@ -1018,14 +1096,7 @@ def premarket_section(data, report_mode=False):
             "</tr>"
         )
     if has_full_universe:
-        counts = {key: sum(1 for row in all_rows
-                           if row.get("qualification_status") == key)
-                  for key in ("qualified", "rejected", "incomplete_data", "error")}
-        selected_count = sum(1 for row in all_rows if row.get("selected"))
-        summary = (f"{len(all_rows)} symbols evaluated · {selected_count} selected · "
-                   f"{counts['qualified']} qualified · {counts['rejected']} rejected · "
-                   f"{counts['incomplete_data']} incomplete data · {counts['error']} errors")
-        summary_html = f'<p class="fine">{esc(summary)}</p>'
+        summary_html = evaluation_summary(all_rows, include_selection=True)
     else:
         summary_html = ('<p class="fine">Per-symbol evaluations were not saved for this legacy run; '
                         f"{len(cands)} candidate rows are available from a universe of {esc(data.get('universe', 'unknown'))} symbols.</p>")
@@ -1100,13 +1171,7 @@ def intraday_section(data, report_mode=False):
     all_rows = data.get("screened")
     has_full_universe = isinstance(all_rows, list)
     if has_full_universe:
-        status_order = {"qualified": 0, "rejected": 1,
-                        "incomplete_data": 2, "error": 3}
-        cands = sorted(all_rows, key=lambda c: (
-            status_order.get(c.get("qualification_status"), 4),
-            -((c.get("conviction") or 0)
-              if isinstance(c.get("conviction"), (int, float)) else -1),
-            str(c.get("symbol") or "")))
+        cands = sort_evaluations(all_rows, "conviction")
     else:
         # Backward compatibility for reports generated before per-symbol
         # evaluations were persisted.
@@ -1117,15 +1182,13 @@ def intraday_section(data, report_mode=False):
     for c in cands:
         sig = c.get("orb_signal") or c.get("vwap_signal") or "—"
         status = c.get("qualification_status", "qualified")
-        status_label = {"qualified": "QUALIFIED", "rejected": "REJECTED",
-                        "incomplete_data": "INCOMPLETE DATA", "error": "ERROR"}.get(status, str(status).upper())
-        status_class = "good" if status == "qualified" else ("warn" if status in ("incomplete_data", "error") else "bad")
         reasons = c.get("qualification_reasons") or c.get("missed") or []
         reason_text = "; ".join(str(reason) for reason in reasons) or "Passed all configured gates"
         rows.append(
             "<tr>"
             f"{sym_cell(c.get('symbol'))}"
-            f"<td><span class='badge {status_class}'>{esc(status_label)}</span></td>"
+            f"<td>{qualification_badge(status)}</td>"
+            f"<td>{selection_badge(c, default_selected=not has_full_universe)}</td>"
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
             f"<td class='num'>{num(c.get('orb_high'), 2)} / {num(c.get('orb_low'), 2)}</td>"
             f"<td>{esc(sig)}</td>"
@@ -1140,22 +1203,15 @@ def intraday_section(data, report_mode=False):
             f"<td>{esc(reason_text)}</td>"
             "</tr>"
         )
-    counts = data.get("qualification_counts") or {}
     if has_full_universe:
-        counts = {key: sum(1 for row in all_rows
-                           if row.get("qualification_status") == key)
-                  for key in ("qualified", "rejected", "incomplete_data", "error")}
-        summary = (f"{len(all_rows)} symbols evaluated · {counts['qualified']} qualified · "
-                   f"{counts['rejected']} rejected · {counts['incomplete_data']} incomplete data · "
-                   f"{counts['error']} errors")
-        summary_html = f'<p class="fine">{esc(summary)}</p>'
+        summary_html = evaluation_summary(all_rows, include_selection=True)
     else:
         summary_html = ('<p class="fine">Per-symbol evaluations were not saved for this legacy run; '
                         f"{len(cands)} candidate rows are available out of {esc(data.get('universe', 'unknown'))} screened.</p>")
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th title='Underlying symbol. Click for quote pages.'>Symbol</th>"
-        "<th>Qualification</th>"
+        "<th>Qualification</th><th>Selection</th>"
         "<th title='Last price at screen time.'>Price</th>"
         "<th>OR high / low</th>"
         "<th title='Fired signal: breakout_up / breakdown_down (15-min opening range), reclaim_up / loss_down (session VWAP cross).'>Signal</th>"
@@ -1169,12 +1225,12 @@ def intraday_section(data, report_mode=False):
         "<th>Qualification details</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
-           f'<tr><td colspan="14" class="empty">No symbols were evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
+           f'<tr><td colspan="15" class="empty">No symbols were evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
         + "</tbody></table></div>"
     )
     near = data.get("near_misses") or []
     near_html = ""
-    if near:
+    if near and not has_full_universe:
         nrows = []
         for n in near:
             missed = "; ".join(n.get("missed") or [])
@@ -1438,8 +1494,13 @@ def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None,
     if rtype == "pmcc":
         return {"pairs": len((pmcc or {}).get("pairs") or {})}
     res = (spreads or {}).get("results") or {}
+    stock_counts = (stock or {}).get("qualification_counts") or {}
     stats = {
         "stocks": len((stock or {}).get("passing") or []),
+        "stock_qualified": stock_counts.get("qualified", len((stock or {}).get("passing") or [])),
+        "stock_rejected": stock_counts.get("rejected", len((stock or {}).get("rejected") or {})),
+        "stock_incomplete_data": stock_counts.get("incomplete_data", 0),
+        "stock_errors": stock_counts.get("error", 0),
         "bull_puts": len(res.get("bull_puts") or {}),
         "iron_condors": len(res.get("iron_condors") or {}),
         "asym_condors": len(res.get("asym_condors") or {}),

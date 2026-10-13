@@ -259,7 +259,7 @@ made by you, reading both tables — see the overlap note below.
 
 ### Shared libraries (issue #36)
 
-All screeners are stdlib-only and import from four shared modules — no
+All screeners are stdlib-only and import from five shared modules — no
 duplicated plumbing:
 
 | Module | Provides | Used by |
@@ -268,10 +268,44 @@ duplicated plumbing:
 | `market_data.py` | Canonical bar dicts (`date`/`ts`, `open`, `high`, `low`, `close`, `volume`); `daily_bars`, `intraday_bars`, `quotes`, `quote` | all screeners |
 | `indicators.py` | Pure indicator math: SMA, EMA, MACD, RSI, ATR, Bollinger, VWAP, anchored VWAP, fractal pivots, gaps | stock, premarket, intraday |
 | `options_chain.py` | OSI parsing, DTE, `parse_chain`, `greeks` (with `signed` flag: put spreads validate delta on [-1, 1], PMCC calls on [0, 1]) | spread, pmcc |
+| `screening_common.py` | Shared qualification categories, per-symbol result records, consistent status counts, deterministic ranking, and selection metadata | stock, premarket, intraday |
 
 Screen-specific logic stays in each screener (gap bias, ORB detection,
 structure pricing, regime scoring). Tests patch the single funnel
 (`mcp_client.mcp_call`) rather than per-screener copies.
+
+The stock, pre-market, and intraday symbol-universe reports use one shared
+qualification contract (`qualified`, `rejected`, `incomplete_data`, `error`).
+They retain every evaluated symbol, then add screen-specific metrics and
+reasons. Option spread and PMCC reports remain structure/pair-specific because
+one underlying can produce many distinct candidate contracts and gate outcomes.
+
+### Coverage, data quality, and what to add next
+
+The current universe is useful for liquid large-cap technical and defined-risk
+options screening, but it is not a complete market-wide opportunity finder.
+Index lists are maintained snapshots, stock qualification is technical rather
+than fundamental, and pre-market/intraday signals have no integrated catalyst
+feed. The next useful additions are (1) a benchmark/breadth regime context
+using broad-market and sector ETFs, and (2) timestamped earnings/news catalysts
+with explicit freshness and missing-data states. A fundamentals screen only
+makes sense after a reliable fundamentals source is available. Adding more
+overlapping oscillators is lower priority than measuring whether current signal
+groups add value after execution costs.
+
+Relative volume needs horizon-matched baselines. The intraday screener currently
+uses a time-prorated daily-volume estimate; the pre-market screener compares
+pre-market cumulative volume with a full-day average, which is only a rough
+proxy and should not be interpreted as a pre-market-specific RVOL. A true
+pre-market RVOL needs historical extended-hours volume through the same time of
+day. When that baseline is unavailable, reports should expose the limitation
+and avoid treating the metric as validated evidence.
+
+None of the screeners establishes profitability by itself. The win-rate and EV
+fields for options are delta-based estimates, and technical ranks are ordering
+scores, not calibrated probabilities. Before using changes to optimize returns,
+evaluate each signal family on timestamp-correct historical data with realistic
+fills, fees, slippage, out-of-sample periods, and portfolio drawdown/risk.
 
 ### Overlap between the screeners
 

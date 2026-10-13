@@ -121,7 +121,8 @@ def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
             continue
         out[osi] = {"sym": osi, "strike": k, "bid": bid, "ask": ask,
                     "mid": mid, "spread": ask - bid,
-                    "spread_pct": (ask - bid) / mid, "expiration": exp}
+                    "spread_pct": (ask - bid) / mid, "expiration": exp,
+                    "open_interest": oi, "volume": vol}
     return out, diag, rejected
 
 
