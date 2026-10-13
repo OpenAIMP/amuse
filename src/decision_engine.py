@@ -72,13 +72,22 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
             # 3. Timing / signal quality
             score = (stock or {}).get("score")
             squeezed = bool((ind.get("bollinger") or {}).get("squeeze"))
+            confirmation = ind.get("confirmations") or {}
+            smi_read = confirmation.get("smi_13_3_3") or {}
+            adx_read = confirmation.get("adx14") or {}
+            timing_context = (
+                f"; confirmation context only: SMI={smi_read.get('value')} "
+                f"(signal {smi_read.get('signal')}), CCI20={confirmation.get('cci20')}, "
+                f"Williams %R14={confirmation.get('williams_r14')}, "
+                f"ADX14={adx_read.get('adx')} (+DI={adx_read.get('plus_di')}, "
+                f"-DI={adx_read.get('minus_di')})") if confirmation else ""
             timing_ok = score is not None and score >= 20 and not squeezed
             if not stock or score is None:
                 reasons.append("timing score unavailable")
             elif score < 20:
                 reasons.append(f"technical score {score} is below the 20-point watch threshold")
             steps.append({"step": 3, "name": "Timing", "status": "PASS" if timing_ok else "BLOCK",
-                          "detail": f"technical score={score}; squeeze={squeezed}"})
+                          "detail": f"technical score={score}; squeeze={squeezed}{timing_context}"})
             # 4. Volatility
             vol_state = str(vol.get("decision", "NO_READ")).upper()
             vol_ok = vol_state != "STAND_DOWN"
