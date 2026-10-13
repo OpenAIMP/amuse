@@ -145,6 +145,24 @@ LEV_ETF = _dedupe([
 # Core 7: intersection of Dow 30 / Nasdaq-100 / S&P 500 / S&P 100
 CORE7 = _dedupe(["AAPL", "AMGN", "AMZN", "CSCO", "MSFT", "NVDA", "WMT"])
 
+def _load_txt(name):
+    """Load a universe from universes/<name>.txt (issue #30)."""
+    import os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "universes", f"{name}.txt")
+    if not os.path.exists(path):
+        return []
+    syms = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                syms.append(line.upper())
+    return _dedupe(syms)
+
+BLUECHIP = _load_txt("bluechip")
+QUANTUM = _load_txt("quantum")
+UNDERVALUED = _load_txt("undervalued")
+
 UNIVERSES = {
     "sp500": SP500,
     "sp100": SP100,
@@ -152,6 +170,9 @@ UNIVERSES = {
     "dow30": DOW30,
     "lev_etf": LEV_ETF,
     "core7": CORE7,
+    "bluechip": BLUECHIP,
+    "quantum": QUANTUM,
+    "undervalued": UNDERVALUED,
 }
 
 
