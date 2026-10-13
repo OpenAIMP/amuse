@@ -386,6 +386,7 @@ def spread_tables(data):
             f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
             f"<td class='num'>{money(r.get('expected_value'))}</td>"
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
+            f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
             + (f"<tr class='whyrow'><td colspan='12'>{esc(why)}</td></tr>" if why else "")
@@ -403,6 +404,7 @@ def spread_tables(data):
         "<th title='Estimated win probability: (1 - |short delta|). A delta-based estimate, not a market fact.'>Win%</th>"
         "<th title='Expected value: P(win)×credit − P(loss)×max loss. Delta-based estimate.'>EV$</th>"
         "<th title='Loss multiple: max loss ÷ credit. How many times the credit you risk.'>Loss×</th>"
+        "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr>')
@@ -431,6 +433,7 @@ def spread_tables(data):
             f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
             f"<td class='num'>{money(r.get('expected_value'))}</td>"
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
+            f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
             + (f"<tr class='whyrow'><td colspan='13'>{esc(why)}</td></tr>" if why else "")
@@ -449,6 +452,7 @@ def spread_tables(data):
         "<th title='Estimated win probability: (1-|put delta|)×(1-|call delta|). Delta-based estimate.'>Win%</th>"
         "<th title='Expected value: P(win)×credit − P(loss)×max loss.'>EV$</th>"
         "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
+        "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else '<tr><td colspan="13" class="empty">No qualifying condors.</td></tr>')
@@ -472,6 +476,7 @@ def spread_tables(data):
             "<th title='Estimated win probability: delta-based.'>Win%</th>"
             "<th title='Expected value: P(win)×credit − P(loss)×max loss.'>EV$</th>"
             "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
+        "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
             "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
             "</tr></thead><tbody>"
             + "".join(ac_rows)
@@ -872,6 +877,7 @@ def norm_asym_condor(r, stock=None):
         "win_prob_est": r.get("win_prob_est"),
         "expected_value": r.get("expected_value"),
         "loss_multiple": r.get("loss_multiple"),
+        "lucrative": r.get("lucrative"),
         "events": r.get("events"),
         "why_key": r.get("stock") or stock,
     }
@@ -909,6 +915,7 @@ def asym_condor_rows(data, asof, readout):
             f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
             f"<td class='num'>{money(r.get('expected_value'))}</td>"
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
+            f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
             "</tr>"
             + (f"<tr class='whyrow'><td colspan='14'>{esc(why)}</td></tr>" if why else "")
