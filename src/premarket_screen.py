@@ -50,11 +50,10 @@ from screening_common import evaluation_record, qualification_counts, rank_quali
 
 
 def _apply_gates(path=None):
-    global GAP_MIN_PCT, REL_VOL_MIN, PRICE_MIN
+    global GAP_MIN_PCT, PRICE_MIN
     global ATR_PCT_MIN, ATR_PCT_MAX, TOP_N, MIN_DAILY_BARS
     G = _gates_mod.load(path)["premarket"]
     GAP_MIN_PCT = G["gap_min_pct"]
-    REL_VOL_MIN = G["rel_vol_min"]
     PRICE_MIN = G["price_min"]
     ATR_PCT_MIN, ATR_PCT_MAX = G["atr_pct_min"], G["atr_pct_max"]
     TOP_N = G["top_n"]
@@ -140,15 +139,20 @@ def screen_one(symbol, quote_map=None):
     today_bars = [b for b in ibars if b["ts"].date() == latest_day]
     res["session"] = latest_day.isoformat()
     today_vol = sum(b["volume"] for b in today_bars)
-    if avg20_vol and avg20_vol > 0:
+    if today_vol <= 0:
+        rel_vol = None
+        reasons.append("no reported premarket volume")
+    elif avg20_vol and avg20_vol > 0:
         rel_vol = today_vol / avg20_vol
     else:
         rel_vol = None
     res["rel_vol"] = rel_vol
-    if rel_vol is None:
+    if rel_vol is None and today_vol > 0:
         reasons.append("volume baseline unknown")
-    elif rel_vol < REL_VOL_MIN:
-        reasons.append("volume too thin")
+    # Premarket volume is a fraction of average *full-session* volume, not a
+    # time-matched relative-volume measure. Public exposes no historical
+    # premarket baseline, so this is useful context but cannot be a valid
+    # pass/fail gate before the open.
 
     # Developing session VWAP from today's bars (all sessions included).
     vwap = calc_vwap(today_bars)
@@ -212,11 +216,12 @@ def main():
     print(f"Universe: {'override' if args.names else 'Nasdaq-100 (shared default)'} "
           f"({len(names)} names)")
     print("Settings: "
-          f"|gap| >= {GAP_MIN_PCT}%, rel_vol >= {REL_VOL_MIN}, "
+          f"|gap| >= {GAP_MIN_PCT}%, "
           f"price >= ${PRICE_MIN:g}, ATR% {ATR_PCT_MIN}-{ATR_PCT_MAX}, "
-          f"rank by conviction = |gap| x rel_vol, top {TOP_N}. "
-          f"Gap = quote vs prior regular-session close; rel_vol = today's "
-          f"volume so far (all sessions) vs 20d avg daily volume; "
+          f"rank by conviction = |gap| x premarket volume participation, top {TOP_N}. "
+          f"Gap = quote vs prior regular-session close; premarket volume participation "
+          f"= premarket volume so far vs 20d avg daily volume (context only; "
+          f"no historical premarket-volume baseline is available); "
           f"VWAP = developing session VWAP. "
           "LIMITATION: no news/catalyst feed via the MCP -- gaps are "
           "technical-only; check headlines before trading any candidate.")
@@ -268,8 +273,7 @@ def main():
             # Near-miss: rejected but close on the key gates — show what
             # almost qualified so an empty report explains itself (#26).
             gap = abs(res.get("gap_pct") or 0)
-            rv = res.get("rel_vol") or 0
-            if gap >= 0.5 * GAP_MIN_PCT or rv >= 0.67 * REL_VOL_MIN:
+            if gap >= 0.5 * GAP_MIN_PCT:
                 near.append({"symbol": sym,
                              "gap_pct": res.get("gap_pct"),
                              "rel_vol": res.get("rel_vol"),
@@ -286,13 +290,13 @@ def main():
     top = rank_qualified(screened, cands, TOP_N, score_key="conviction")
 
     print(f"\n=== TOP {TOP_N} BY CONVICTION ({len(cands)} candidates / {len(names)} screened) ===")
-    print(f"{'sym':6} {'price':>8} {'gap%':>7} {'relVol':>7} {'vwapD%':>7} "
+    print(f"{'sym':6} {'price':>8} {'gap%':>7} {'pmVol%':>7} {'vwapD%':>7} "
           f"{'atr%':>6} {'rngATR':>7} {'conv':>8}  bias")
     for r in top:
         vd = r["vwap_dist_pct"]
         vd_s = "   n/a" if vd is None else f"{vd:+.2f}"
         print(f"{r['symbol']:6} {r['price']:8.2f} {r['gap_pct']:+7.2f} "
-              f"{r['rel_vol']:7.2f} {vd_s:>7} "
+              f"{(r['rel_vol'] or 0) * 100:6.2f}% {vd_s:>7} "
               f"{r['atr_pct']:6.2f} {r['range_atr']:+7.2f} {r['conviction']:8.1f}  "
               f"{r['bias']}")
 
@@ -312,10 +316,11 @@ def main():
                 rel_vol = n.get("rel_vol")
                 gap_text = (f"{gap_pct:+.2f}%" if isinstance(gap_pct, (int, float))
                             else "n/a")
-                volume_text = (f"{rel_vol:.1f}x" if isinstance(rel_vol, (int, float))
+                volume_text = (f"{rel_vol * 100:.2f}% of avg daily volume"
+                               if isinstance(rel_vol, (int, float))
                                else "n/a")
                 print(f"  {n['symbol']}: gap {gap_text}, "
-                      f"vol {volume_text} — missed: "
+                      f"premarket volume {volume_text} — missed: "
                       f"{'; '.join(n['missed'])}")
     else:
         ups = [r for r in cands if r["gap_pct"] > 0]
@@ -325,7 +330,8 @@ def main():
         if gng:
             g = gng[0]
             print(f"- Strongest gap-and-go: {g['symbol']} "
-                  f"({g['gap_pct']:+.1f}% gap, {g['rel_vol']:.1f}x vol, "
+                  f"({g['gap_pct']:+.1f}% gap, "
+                  f"{g['rel_vol'] * 100:.2f}% of avg daily volume, "
                   f"{g['vwap_dist_pct']:+.2f}% vs VWAP).")
         if fade:
             f = fade[0]
@@ -356,7 +362,8 @@ def main():
         with open(args.json_out, "w") as f:
             json.dump({"run": RUN_TS, "universe": len(names),
                        "settings": {"gap_min_pct": GAP_MIN_PCT,
-                                    "rel_vol_min": REL_VOL_MIN,
+                                    "volume_role": "context_only",
+                                    "volume_metric": "premarket_volume_pct_of_avg_daily",
                                     "price_min": PRICE_MIN,
                                     "atr_pct_min": ATR_PCT_MIN,
                                     "atr_pct_max": ATR_PCT_MAX},

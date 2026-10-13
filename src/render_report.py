@@ -1085,7 +1085,7 @@ def premarket_section(data, report_mode=False):
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
             f"<td class='num'>{num(c.get('prior_close'), 2)}</td>"
             f"<td class='num'>{num(c.get('gap_pct'), 2, '%')}</td>"
-            f"<td class='num'>{num(c.get('rel_vol'), 1)}×</td>"
+            f"<td class='num'>{num((c.get('rel_vol') * 100) if isinstance(c.get('rel_vol'), (int, float)) else None, 2, '%')}</td>"
             f"<td>{esc(c.get('session') or '—')}</td>"
             f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
             f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
@@ -1107,7 +1107,7 @@ def premarket_section(data, report_mode=False):
         "<th title='Last price at screen time.'>Price</th>"
         "<th>Prior close</th>"
         "<th title='Overnight gap: (open / prior close − 1). Gate: at least 2% in either direction.'>Gap%</th>"
-        "<th title='Pre-market volume vs its recent average. Gate: at least 1.5×.'>RelVol</th>"
+        "<th title='Observed premarket volume as a percentage of average daily volume. Context only; not a qualification gate because historical premarket volume is unavailable.'>PM Vol / Avg Day</th>"
         "<th>Session data</th>"
         "<th title='Distance from the developing session VWAP (%). Sets gap-and-go vs fade bias.'>VWAP dist</th>"
         "<th title='Average True Range as % of price. Gate: 1–8%.'>ATR%</th>"
@@ -1131,7 +1131,7 @@ def premarket_section(data, report_mode=False):
                 f"{sym_cell(n.get('symbol'))}"
                 f"<td class='num'>{num(n.get('price'), 2)}</td>"
                 f"<td class='num'>{num(n.get('gap_pct'), 2, '%')}</td>"
-                f"<td class='num'>{num(n.get('rel_vol'), 1)}×</td>"
+                f"<td class='num'>{num((n.get('rel_vol') * 100) if isinstance(n.get('rel_vol'), (int, float)) else None, 2, '%')}</td>"
                 f"<td class='num'>{num(n.get('atr_pct'), 2, '%')}</td>"
                 f"<td>{esc(missed)}</td>"
                 "</tr>"
@@ -1139,7 +1139,7 @@ def premarket_section(data, report_mode=False):
         near_html = (
             "<h3>Near-misses <span class='dim'>(rejected but close — what almost qualified)</span></h3>"
             '<div class="tbl-wrap"><table><thead><tr>'
-            "<th>Symbol</th><th>Price</th><th>Gap%</th><th>RelVol</th>"
+            "<th>Symbol</th><th>Price</th><th>Gap%</th><th>PM Vol / Avg Day</th>"
             "<th>ATR%</th><th>Missed gate</th>"
             "</tr></thead><tbody>" + "".join(nrows) + "</tbody></table></div>"
         )
@@ -1150,11 +1150,13 @@ def premarket_section(data, report_mode=False):
         readout = f'<div class="readout"><div class="readout-title">Readout</div><ul>{lines}</ul></div>'
     settings = data.get("settings") or {}
     fine = (
-        '<p class="fine">Ranked by conviction = |gap| × relative volume. '
+        '<p class="fine">Ranked by conviction = |gap| × premarket participation '
+        '(premarket volume ÷ 20-day average daily volume). '
         f"Gates: gap ≥ {esc(settings.get('gap_min_pct', 2))}%, "
-        f"rel vol ≥ {esc(settings.get('rel_vol_min', 1.5))}×, "
         f"price ≥ ${esc(settings.get('price_min', 10))}, "
         f"ATR% {esc(settings.get('atr_pct_min', 1))}–{esc(settings.get('atr_pct_max', 8))}. "
+        "Premarket volume is contextual only; the data source has no historical "
+        "premarket-volume baseline for a time-matched relative-volume gate. "
         "Technical-only — check headlines before trading any candidate. "
         "Bias is not a prediction.</p>"
     )

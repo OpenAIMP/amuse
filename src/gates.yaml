@@ -63,7 +63,8 @@ stock:
 
 premarket:
   gap_min_pct: 2.0          # |gap| must be at least 2%
-  rel_vol_min: 1.5          # today's volume so far vs 20d avg daily volume
+  # Premarket volume is informational: the API does not provide a historical
+  # premarket-volume baseline for a time-matched relative-volume gate.
   price_min: 10.0
   atr_pct_min: 1.0
   atr_pct_max: 8.0

@@ -48,7 +48,7 @@ DEFAULTS = {
         "bias_bull_min": 4, "bias_bear_max": 2,
     },
     "premarket": {
-        "gap_min_pct": 2.0, "rel_vol_min": 1.5, "price_min": 10.0,
+        "gap_min_pct": 2.0, "price_min": 10.0,
         "atr_pct_min": 1.0, "atr_pct_max": 8.0,
         "top_n": 20, "min_daily_bars": 30,
     },
