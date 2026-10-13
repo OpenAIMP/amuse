@@ -5,9 +5,7 @@ name: Leveraged-ETF screen
 # Runs weekdays at 10:30am ET, after the open settles — leveraged ETFs are
 # short-term spread vehicles (21-60 DTE) that need live quotes; nightly or
 # weekend runs would return empty on stale chains.
-# Independent of master.yml.
-# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
-# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+# Runs standalone on its own schedule, by dispatch, or from master.yml.
 on:
   schedule:
     # Weekdays 10:30am ET (14:30 UTC; drifts an hour with DST).
@@ -16,6 +14,13 @@ on:
     inputs:
       names:
         description: "Comma-separated watchlist override (blank = lev_etf universe)"
+        type: string
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      names:
+        type: string
         required: false
         default: ""
 
@@ -43,13 +48,16 @@ jobs:
             screen-state-
 
       - name: Load universe
+        env:
+          INPUT_NAMES: ${{ inputs.names }}
         run: |
-          if [ -n "${{ inputs.names }}" ]; then
-            echo "ARGS=--names ${{ inputs.names }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_NAMES" ]; then
+            [[ "$INPUT_NAMES" =~ ^[A-Za-z0-9.,_-]+$ ]] || { echo "Invalid symbol list" >&2; exit 2; }
+            echo "NAMES=$INPUT_NAMES" >> "$GITHUB_ENV"
             echo "SRC=custom" >> $GITHUB_ENV
-            echo "DETAIL=$(echo "${{ inputs.names }}" | tr ',' '\n' | grep -c . | tr -d ' ') names" >> $GITHUB_ENV
+            echo "DETAIL=$(echo "$INPUT_NAMES" | tr ',' '\n' | grep -c . | tr -d ' ') names" >> $GITHUB_ENV
           else
-            echo "ARGS=--universe lev_etf" >> $GITHUB_ENV
+            echo "NAMES=" >> $GITHUB_ENV
             echo "SRC=lev_etf" >> $GITHUB_ENV
             echo "DETAIL=$(PYTHONPATH=src python3 -c "import universes; print(str(len(universes.UNIVERSES['lev_etf']))+' names')")" >> $GITHUB_ENV
           fi
@@ -64,7 +72,9 @@ jobs:
         run: |
           set -o pipefail
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
-          python3 src/stock_screener.py $ARGS \
+          ARGS=()
+          if [ -n "$NAMES" ]; then ARGS+=(--names "$NAMES"); else ARGS+=(--universe lev_etf); fi
+          python3 src/stock_screener.py "${ARGS[@]}" \
             --json-out reports/stock-levetf.json | tee reports/stock-levetf.txt
 
       - name: Spread screener (income structures)
@@ -75,7 +85,9 @@ jobs:
         run: |
           set -o pipefail
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
-          python3 src/spread_screener.py $ARGS \
+          ARGS=()
+          if [ -n "$NAMES" ]; then ARGS+=(--names "$NAMES"); else ARGS+=(--universe lev_etf); fi
+          python3 src/spread_screener.py "${ARGS[@]}" \
             --iv-history state/iv_history.jsonl \
             --json-out reports/spread-levetf.json | tee reports/spread-levetf.txt
 

@@ -1,25 +1,41 @@
-name: Master — all screens
+name: Master - all screens
 
-# Runs every screen by CALLING the existing workflows (no duplicated logic).
-# Each called workflow declares `on: workflow_call`; their own `schedule`
-# blocks were removed so this file is the single scheduler. Manual runs of
-# the individual workflows still work via their workflow_dispatch triggers.
+# Central full run. Each child also keeps its own schedule and manual entry
+# point; overlapping central/standalone runs are intentional.
 on:
   schedule:
-    # Weekdays ~9:45am ET (13:45 UTC; drifts an hour with DST).
+    # Weekdays 9:45 ET during daylight time / 8:45 ET during standard time.
     - cron: "45 13 * * 1-5"
+    # First Sunday refresh: UTC schedule because index constituents change slowly.
+    - cron: "0 6 1-7 * 0"
   workflow_dispatch:
     inputs:
+      screen:
+        description: "Run all screens or one workflow"
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - daily
+          - premarket
+          - intraday
+          - leverage
+          - monthly
+          - universes
       names:
-        description: "Watchlist override for daily + monthly (blank = defaults)"
+        description: "Comma-separated symbol override (blank = screen defaults)"
+        type: string
         required: false
         default: ""
       universe:
-        description: "Universe override for the daytrade + daily screens (blank = defaults)"
+        description: "Index universe override where supported (blank = screen default)"
+        type: string
         required: false
         default: ""
       limit:
-        description: "Cap for the day-trade universe (blank = full universe)"
+        description: "Optional cap for premarket/intraday screens"
+        type: string
         required: false
         default: ""
 
@@ -30,42 +46,67 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      day: ${{ steps.d.outputs.day }}
+      day: ${{ steps.date.outputs.day }}
+      first_sunday: ${{ steps.date.outputs.first_sunday }}
     steps:
-      - id: d
-        run: echo "day=$(date +%d)" >> $GITHUB_OUTPUT
+      - id: date
+        name: Resolve schedule date in Eastern time
+        shell: bash
+        run: |
+          day=$(TZ=America/New_York date +%d)
+          weekday=$(TZ=America/New_York date +%u)
+          first_sunday=false
+          if [ "$weekday" = "7" ] && [ "$day" -le 7 ]; then first_sunday=true; fi
+          echo "day=$day" >> "$GITHUB_OUTPUT"
+          echo "first_sunday=$first_sunday" >> "$GITHUB_OUTPUT"
 
-  daytrade:
+  premarket:
     needs: setup
-    uses: ./.github/workflows/daytrade-screen.yml
+    if: ${{ (github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'premarket' }}
+    uses: ./.github/workflows/premarket-screen.yml
     with:
       names: ${{ inputs.names }}
-      limit: ${{ inputs.limit }}
       universe: ${{ inputs.universe }}
+      limit: ${{ inputs.limit }}
     secrets: inherit
 
   daily:
-    needs: daytrade
+    needs: [setup, premarket]
+    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'daily') }}
     uses: ./.github/workflows/daily-watch.yml
     with:
       names: ${{ inputs.names }}
       universe: ${{ inputs.universe }}
     secrets: inherit
 
+  intraday:
+    needs: [setup, daily]
+    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'intraday') }}
+    uses: ./.github/workflows/intraday-screen.yml
+    with:
+      names: ${{ inputs.names }}
+      universe: ${{ inputs.universe }}
+      limit: ${{ inputs.limit }}
+    secrets: inherit
+
+  leverage:
+    needs: [setup, intraday]
+    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5') || inputs.screen == 'all' || inputs.screen == 'leverage') }}
+    uses: ./.github/workflows/leverage-screen.yml
+    with:
+      names: ${{ inputs.names }}
+    secrets: inherit
+
   monthly:
-    needs: setup
-    # Monthly screen runs on the 3rd; a manual master run always includes it.
-    if: needs.setup.outputs.day == '03' || github.event_name == 'workflow_dispatch'
+    needs: [setup, leverage]
+    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5' && needs.setup.outputs.day == '03') || (github.event_name == 'workflow_dispatch' && (inputs.screen == 'all' || inputs.screen == 'monthly'))) }}
     uses: ./.github/workflows/monthly-screen.yml
     with:
       names: ${{ inputs.names }}
     secrets: inherit
 
   universes:
-    needs: setup
-    # Refresh index constituents on the 1st of each month;
-    # a manual master run always includes it.
-    if: needs.setup.outputs.day == '01' || github.event_name == 'workflow_dispatch'
+    needs: [setup, monthly]
+    if: ${{ always() && ((github.event_name == 'schedule' && github.event.schedule == '0 6 1-7 * 0' && needs.setup.outputs.first_sunday == 'true') || (github.event_name == 'workflow_dispatch' && (inputs.screen == 'all' || inputs.screen == 'universes'))) }}
     uses: ./.github/workflows/build-universes.yml
     secrets: inherit
-

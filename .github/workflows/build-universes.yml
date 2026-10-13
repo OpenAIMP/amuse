@@ -6,16 +6,33 @@ name: Refresh index universes
 
 on:
   schedule:
-    # First Sunday of each month, 06:00 UTC (constituent churn is slow).
+    # GitHub cron cannot express an nth weekday directly; schedule-gate below
+    # filters this first-week/Sunday superset down to the first Sunday only.
     - cron: "0 6 1-7 * 0"
   workflow_call:
-  workflow_dispatch:  
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  schedule-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      first_sunday: ${{ steps.date.outputs.first_sunday }}
+    steps:
+      - id: date
+        shell: bash
+        run: |
+          day=$(TZ=America/New_York date +%d)
+          weekday=$(TZ=America/New_York date +%u)
+          first_sunday=false
+          if [ "$weekday" = "7" ] && [ "$day" -le 7 ]; then first_sunday=true; fi
+          echo "first_sunday=$first_sunday" >> "$GITHUB_OUTPUT"
+
   refresh:
+    needs: schedule-gate
+    if: ${{ github.event_name != 'schedule' || needs.schedule-gate.outputs.first_sunday == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

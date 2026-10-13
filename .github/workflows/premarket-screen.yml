@@ -2,20 +2,39 @@ name: Pre-market gap screen
 
 # Scans the watchlist for pre-market gap + volume candidates.
 # Runs at 9:00am ET on weekdays, before the open. Independent of master.yml.
-# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
-# created/edited via the GitHub web UI -- it cannot be pushed through the API.
 on:
   schedule:
     # Weekdays 9:00am ET (13:00 UTC; drifts an hour with DST).
     - cron: "0 13 * * 1-5"
+  workflow_call:
+    inputs:
+      names:
+        type: string
+        required: false
+        default: ""
+      universe:
+        type: string
+        required: false
+        default: ""
+      limit:
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
     inputs:
       names:
         description: "Comma-separated watchlist override (blank = watchlist.txt)"
+        type: string
+        required: false
+        default: ""
+      universe:
+        description: "Index universe override (blank = Nasdaq-100)"
+        type: string
         required: false
         default: ""
       limit:
         description: "Cap universe size (for tests; blank = full universe)"
+        type: string
         required: false
         default: ""
 
@@ -35,12 +54,22 @@ jobs:
           python-version: "3.12"
 
       - name: Load watchlist
+        env:
+          INPUT_NAMES: ${{ inputs.names }}
+          INPUT_UNIVERSE: ${{ inputs.universe }}
         run: |
-          if [ -n "${{ inputs.names }}" ]; then
-            echo "WATCHLIST=${{ inputs.names }}" >> $GITHUB_ENV
+          if [ -n "$INPUT_NAMES" ]; then
+            [[ "$INPUT_NAMES" =~ ^[A-Za-z0-9.,_-]+$ ]] || { echo "Invalid symbol list" >&2; exit 2; }
+            echo "WATCHLIST=$INPUT_NAMES" >> "$GITHUB_ENV"
             echo "SRC=custom" >> $GITHUB_ENV
+          elif [ -n "$INPUT_UNIVERSE" ]; then
+            [[ "$INPUT_UNIVERSE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid universe name" >&2; exit 2; }
+            echo "UNIVERSE=$INPUT_UNIVERSE" >> "$GITHUB_ENV"
+            echo "WATCHLIST=" >> "$GITHUB_ENV"
+            echo "SRC=$INPUT_UNIVERSE" >> "$GITHUB_ENV"
           else
             echo "WATCHLIST=$(grep -v '^#' src/watchlist.txt | grep -v '^$' | tr '\n' ',' | sed 's/,$//')" >> $GITHUB_ENV
+            echo "UNIVERSE=" >> $GITHUB_ENV
             echo "SRC=watchlist" >> $GITHUB_ENV
           fi
           chmod +x bin/public-mcp
@@ -48,6 +77,7 @@ jobs:
 
       - name: Pre-market screen
         env:
+          INPUT_LIMIT: ${{ inputs.limit }}
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
@@ -56,9 +86,13 @@ jobs:
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           STAMP=$(date -u +%F-%H%M)
           echo "STAMP=$STAMP" >> $GITHUB_ENV
-          ARGS="--names $WATCHLIST"
-          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
-          python3 src/premarket_screen.py $ARGS \
+          ARGS=()
+          if [ -n "$UNIVERSE" ]; then ARGS+=(--universe "$UNIVERSE"); else ARGS+=(--names "$WATCHLIST"); fi
+          if [ -n "$INPUT_LIMIT" ]; then
+            [[ "$INPUT_LIMIT" =~ ^[0-9]+$ ]] || { echo "Limit must be an integer" >&2; exit 2; }
+            ARGS+=(--limit "$INPUT_LIMIT")
+          fi
+          python3 src/premarket_screen.py "${ARGS[@]}" \
             --json-out reports/premarket-screen-$STAMP.json | tee reports/premarket-screen-$STAMP.txt
 
       - name: Upload run outputs
@@ -76,6 +110,8 @@ jobs:
           STAMP=${STAMP:-$(date -u +%F-%H%M)}
           if [ "$SRC" = "custom" ]; then
             DETAIL="$(echo "$WATCHLIST" | tr ',' '\n' | grep -c . | tr -d ' ') names"
+          elif [ -n "$UNIVERSE" ]; then
+            DETAIL="$(PYTHONPATH=src python3 -c "import universes; print(str(len(universes.UNIVERSES['$UNIVERSE']))+' names')")"
           else
             DETAIL="$(grep -v '^#' src/watchlist.txt | grep -vc '^$' | tr -d ' ') names"
           fi

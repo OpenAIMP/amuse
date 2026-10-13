@@ -1,125 +1,45 @@
-name: Pre-market day-trade screen
+name: Pre-market day-trade screen (legacy alias)
 
-# Scans the embedded S&P 500 universe for pre-market gap + volume candidates.
-# Designed to run ~9:00am ET on weekdays, before the open.
-# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
-# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+# Keep the historical workflow name available while routing all execution
+# through the canonical premarket-screen workflow.
 on:
-  # Scheduled runs are owned by master.yml (which calls this workflow).
-  # Manual runs use workflow_dispatch below.
   workflow_call:
     inputs:
       names:
-        description: "Comma-separated watchlist override (blank = embedded S&P 500)"
-        required: false
         type: string
-        default: ""
-      limit:
-        description: "Cap universe size (for tests; blank = full universe)"
         required: false
-        type: string
         default: ""
       universe:
-        description: "Index universe override (blank = S&P 500)"
-        required: false
         type: string
+        required: false
+        default: ""
+      limit:
+        type: string
+        required: false
         default: ""
   workflow_dispatch:
     inputs:
       names:
-        description: "Comma-separated watchlist override (blank = embedded S&P 500)"
-        required: false
-        default: ""
-      limit:
-        description: "Cap universe size (for tests; blank = full universe)"
+        description: "Comma-separated symbol override"
+        type: string
         required: false
         default: ""
       universe:
-        description: "Index universe override (blank = S&P 500)"
+        description: "Index universe override"
+        type: string
+        required: false
+        default: ""
+      limit:
+        description: "Optional cap on symbols scanned"
+        type: string
         required: false
         default: ""
 
-permissions:
-  contents: write
-
 jobs:
-  daytrade:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Pre-market screen
-        env:
-          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
-          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
-        run: |
-          set -o pipefail
-          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
-          chmod +x bin/public-mcp
-          mkdir -p reports
-          STAMP=$(date -u +%F-%H%M)
-          echo "STAMP=$STAMP" >> $GITHUB_ENV
-          ARGS=""
-          if [ -n "${{ inputs.names }}" ]; then ARGS="$ARGS --names ${{ inputs.names }}"; fi
-          if [ -n "${{ inputs.universe }}" ]; then ARGS="$ARGS --universe ${{ inputs.universe }}"; fi
-          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
-          python3 src/daytrade_screen.py $ARGS \
-            --json-out reports/daytrade-screen-$STAMP.json | tee reports/daytrade-screen-$STAMP.txt
-
-      - name: Upload run outputs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: daytrade-screen-${{ github.run_id }}
-          path: reports/
-          retention-days: 90
-
-      - name: Render day-trade report
-        if: always()
-        run: |
-          mkdir -p docs/reports
-          STAMP=${STAMP:-$(date -u +%F-%H%M)}
-          if [ -n "${{ inputs.names }}" ]; then
-            SRC="custom"
-            DETAIL="$(echo '${{ inputs.names }}' | tr ',' '\n' | grep -c . | tr -d ' ') names"
-          elif [ -n "${{ inputs.universe }}" ]; then
-            SRC="${{ inputs.universe }}"
-            DETAIL="$(grep -v '^#' src/universes/${{ inputs.universe }}.txt | grep -vc '^$' | tr -d ' ') names"
-          elif [ -n "${{ inputs.limit }}" ]; then
-            SRC="custom"
-            DETAIL="first ${{ inputs.limit }} of S&P 500"
-          else
-            SRC="sp500"
-            DETAIL="502 names"
-          fi
-          python3 src/render_report.py --daytrade reports/daytrade-screen-$STAMP.json \
-            --report-id daytrade-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
-          python3 src/render_hub.py
-          ls docs/index.html
-
-      - name: Publish dashboard to GitHub Pages
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # bin/public-mcp is chmod +x'd every run, flipping the mode of a
-          # tracked file (API pushes land as 100644). Discard the flip so it
-          # never blocks the rebase below.
-          git checkout -- bin/public-mcp 2>/dev/null || true
-          git add docs/
-          git diff --cached --quiet || git commit -m "dashboard: update day-trade screen"
-          # Fold in concurrent pushes (doc edits, other jobs). If the hub
-          # conflicts, keep the remote copy — it is re-rendered from all
-          # reports right below, so nothing is lost.
-          git pull --rebase --strategy-option=theirs
-          python3 src/render_hub.py
-          git add docs/
-          git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
-          git push
+  premarket:
+    uses: ./.github/workflows/premarket-screen.yml
+    with:
+      names: ${{ inputs.names }}
+      universe: ${{ inputs.universe }}
+      limit: ${{ inputs.limit }}
+    secrets: inherit
