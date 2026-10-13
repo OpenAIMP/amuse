@@ -58,7 +58,7 @@ jobs:
 
       - name: Stock screener (regime)
         env:
-PUBLIC_API_KEY: <redacted>
+          PUBLIC_API_KEY: <redacted>
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
@@ -67,7 +67,7 @@ PUBLIC_API_KEY: <redacted>
 
       - name: Spread screener (income structures)
         env:
-PUBLIC_API_KEY: <redacted>
+          PUBLIC_API_KEY: <redacted>
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
           PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
         run: |
