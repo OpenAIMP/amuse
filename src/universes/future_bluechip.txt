@@ -1,0 +1,68 @@
+# Future blue chip universe (issue #34)
+# Secular-growth candidates with massive TAM that could compound into
+# the next generation of mega-caps. Updated 2026-10-12.
+#
+# HUNTING FRAMEWORK (not prediction):
+# - Massive TAM with secular tailwind
+# - Compounding moat forming (network effects, data, switching costs)
+# - Revenue growth + improving margins
+# NOTE: quantum names have thin options chains — stock-picking names
+# for now, not options-income names (verified 2026-10-12).
+#
+# Quantum computing
+IONQ
+QBTS
+RGTI
+QUBT
+ARQQ
+# AI infrastructure
+NVDA
+AVGO
+AMD
+TSM
+MRVL
+ANET
+CRWD
+PLTR
+SNOW
+DDOG
+NET
+PANW
+FTNT
+# Semiconductors / compute
+LRCX
+KLAC
+AMAT
+ADI
+NXPI
+MCHP
+ON
+MPWR
+# Cloud / data
+MSFT
+GOOGL
+AMZN
+META
+ORCL
+CRM
+NOW
+MDB
+# Biotech / genomics
+REGN
+VRTX
+MRNA
+BNTX
+CRSP
+NTLA
+# Energy transition
+ENPH
+SEDG
+FSLR
+TSLA
+RIVN
+LCID
+# Space / frontier
+RKLB
+ASTS
+JOBY
+ACHR
