@@ -45,6 +45,7 @@ from market_data import daily_bars, quotes
 from options_chain import dte, eligible_expirations
 from options_chain import parse_chain
 from options_chain import greeks as chain_greeks
+from screening_common import evaluation_record, qualification_counts
 import vol as _vol
 
 
@@ -593,6 +594,12 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
             for c in cc.values():
                 if c["sym"] in g:
                     c["delta"], c["iv"] = g[c["sym"]]
+        # Preserve valid as well as rejected contracts for the report audit.
+        for side, by_exp in (("put", puts_by_exp), ("call", calls_by_exp)):
+            for contracts in by_exp.values():
+                chain_rejected.extend({**c, "type": side,
+                                       "gate": "passed quote/liquidity gates"}
+                                      for c in contracts.values())
 
         notes = []
         for src, name in ((diag_p, "put"), (diag_c, "call")):
@@ -886,7 +893,8 @@ def main():
     spot_map = quotes(names, ACCT)
 
     bull_puts, condors, asym_condors = [], [], []
-    stock_notes = {}
+    stock_notes, diagnostics = {}, {}
+    screened = []
     vol_veto_total = 0
     rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
                "asym_condor": {}}
@@ -910,6 +918,17 @@ def main():
         results = list(ex.map(safe, names))
     for sym, r in results:
         stock_notes[sym] = [r["error"]] if r["error"] else r["notes"]
+        diagnostics[sym] = {"considered": r.get("considered", []),
+                            "chain": r.get("chain", []),
+                            "notes": stock_notes[sym],
+                            "error": r.get("error")}
+        accepted_count = len(r["bp"]) + len(r["ic"]) + len(r["ac"])
+        if r["error"]:
+            screened.append(evaluation_record({"symbol": sym}, error=r["error"]))
+        else:
+            screened.append(evaluation_record(
+                {"symbol": sym, "accepted_structures": accepted_count},
+                [] if accepted_count else (r["notes"] or ["no structures passed all gates"])))
         for key, d in r["rejs"].items():
             for k, v in d.items():
                 rej_all[key][k] = rej_all[key].get(k, 0) + v
@@ -1039,6 +1058,9 @@ def main():
                 }
         with open(args.json_out, "w") as f:
             json.dump({"asof": RUN_DATE.isoformat(), "results": best,
+                       "diagnostics": diagnostics,
+                       "screened": screened,
+                       "qualification_counts": qualification_counts(screened),
                        "readout": readout}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
 

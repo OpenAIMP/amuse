@@ -46,6 +46,7 @@ from market_data import daily_bars, intraday_bars, quotes
 from market_data import quote as quote_one
 from indicators import atr as calc_atr
 from indicators import vwap as calc_vwap
+from screening_common import evaluation_record, qualification_counts, rank_qualified
 
 
 def _apply_gates(path=None):
@@ -135,9 +136,9 @@ def screen_one(symbol, quote_map=None):
         return res, [f"intraday bars failed: {e}"]
     if not ibars:
         return res, ["no intraday bars"]
-    latest_day = max(b["ts"] for b in ibars)
-    today_bars = [b for b in ibars if b["ts"] == latest_day]
-    res["session"] = latest_day.date().isoformat()
+    latest_day = max(b["ts"] for b in ibars).date()
+    today_bars = [b for b in ibars if b["ts"].date() == latest_day]
+    res["session"] = latest_day.isoformat()
     today_vol = sum(b["volume"] for b in today_bars)
     if avg20_vol and avg20_vol > 0:
         rel_vol = today_vol / avg20_vol
@@ -256,18 +257,9 @@ def main():
             key = err.split(":")[0]
             rej[key] = rej.get(key, 0) + 1
             rej_notes.setdefault(key, []).append(f"{sym}: {err}"[:90])
-            screened.append({"symbol": sym, "qualification_status": "error",
-                             "qualification_reasons": [err], "error": err})
+            screened.append(evaluation_record({"symbol": sym}, error=err))
             continue
-        data_prefixes = ("daily bars failed", "insufficient daily history",
-                         "atr uncomputable", "quote failed", "no quote",
-                         "intraday bars failed", "no intraday bars",
-                         "volume baseline unknown")
-        incomplete = any(str(reason).startswith(data_prefixes) for reason in reasons)
-        status = ("qualified" if not reasons else
-                  "incomplete_data" if incomplete else "rejected")
-        screened.append({**res, "qualification_status": status,
-                         "qualification_reasons": list(reasons)})
+        screened.append(evaluation_record(res, reasons))
         if reasons:
             for r in reasons:
                 key = r.split(":")[0]
@@ -291,13 +283,7 @@ def main():
             time.sleep(PACE_S)
 
     cands.sort(key=lambda r: (r["conviction"] or 0), reverse=True)
-    top = cands[:TOP_N]
-    ranks = {r["symbol"]: rank for rank, r in enumerate(cands, start=1)}
-    for row in screened:
-        rank = ranks.get(row.get("symbol"))
-        row["candidate_rank"] = rank
-        row["selected"] = (row.get("qualification_status") == "qualified"
-                           and rank is not None and rank <= TOP_N)
+    top = rank_qualified(screened, cands, TOP_N, score_key="conviction")
 
     print(f"\n=== TOP {TOP_N} BY CONVICTION ({len(cands)} candidates / {len(names)} screened) ===")
     print(f"{'sym':6} {'price':>8} {'gap%':>7} {'relVol':>7} {'vwapD%':>7} "
@@ -376,10 +362,7 @@ def main():
                                     "atr_pct_max": ATR_PCT_MAX},
                        "candidates": top,
                        "screened": screened,
-                       "qualification_counts": {
-                           status: sum(1 for row in screened
-                                       if row.get("qualification_status") == status)
-                           for status in ("qualified", "rejected", "incomplete_data", "error")},
+                       "qualification_counts": qualification_counts(screened),
                        "near_misses": near_sorted,
                        "rejections": rej}, f, indent=1)
         print(f"\nwrote {args.json_out}")

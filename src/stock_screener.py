@@ -31,6 +31,7 @@ DEFAULT_NAMES = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO",
 # Tunables live in gates.yaml; this block binds them to module constants.
 import gates as _gates_mod
 from mcp_client import McpError
+from screening_common import evaluation_record, qualification_counts, rank_qualified
 from market_data import daily_bars, intraday_bars
 from indicators import sma, ema, macd, sma_cross, rsi
 from indicators import atr_pct, bollinger, anchored_vwap
@@ -686,10 +687,13 @@ def main():
     # work. Merge in submission order in the main thread -- no locks,
     # deterministic output regardless of worker count.
     passing, rejected = [], {}
+    screened = []
     with concurrent.futures.ThreadPoolExecutor(
             max_workers=max(1, args.workers)) as ex:
         results = list(ex.map(screen_stock, names))
     for sym, ok, metrics, reasons in results:
+        screened.append(evaluation_record(
+            {"symbol": sym, **(metrics or {})}, reasons))
         if metrics is None:
             rejected[sym] = {"reasons": reasons, "indicators": None}
         elif ok:
@@ -709,6 +713,7 @@ def main():
                              "ret_3m_pct": metrics.get("ret_3m_pct")}
 
     passing.sort(key=lambda m: -m["score"])
+    rank_qualified(screened, passing, score_key="score")
 
     def fmt_ind(m):
         ind = m["indicators"]
@@ -789,6 +794,8 @@ def main():
                            "universe": universe_tag},
                        "passing": passing,
                        "rejected": rejected,
+                       "screened": screened,
+                       "qualification_counts": qualification_counts(screened),
                        "readout": readout}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
 

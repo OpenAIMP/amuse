@@ -48,6 +48,7 @@ from market_data import quotes
 from options_chain import dte, eligible_expirations
 from options_chain import parse_chain
 from options_chain import greeks as chain_greeks
+from screening_common import evaluation_record, qualification_counts
 
 
 def _apply_gates(path=None):
@@ -202,7 +203,7 @@ def main():
 
     spot_map = quotes(names, ACCT)
 
-    all_pairs, stock_notes = [], {}
+    all_pairs, stock_notes, pair_counts, evaluated_pairs = [], {}, {}, {}
     for sym in names:
         spot = spot_map.get(sym)
         if spot is None or not math.isfinite(spot) or spot <= 0:
@@ -271,6 +272,7 @@ def main():
                              f"({gerr[0][:100]})")
 
             pairs, n_rej, rej_reasons = [], 0, {}
+            symbol_evaluations = []
             for lc in long_cands:
                 for sc in short_cands:
                     if lc["expiration"] == sc["expiration"]:
@@ -279,6 +281,16 @@ def main():
                                                       events)
                     r = evaluate_pair(spot, lc, sc)
                     reasons = r.get("reasons", []) + event_reasons
+                    symbol_evaluations.append({
+                        "symbol": sym, "long_exp": lc["expiration"],
+                        "short_exp": sc["expiration"],
+                        "long_strike": lc["strike"], "short_strike": sc["strike"],
+                        "long_delta": lc.get("delta"), "short_delta": sc.get("delta"),
+                        "premium_to_debit_30d": r.get("premium_to_debit_30d"),
+                        "capital": r.get("capital"), "friction": r.get("friction"),
+                        "qualification_status": "rejected" if reasons else "qualified",
+                        "qualification_reasons": list(reasons),
+                    })
                     if reasons:
                         n_rej += 1
                         for reason in reasons:
@@ -286,7 +298,9 @@ def main():
                         continue
                     r.update({"stock": sym, "spot": spot, "events": flags})
                     pairs.append(r)
+            evaluated_pairs[sym] = symbol_evaluations
             pairs.sort(key=lambda r: (-r["premium_to_debit_30d"], r["friction"]))
+            pair_counts[sym] = len(pairs)
             all_pairs.extend(pairs[:3])
             notes.append(f"{len(pairs)} pairs accepted, {n_rej} rejected")
             for reason, cnt in sorted(rej_reasons.items(),
@@ -295,6 +309,8 @@ def main():
             stock_notes[sym] = notes
         except McpError as e:
             stock_notes[sym] = [f"MCP error: {e}"]
+        except Exception as e:
+            stock_notes[sym] = [f"unexpected error: {type(e).__name__}: {e}"]
 
     all_pairs.sort(key=lambda r: (-r["premium_to_debit_30d"], r["friction"]))
     print(f"\n{'sym':<5}{'long':<26}{'short':<24}{'debit$':>9}{'cap$':>8}"
@@ -330,8 +346,24 @@ def main():
                     "long_strike": r["long_strike"], "short_strike": r["short_strike"],
                     "events": r["events"],
                 }
+        best_by_symbol = {r["stock"]: r for r in all_pairs}
+        screened = []
+        for sym in names:
+            notes = stock_notes.get(sym, ["no data"])
+            accepted_count = pair_counts.get(sym, 0)
+            if accepted_count:
+                row = evaluation_record({"symbol": sym,
+                                         "accepted_pairs": accepted_count,
+                                         "best_pair": best_by_symbol.get(sym)}, [])
+                row["diagnostics"] = notes
+            else:
+                row = evaluation_record({"symbol": sym, "accepted_pairs": 0}, notes)
+            screened.append(row)
         with open(args.json_out, "w") as f:
-            json.dump({"asof": RUN_DATE.isoformat(), "pairs": best}, f, indent=1)
+            json.dump({"asof": RUN_DATE.isoformat(), "pairs": best,
+                       "evaluated_pairs": evaluated_pairs,
+                       "screened": screened,
+                       "qualification_counts": qualification_counts(screened)}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
 
 
