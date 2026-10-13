@@ -58,11 +58,15 @@ def eligible_expirations(expirations, minimum, maximum):
 
 def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
                want="calls"):
-    """Return ({osi: contract}, diagnostics). want in {"puts", "calls"}.
+    """Return ({osi: contract}, diagnostics, [rejected]). want in {"puts", "calls"}.
 
     Contract keyed by full OSI symbol; type and expiration validated from the
     symbol itself. Bid/ask preserved; no midpoints stored for decisions.
     Liquidity, spread-width, and quote sanity gates applied here.
+
+    The rejected list (issue #38) carries every contract that failed a gate,
+    with its raw quote data and the specific gate name — nothing is silently
+    dropped from the report.
     """
     assert want in ("puts", "calls")
     p = mcp_client.mcp_call("get_option_chain",
@@ -74,40 +78,51 @@ def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
     out, diag = {}, {"bad_symbol": 0, "wrong_type_or_expiry": 0,
                      "bad_quote": 0, "wide_spread": 0,
                      "liquidity_unknown": 0, "insufficient_liquidity": 0}
+    rejected = []
+
+    def _reject(gate, osi=None, strike=None, bid=None, ask=None,
+                oi=None, vol=None):
+        diag[gate] += 1
+        rejected.append({"gate": gate, "sym": osi, "strike": strike,
+                         "bid": bid, "ask": ask,
+                         "open_interest": oi, "volume": vol,
+                         "expiration": exp,
+                         "type": "call" if want_call else "put"})
+
     for c in p.get(want, []):
         try:
             osi = c["instrument"]["symbol"]
             c_exp, is_call, k = parse_osi(osi)
         except (ValueError, KeyError, TypeError):
-            diag["bad_symbol"] += 1
+            _reject("bad_symbol")
             continue
         if is_call != want_call or c_exp != exp:
-            diag["wrong_type_or_expiry"] += 1
+            _reject("wrong_type_or_expiry", osi, k)
             continue
         try:
             bid, ask = float(c["bid"] or 0), float(c["ask"] or 0)
         except (TypeError, ValueError):
-            diag["bad_quote"] += 1
+            _reject("bad_quote", osi, k)
             continue
         if not (math.isfinite(bid) and math.isfinite(ask)) or bid <= 0 or ask < bid:
-            diag["bad_quote"] += 1
+            _reject("bad_quote", osi, k, bid, ask)
             continue
         mid = (bid + ask) / 2
         if (ask - bid) / mid > max_spread_pct:
-            diag["wide_spread"] += 1
+            _reject("wide_spread", osi, k, bid, ask)
             continue
         oi = optional_int(c.get("openInterest"))
         vol = optional_int(c.get("volume"))
         if oi is None and vol is None:
-            diag["liquidity_unknown"] += 1
+            _reject("liquidity_unknown", osi, k, bid, ask)
             continue
         if (oi or 0) < min_liquidity and (vol or 0) < min_liquidity:
-            diag["insufficient_liquidity"] += 1
+            _reject("insufficient_liquidity", osi, k, bid, ask, oi, vol)
             continue
         out[osi] = {"sym": osi, "strike": k, "bid": bid, "ask": ask,
                     "mid": mid, "spread": ask - bid,
                     "spread_pct": (ask - bid) / mid, "expiration": exp}
-    return out, diag
+    return out, diag, rejected
 
 
 def greeks(symbols, account_id, signed=True, batch_size=50):
