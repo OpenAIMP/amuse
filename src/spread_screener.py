@@ -532,7 +532,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
 
     Pure per-symbol work; safe to run in a thread pool (issue #14).
     Keys: bp/ic/ac (top-3 accepted structure lists), notes (list),
-    rejs ({kind: {reason: count}}), vol_veto (int), error (None or str).
+    rejs ({kind: {reason: count}}), vol_veto (int), error (None or str),
+    considered (issue #38: every evaluated structure with qualification).
     """
     out = {"bp": [], "ic": [], "ac": [], "notes": [],
            "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {},
@@ -628,6 +629,20 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         bp_rej, bc_rej, ic_rej, ac_rej = {}, {}, {}, {}
         bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
         bp_accepted, bc_accepted = [], []
+        # Issue #38: qualify-don't-filter. Every evaluated structure lands
+        # here with its qualification and reasons, accepted or not.
+        considered = []
+
+        def _record(structure, expiration, short_strike, long_strike,
+                    qualification, reasons, diagnostics=None):
+            considered.append({
+                "structure": structure, "symbol": sym,
+                "expiration": expiration,
+                "short_strike": short_strike, "long_strike": long_strike,
+                "width": width, "qualification": qualification,
+                "reasons": list(reasons),
+                "diagnostics": dict(diagnostics or {}),
+            })
 
         for s in short_puts:
             target = round(s["strike"] - width, 3)
@@ -636,6 +651,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 bp_n_rej += 1
                 bp_rej["long leg missing at width"] = \
                     bp_rej.get("long leg missing at width", 0) + 1
+                _record("bull_put", s["expiration"], s["strike"], target,
+                        "rejected", ["long leg missing at width"])
                 continue
             flags, event_reasons = spread_events(sym, s["expiration"], events)
             r = evaluate_vertical(spot, s, l, width, "bull_put")
@@ -644,9 +661,14 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 bp_n_rej += 1
                 for reason in reasons:
                     bp_rej[reason] = bp_rej.get(reason, 0) + 1
+                _record("bull_put", s["expiration"], s["strike"],
+                        l["strike"], "rejected", reasons,
+                        r.get("diagnostics"))
                 continue
             r.update({"stock": sym, "spot": spot, "events": flags})
             bp_accepted.append(r)
+            _record("bull_put", r["expiration"], r["short_strike"],
+                    r["long_strike"], "accepted", [])
 
         for s in short_calls:
             target = round(s["strike"] + width, 3)
@@ -655,6 +677,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 bc_n_rej += 1
                 bc_rej["long leg missing at width"] = \
                     bc_rej.get("long leg missing at width", 0) + 1
+                _record("bear_call", s["expiration"], s["strike"], target,
+                        "rejected", ["long leg missing at width"])
                 continue
             flags, event_reasons = spread_events(sym, s["expiration"], events)
             r = evaluate_vertical(spot, s, l, width, "bear_call")
@@ -663,9 +687,14 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 bc_n_rej += 1
                 for reason in reasons:
                     bc_rej[reason] = bc_rej.get(reason, 0) + 1
+                _record("bear_call", s["expiration"], s["strike"],
+                        l["strike"], "rejected", reasons,
+                        r.get("diagnostics"))
                 continue
             r.update({"stock": sym, "spot": spot, "events": flags})
             bc_accepted.append(r)
+            _record("bear_call", r["expiration"], r["short_strike"],
+                    r["long_strike"], "accepted", [])
 
         # Iron condors: cross accepted wings on the same expiration.
         ic_accepted = []
@@ -677,13 +706,22 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                     sym, pw["expiration"], events)
                 r = evaluate_condor(spot, pw, cw, width)
                 reasons = r.get("reasons", []) + event_reasons
+                wings = (f"{pw['short_strike']}/{pw['long_strike']}P x "
+                         f"{cw['short_strike']}/{cw['long_strike']}C")
                 if reasons:
                     ic_n_rej += 1
                     for reason in reasons:
                         ic_rej[reason] = ic_rej.get(reason, 0) + 1
+                    _record("iron_condor", pw["expiration"],
+                            pw["short_strike"], pw["long_strike"],
+                            "rejected", reasons, {"wings": wings})
                     continue
                 r.update({"stock": sym, "spot": spot, "events": flags})
                 ic_accepted.append(r)
+                _record("iron_condor", r["expiration"],
+                        r.get("put_short", pw["short_strike"]),
+                        r.get("put_long", pw["long_strike"]),
+                        "accepted", [], {"wings": wings})
 
         # asymmetric iron condors (defined-risk): accepted put wing + accepted call
         # wing with the call wing skewed far OTM (asym condor character).
@@ -696,13 +734,22 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                     sym, pw["expiration"], events)
                 r = evaluate_asym_condor(spot, pw, cw, width)
                 reasons = r.get("reasons", []) + event_reasons
+                wings = (f"{pw['short_strike']}/{pw['long_strike']}P x "
+                         f"{cw['short_strike']}/{cw['long_strike']}C")
                 if reasons:
                     jl_n_rej += 1
                     for reason in reasons:
                         ac_rej[reason] = ac_rej.get(reason, 0) + 1
+                    _record("asym_condor", pw["expiration"],
+                            pw["short_strike"], pw["long_strike"],
+                            "rejected", reasons, {"wings": wings})
                     continue
                 r.update({"stock": sym, "spot": spot, "events": flags})
                 ac_accepted.append(r)
+                _record("asym_condor", r["expiration"],
+                        r.get("put_short", pw["short_strike"]),
+                        r.get("put_long", pw["long_strike"]),
+                        "accepted", [], {"wings": wings})
 
         bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
@@ -728,11 +775,16 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 out["vol_veto"] += n_veto
                 notes.append(f"vol veto: {n_veto} structures stood down "
                              "(cheap premium)")
+                for c in considered:
+                    if c["qualification"] == "accepted":
+                        c["qualification"] = "rejected"
+                        c["reasons"] = ["vol veto: cheap premium"]
                 bp_accepted, ic_accepted, ac_accepted = [], [], []
 
         out["bp"] = bp_accepted[:3]
         out["ic"] = ic_accepted[:3]
         out["ac"] = ac_accepted[:3]
+        out["considered"] = considered
 
         notes.append(f"bull puts: {len(bp_accepted)} accepted, "
                      f"{bp_n_rej} rejected")
