@@ -153,9 +153,17 @@ jobs:
           else
             DETAIL="$(PYTHONPATH=src python3 -c "import universes; print(str(len(universes.UNIVERSES['$SRC']))+' names')")"
           fi
+          REPORT_ARGS=()
+          if [ -s reports/decision.json ]; then
+            REPORT_ARGS+=(--decision reports/decision.json)
+          fi
+          if [ -s reports/portfolio-risk.json ]; then
+            REPORT_ARGS+=(--portfolio-risk reports/portfolio-risk.json)
+          fi
           python3 src/render_report.py --stock reports/stock-screen.json \
             --spreads reports/spread-screen.json \
             --news reports/news.json \
+            "${REPORT_ARGS[@]}" \
             --report-id daily-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
           python3 src/render_hub.py
           ls docs/index.html
