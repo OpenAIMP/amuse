@@ -162,6 +162,7 @@ def _load_txt(name):
 BLUECHIP = _load_txt("bluechip")
 QUANTUM = _load_txt("quantum")
 UNDERVALUED = _load_txt("undervalued")
+FUTURE_BLUECHIP = _load_txt("future_bluechip")
 
 UNIVERSES = {
     "sp500": SP500,
@@ -173,6 +174,7 @@ UNIVERSES = {
     "bluechip": BLUECHIP,
     "quantum": QUANTUM,
     "undervalued": UNDERVALUED,
+    "future_bluechip": FUTURE_BLUECHIP,
 }
 
 
