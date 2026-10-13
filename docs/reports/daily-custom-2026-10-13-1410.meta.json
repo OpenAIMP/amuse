@@ -1,0 +1,24 @@
+{
+ "id": "daily-custom-2026-10-13-1410",
+ "type": "daily",
+ "date": "2026-10-13-1410",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-13-1410",
+ "blurb": "SSO 30.6 leads; 2 bull puts, 1 condor, 1 asym condor; Decision: NO TRADE: no candidate cleared the decision gates; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 5,
+  "stock_qualified": 5,
+  "stock_rejected": 24,
+  "stock_incomplete_data": 0,
+  "stock_errors": 0,
+  "bull_puts": 2,
+  "iron_condors": 1,
+  "asym_condors": 1,
+  "pmcc_pairs": 0,
+  "decision_candidates": 4,
+  "recommendation": "NO TRADE",
+  "Kelly": "UNSIZED",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "custom",
+ "source_detail": "29 names"
+}
