@@ -63,8 +63,10 @@ stock:
 
 premarket:
   gap_min_pct: 2.0          # |gap| must be at least 2%
-  # Premarket volume is informational: the API does not provide a historical
-  # premarket-volume baseline for a time-matched relative-volume gate.
+  rel_vol_min: 1.5          # Same-time premarket RVOL gate when baseline is ready
+  rel_vol_lookback_sessions: 20
+  rel_vol_bucket_minutes: 15 # Compare snapshots from the same time bucket
+  # If fewer than 20 prior samples exist, use the gap/ATR score without a volume gate.
   price_min: 10.0
   atr_pct_min: 1.0
   atr_pct_max: 8.0

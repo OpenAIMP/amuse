@@ -245,11 +245,13 @@ for data requirements and limitations.</p>
 </section>
 <section class="card"><h2>Reading the screens — notes &amp; lessons</h2>
 <h3>Pre-market gap vs intraday momentum</h3>
-<p>The <b>pre-market gap screen</b> (9:00am ET) looks for overnight gaps ≥ 2% with
-pre-market volume ≥ 1.5× average. It only works before the open — its volume gate
-compares partial-day volume to a full-day average, which becomes nearly impossible
-by midday. An empty pre-market report after the open means the signal is stale,
-not that the market is quiet.</p>
+<p>The <b>pre-market gap screen</b> runs before 9:30am ET and qualifies gaps using
+gap size, ATR, and price. It compares premarket volume with cached snapshots from
+the same 15-minute time bucket over the prior 20 sessions when available. Until
+that baseline is ready, it shows raw shares and ranks by gap/ATR without a volume
+gate. The post-open <b>opening-range confirmation</b> uses regular-session volume
+divided by the 20-day average daily volume prorated by elapsed minutes, and
+calculates VWAP from regular-session bars only.</p>
 <p>The <b>intraday momentum screen</b> (11am, 2pm ET) uses <b>session-aware</b>
 signals, rebuilt 2026-10-12 after the first version proved too narrow:</p>
 <ul>

@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
 """
-Pre-market day-trading screener over the S&P 500 universe.
+Pre-market gap and opening-range screener over a configurable equity universe.
 
 Designed to run ~9:00am ET before the open. For each name it computes:
   gap_pct      - (current price - prior regular-session close) / prior close
-  rel_vol      - today's volume so far vs 20-day average daily volume
-  vwap_dist    - distance % from the developing session VWAP
+  mode         - premarket before 9:30 ET; opening_range at/after the open
+  rel_vol      - unavailable premarket without a time-matched history baseline;
+                 after open, regular volume vs time-prorated average daily volume
+  vwap_dist    - distance % from premarket or regular-session VWAP by mode
   atr_pct      - 14-day ATR as % of price (expected daily range)
-  range_pos    - where price sits inside the ATR-implied expected range
+  gap_atr      - absolute gap normalized by ATR percentage
 
-Candidates pass |gap| >= 2.0%, rel_vol >= 1.5, price >= $10, ATR% 1-8,
-then rank by conviction = |gap| x rel_vol. Direction is stated as a bias,
-never a prediction: gap + holding above developing VWAP -> "gap-and-go
-bias"; gap + back below VWAP -> "fade risk" (mirror for gap downs).
+Premarket mode gates on gap, price, and ATR, then ranks by |gap| / ATR%;
+same-time premarket RVOL is accumulated from cached prior-run snapshots because
+Public provides no historical premarket bars. Until 20 same-time samples exist,
+the premarket volume gate is disabled and ranking falls back to |gap| / ATR%.
+Opening-range mode gates on those metrics plus regular-session volume versus
+the elapsed-time-prorated 20-day average (1.5x minimum), then ranks by
+(|gap| / ATR%) x relative volume. Direction is a bias, never a prediction.
 
 HONEST LIMITATION: the MCP has no news/catalyst feed, so gaps driven by
 news cannot be classified -- treat every gap here as technical-only and
 check headlines before trading any candidate.
 
-The S&P 500 list is EMBEDDED and frozen (sourced 2026-10-11 from
-https://en.wikipedia.org/wiki/List_of_S%26P_500_companies); no web fetch
-happens at runtime. Dotted symbols (BRK.B, BF.B) are used verbatim --
-verified against the API.
+The default universe is NASDAQ-100; index universes are embedded and frozen
+under src/universes/. No web fetch happens at runtime.
 """
 import argparse
 import concurrent.futures
@@ -30,7 +33,7 @@ import os
 import statistics
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, time as wall_time, timedelta
 from zoneinfo import ZoneInfo
 
 
@@ -50,10 +53,16 @@ from screening_common import evaluation_record, qualification_counts, rank_quali
 
 
 def _apply_gates(path=None):
-    global GAP_MIN_PCT, PRICE_MIN
+    global GAP_MIN_PCT, PREMARKET_REL_VOL_MIN, PREMARKET_LOOKBACK, PREMARKET_BUCKET
+    global OPEN_REL_VOL_MIN, PRICE_MIN
     global ATR_PCT_MIN, ATR_PCT_MAX, TOP_N, MIN_DAILY_BARS
-    G = _gates_mod.load(path)["premarket"]
+    config = _gates_mod.load(path)
+    G = config["premarket"]
     GAP_MIN_PCT = G["gap_min_pct"]
+    PREMARKET_REL_VOL_MIN = G["rel_vol_min"]
+    PREMARKET_LOOKBACK = G["rel_vol_lookback_sessions"]
+    PREMARKET_BUCKET = G["rel_vol_bucket_minutes"]
+    OPEN_REL_VOL_MIN = config["intraday"]["rel_vol_min"]
     PRICE_MIN = G["price_min"]
     ATR_PCT_MIN, ATR_PCT_MAX = G["atr_pct_min"], G["atr_pct_max"]
     TOP_N = G["top_n"]
@@ -63,11 +72,99 @@ def _apply_gates(path=None):
 _apply_gates()
 PACE_S = 0.2             # seconds between MCP calls
 
-RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
-RUN_DATE_ET = datetime.now(ZoneInfo("America/New_York")).date()
+ET = ZoneInfo("America/New_York")
+RUN_DT_ET = datetime.now(ET)
+RUN_TS = RUN_DT_ET.isoformat(timespec="seconds")
+RUN_DATE_ET = RUN_DT_ET.date()
+MODE = "premarket" if RUN_DT_ET.time() < wall_time(9, 30) else "opening_range"
 
 
-def screen_one(symbol, quote_map=None):
+def _in_mode_window(bar, mode):
+    ts = bar["ts"]
+    ts = ts.replace(tzinfo=ET) if ts.tzinfo is None else ts.astimezone(ET)
+    if ts.date() != RUN_DATE_ET:
+        return False
+    minute = ts.hour * 60 + ts.minute
+    if mode == "premarket":
+        return 4 * 60 <= minute < 9 * 60 + 30
+    return 9 * 60 + 30 <= minute < 16 * 60
+
+
+def _time_bucket(now_et, bucket_minutes):
+    minute = now_et.hour * 60 + now_et.minute
+    return (minute // bucket_minutes) * bucket_minutes
+
+
+def _load_premarket_history(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        samples = data.get("samples") if isinstance(data, dict) else None
+        return {"version": 1, "samples": samples if isinstance(samples, dict) else {}}
+    except FileNotFoundError:
+        return {"version": 1, "samples": {}}
+    except (OSError, ValueError) as e:
+        print(f"warning: premarket volume history unavailable ({e}); "
+              "using gap/ATR mode until a baseline is available", file=sys.stderr)
+        return {"version": 1, "samples": {}}
+
+
+def _premarket_baseline(history, symbol, bucket_minute):
+    """Return (mean volume, sample count) from distinct prior days, same bucket."""
+    by_date = {}
+    for sample in history["samples"].get(symbol, []):
+        if not isinstance(sample, dict) or sample.get("bucket_minute") != bucket_minute:
+            continue
+        date = sample.get("date")
+        if not isinstance(date, str) or date >= RUN_DATE_ET.isoformat():
+            continue
+        try:
+            volume = float(sample["volume"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if volume >= 0:
+            by_date[date] = volume
+    recent = sorted(by_date.items())[-PREMARKET_LOOKBACK:]
+    baseline = (statistics.fmean(volume for _, volume in recent)
+                if recent else None)
+    return baseline, len(recent)
+
+
+def _save_premarket_history(path, history, rows):
+    """Store one cumulative-volume observation per symbol/date/time bucket."""
+    bucket = _time_bucket(RUN_DT_ET, PREMARKET_BUCKET)
+    date = RUN_DATE_ET.isoformat()
+    for row in rows:
+        symbol = row.get("symbol")
+        volume = row.get("premarket_volume")
+        if not symbol or not isinstance(volume, (int, float)) or volume < 0:
+            continue
+        samples = history["samples"].get(symbol)
+        if not isinstance(samples, list):
+            samples = []
+            history["samples"][symbol] = samples
+        samples[:] = [s for s in samples if isinstance(s, dict)
+                      and not (s.get("date") == date
+                               and s.get("bucket_minute") == bucket)]
+        samples.append({"date": date, "bucket_minute": bucket,
+                        "volume": volume})
+        samples.sort(key=lambda s: (s.get("date", ""),
+                                    s.get("bucket_minute", -1)))
+        # Bound state size while retaining enough observations per time bucket.
+        history["samples"][symbol] = samples[-(PREMARKET_LOOKBACK * 24):]
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        temp_path = path + ".tmp"
+        with open(temp_path, "w") as f:
+            json.dump(history, f, separators=(",", ":"))
+        os.replace(temp_path, path)
+    except OSError as e:
+        print(f"warning: could not save premarket volume history ({e})",
+              file=sys.stderr)
+
+
+def screen_one(symbol, quote_map=None, mode=None, premarket_baseline=None,
+               premarket_baseline_samples=0):
     """Compute all pre-market signals. Returns (result_dict, [reasons]).
 
     quote_map: optional {symbol: price} from a batched get_quotes call.
@@ -78,11 +175,18 @@ def screen_one(symbol, quote_map=None):
     categories (empty when the name qualifies). Never raises for data
     problems -- unknown metrics become rejection reasons, not crashes.
     """
+    mode = mode or MODE
     reasons = []
-    res = {"symbol": symbol, "gap_pct": None, "rel_vol": None,
+    res = {"symbol": symbol, "mode": mode, "gap_pct": None, "rel_vol": None,
+           "premarket_rel_vol": None, "regular_rel_vol": None,
+           "premarket_baseline_volume": premarket_baseline,
+           "expected_regular_volume": None,
            "vwap_dist_pct": None, "atr_pct": None, "range_atr": None,
-           "bias": None, "conviction": None, "price": None,
-           "prior_close": None, "session": None}
+           "gap_atr": None, "bias": None, "conviction": None, "price": None,
+           "prior_close": None, "session": None,
+           "premarket_volume": None, "regular_volume": None,
+           "premarket_baseline_samples": premarket_baseline_samples,
+           "volume_note": None}
 
     try:
         bars = daily_bars(symbol, ACCT)
@@ -135,27 +239,95 @@ def screen_one(symbol, quote_map=None):
         return res, [f"intraday bars failed: {e}"]
     if not ibars:
         return res, ["no intraday bars"]
-    latest_day = max(b["ts"] for b in ibars).date()
-    today_bars = [b for b in ibars if b["ts"].date() == latest_day]
-    res["session"] = latest_day.isoformat()
-    today_vol = sum(b["volume"] for b in today_bars)
-    if today_vol <= 0:
-        rel_vol = None
-        reasons.append("no reported premarket volume")
-    elif avg20_vol and avg20_vol > 0:
-        rel_vol = today_vol / avg20_vol
-    else:
-        rel_vol = None
-    res["rel_vol"] = rel_vol
-    if rel_vol is None and today_vol > 0:
-        reasons.append("volume baseline unknown")
-    # Premarket volume is a fraction of average *full-session* volume, not a
-    # time-matched relative-volume measure. Public exposes no historical
-    # premarket baseline, so this is useful context but cannot be a valid
-    # pass/fail gate before the open.
+    today_bars = [b for b in ibars
+                  if _in_mode_window(b, "premarket")
+                  or _in_mode_window(b, "opening_range")]
+    res["session"] = RUN_DATE_ET.isoformat()
+    premarket_bars = [b for b in today_bars if _in_mode_window(b, "premarket")]
+    regular_bars = [
+        b for b in today_bars
+        if _in_mode_window(b, "opening_range")
+        and (b["ts"].replace(tzinfo=ET) if b["ts"].tzinfo is None
+             else b["ts"].astimezone(ET)) <= RUN_DT_ET - timedelta(minutes=5)
+    ]
+    pm_volume = sum(b["volume"] for b in premarket_bars)
+    regular_volume = sum(b["volume"] for b in regular_bars)
+    res["premarket_volume"] = pm_volume if premarket_bars else None
+    res["regular_volume"] = regular_volume if regular_bars else None
 
-    # Developing session VWAP from today's bars (all sessions included).
-    vwap = calc_vwap(today_bars)
+    if mode == "premarket":
+        session_bars = premarket_bars
+        if not session_bars or pm_volume <= 0:
+            rel_vol = None
+            res["volume_note"] = (
+                "premarket volume unavailable; volume gate disabled, "
+                "using gap/ATR score"
+            )
+        elif premarket_baseline_samples >= PREMARKET_LOOKBACK:
+            if premarket_baseline is None or premarket_baseline <= 0:
+                rel_vol = None
+                reasons.append("premarket volume baseline unknown")
+                res["volume_note"] = "same-time premarket baseline has no positive volume"
+            else:
+                rel_vol = pm_volume / premarket_baseline
+                res["premarket_rel_vol"] = rel_vol
+                res["volume_note"] = (
+                    f"same-time premarket RVOL {rel_vol:.2f}x "
+                    f"({premarket_baseline_samples} prior sessions)"
+                )
+                if rel_vol < PREMARKET_REL_VOL_MIN:
+                    reasons.append("premarket RVOL below same-time minimum")
+        else:
+            rel_vol = None
+            baseline_note = (
+                f"same-time premarket baseline building "
+                f"({premarket_baseline_samples}/{PREMARKET_LOOKBACK} sessions)"
+            )
+            res["volume_note"] = (
+                f"{baseline_note}; volume gate disabled, using gap/ATR score"
+            )
+    else:
+        session_bars = regular_bars
+        if not session_bars:
+            reasons.append("no regular-session bars")
+        elif regular_volume <= 0:
+            reasons.append("no reported regular-session volume")
+        market_open = RUN_DT_ET.replace(hour=9, minute=30, second=0, microsecond=0)
+        elapsed_minutes = max(0.0, min(
+            (RUN_DT_ET - market_open).total_seconds() / 60.0, 390.0))
+        expected_vol = (avg20_vol * elapsed_minutes / 390.0
+                        if avg20_vol and avg20_vol > 0 else None)
+        res["expected_regular_volume"] = expected_vol
+        regular_rel_vol = (regular_volume / expected_vol
+                           if expected_vol and expected_vol > 0 else None)
+        res["regular_rel_vol"] = regular_rel_vol
+        rel_vol = regular_rel_vol
+        if rel_vol is None and session_bars and regular_volume > 0:
+            reasons.append("volume baseline unknown")
+        elif rel_vol is not None and rel_vol < OPEN_REL_VOL_MIN:
+            reasons.append("regular-session volume below time-normalized minimum")
+        pm_rel_vol = (pm_volume / premarket_baseline
+                      if (premarket_bars and pm_volume > 0
+                          and premarket_baseline_samples >= PREMARKET_LOOKBACK
+                          and premarket_baseline and premarket_baseline > 0)
+                      else None)
+        res["premarket_rel_vol"] = pm_rel_vol
+        pm_note = (f"; premarket same-time RVOL {pm_rel_vol:.2f}x"
+                   if pm_rel_vol is not None else
+                   f"; premarket RVOL baseline {premarket_baseline_samples}/"
+                   f"{PREMARKET_LOOKBACK}")
+        res["volume_note"] = (
+            (f"time-normalized regular-session RVOL {rel_vol:.2f}x"
+             if rel_vol is not None else "time-normalized regular-session RVOL unavailable")
+            + pm_note
+        )
+
+    res["rel_vol"] = rel_vol
+    if mode == "opening_range":
+        res["rel_vol_min"] = OPEN_REL_VOL_MIN
+
+    # Keep premarket and regular-session VWAP separate; never blend the two.
+    vwap = calc_vwap(session_bars)
     if vwap and vwap > 0:
         res["vwap_dist_pct"] = (price / vwap - 1) * 100.0
         above = price >= vwap
@@ -175,8 +347,9 @@ def screen_one(symbol, quote_map=None):
     else:
         res["bias"] = "fade risk (bounce)"
 
-    if rel_vol is not None:
-        res["conviction"] = abs(gap_pct) * rel_vol
+    gap_atr = abs(gap_pct) / max(atr_pct, 0.01)
+    res["gap_atr"] = gap_atr
+    res["conviction"] = gap_atr * rel_vol if rel_vol is not None else gap_atr
     return res, reasons
 
 
@@ -191,11 +364,15 @@ def main():
                     help="cap universe size (for tests)")
     ap.add_argument("--config", default=None,
                     help="path to gates.yaml (default: gates.yaml next to the script)")
+    ap.add_argument("--volume-history", default="state/premarket_volume_history.json",
+                    help="persistent snapshots for same-time premarket RVOL")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent MCP workers (default 8; 1 = sequential)")
     args = ap.parse_args()
     if args.config:
         _apply_gates(args.config)
+    volume_history = _load_premarket_history(args.volume_history)
+    premarket_bucket = _time_bucket(RUN_DT_ET, PREMARKET_BUCKET)
     if args.names:
         names = args.names.split(",")
         universe_tag = "custom"
@@ -212,19 +389,31 @@ def main():
     if args.limit:
         names = names[:args.limit]
 
-    print(f"Pre-market gap screen -- run {RUN_TS} (America/New_York)")
-    print(f"Universe: {'override' if args.names else 'Nasdaq-100 (shared default)'} "
-          f"({len(names)} names)")
+    print(f"Pre-market gap / opening-range screen ({MODE}) -- run {RUN_TS} (America/New_York)")
+    print(f"Universe: {universe_tag} ({len(names)} names)")
+    if MODE == "premarket":
+        volume_method = ("Premarket volume is shown as raw shares; same-time historical "
+                         f"RVOL uses a {PREMARKET_BUCKET}-minute time bucket and "
+                         f"{PREMARKET_LOOKBACK} prior sessions. Until available, the "
+                         "volume gate is disabled. Conviction = |gap| / ATR% when "
+                         "the baseline is unavailable.")
+    else:
+        volume_method = (f"Regular-session volume is normalized against 20-day average "
+                         f"daily volume prorated by elapsed minutes / 390; gate >= "
+                         f"{OPEN_REL_VOL_MIN}x. Conviction = (|gap| / ATR%) x RVOL.")
     print("Settings: "
-          f"|gap| >= {GAP_MIN_PCT}%, "
-          f"price >= ${PRICE_MIN:g}, ATR% {ATR_PCT_MIN}-{ATR_PCT_MAX}, "
-          f"rank by conviction = |gap| x premarket volume participation, top {TOP_N}. "
-          f"Gap = quote vs prior regular-session close; premarket volume participation "
-          f"= premarket volume so far vs 20d avg daily volume (context only; "
-          f"no historical premarket-volume baseline is available); "
-          f"VWAP = developing session VWAP. "
+          f"|gap| >= {GAP_MIN_PCT}%, price >= ${PRICE_MIN:g}, "
+          f"ATR% {ATR_PCT_MIN}-{ATR_PCT_MAX}, top {TOP_N}. "
+          f"Gap = quote vs prior regular-session close; {volume_method} "
+          f"VWAP uses {'premarket' if MODE == 'premarket' else 'regular-session'} bars. "
           "LIMITATION: no news/catalyst feed via the MCP -- gaps are "
           "technical-only; check headlines before trading any candidate.")
+    if MODE == "premarket":
+        ready = sum(1 for symbol in names
+                    if _premarket_baseline(volume_history, symbol,
+                                           premarket_bucket)[1] >= PREMARKET_LOOKBACK)
+        print(f"Premarket same-time RVOL baseline ready for {ready}/{len(names)} names; "
+              f"other names use gap/ATR fallback.")
 
     cands, rej = [], {}
     rej_notes = {}
@@ -244,7 +433,10 @@ def main():
 
     def safe_screen(sym):
         try:
-            res, reasons = screen_one(sym, quote_map)
+            baseline, baseline_samples = _premarket_baseline(
+                volume_history, sym, premarket_bucket)
+            res, reasons = screen_one(sym, quote_map, MODE, baseline,
+                                      baseline_samples)
             return (sym, res, reasons, None)
         except McpError as e:
             return (sym, None, [], f"mcp failure: {e}")
@@ -277,6 +469,16 @@ def main():
                 near.append({"symbol": sym,
                              "gap_pct": res.get("gap_pct"),
                              "rel_vol": res.get("rel_vol"),
+                             "premarket_volume": res.get("premarket_volume"),
+                             "premarket_baseline_volume": res.get("premarket_baseline_volume"),
+                             "premarket_baseline_samples": res.get("premarket_baseline_samples"),
+                             "premarket_rel_vol": res.get("premarket_rel_vol"),
+                             "regular_volume": res.get("regular_volume"),
+                             "expected_regular_volume": res.get("expected_regular_volume"),
+                             "regular_rel_vol": res.get("regular_rel_vol"),
+                             "gap_atr": res.get("gap_atr"),
+                             "conviction": res.get("conviction"),
+                             "volume_note": res.get("volume_note"),
                              "price": res.get("price"),
                              "atr_pct": res.get("atr_pct"),
                              "bias": res.get("bias"),
@@ -287,16 +489,21 @@ def main():
             time.sleep(PACE_S)
 
     cands.sort(key=lambda r: (r["conviction"] or 0), reverse=True)
+    _save_premarket_history(args.volume_history, volume_history, screened)
     top = rank_qualified(screened, cands, TOP_N, score_key="conviction")
 
     print(f"\n=== TOP {TOP_N} BY CONVICTION ({len(cands)} candidates / {len(names)} screened) ===")
-    print(f"{'sym':6} {'price':>8} {'gap%':>7} {'pmVol%':>7} {'vwapD%':>7} "
+    print(f"{'sym':6} {'price':>8} {'gap%':>7} {'gapATR':>7} {'pmVol':>9} {'rthVol':>9} "
+          f"{'RVOL':>7} {'vwapD%':>7} "
           f"{'atr%':>6} {'rngATR':>7} {'conv':>8}  bias")
     for r in top:
         vd = r["vwap_dist_pct"]
         vd_s = "   n/a" if vd is None else f"{vd:+.2f}"
+        pm_vol_s = "n/a" if r["premarket_volume"] is None else f"{r['premarket_volume']:.0f}"
+        rth_vol_s = "n/a" if r["regular_volume"] is None else f"{r['regular_volume']:.0f}"
+        rv_s = "n/a" if r["rel_vol"] is None else f"{r['rel_vol']:.2f}x"
         print(f"{r['symbol']:6} {r['price']:8.2f} {r['gap_pct']:+7.2f} "
-              f"{(r['rel_vol'] or 0) * 100:6.2f}% {vd_s:>7} "
+              f"{r['gap_atr']:7.2f} {pm_vol_s:>9} {rth_vol_s:>9} {rv_s:>7} {vd_s:>7} "
               f"{r['atr_pct']:6.2f} {r['range_atr']:+7.2f} {r['conviction']:8.1f}  "
               f"{r['bias']}")
 
@@ -307,8 +514,7 @@ def main():
     # ---- plain-English readout ----
     print("\nREADOUT:")
     if not cands:
-        print("- No names met the pre-market gates. Tape is quiet or the "
-              "gates are too tight for this morning.")
+        print(f"- No names met the {MODE.replace('_', ' ')} gates.")
         if near:
             print("- Closest near-misses:")
             for n in near[:5]:
@@ -316,11 +522,22 @@ def main():
                 rel_vol = n.get("rel_vol")
                 gap_text = (f"{gap_pct:+.2f}%" if isinstance(gap_pct, (int, float))
                             else "n/a")
-                volume_text = (f"{rel_vol * 100:.2f}% of avg daily volume"
-                               if isinstance(rel_vol, (int, float))
-                               else "n/a")
+                volume_text = (f"{rel_vol:.2f}x RVOL"
+                               if isinstance(rel_vol, (int, float)) else "RVOL n/a")
+                pm_rel_vol = n.get("premarket_rel_vol")
+                rth_rel_vol = n.get("regular_rel_vol")
+                mode_volume_text = (
+                    f"same-time premarket RVOL {pm_rel_vol:.2f}x"
+                    if MODE == "premarket" and isinstance(pm_rel_vol, (int, float)
+                    ) else
+                    f"time-normalized RTH RVOL {rth_rel_vol:.2f}x"
+                    if MODE == "opening_range" and isinstance(rth_rel_vol, (int, float)
+                    ) else volume_text
+                )
                 print(f"  {n['symbol']}: gap {gap_text}, "
-                      f"premarket volume {volume_text} — missed: "
+                      f"premarket {n.get('premarket_volume') or 0:.0f} shares, "
+                      f"regular {n.get('regular_volume') or 0:.0f} shares, "
+                      f"{n.get('volume_note') or mode_volume_text} — missed: "
                       f"{'; '.join(n['missed'])}")
     else:
         ups = [r for r in cands if r["gap_pct"] > 0]
@@ -329,9 +546,11 @@ def main():
         fade = [r for r in top if "fade risk" in (r["bias"] or "")]
         if gng:
             g = gng[0]
+            rv_desc = (g.get("volume_note") or
+                       (f"{g['rel_vol']:.2f}x RVOL" if g.get("rel_vol") is not None
+                        else f"{g.get('premarket_volume') or 0:.0f} premarket shares; RVOL unavailable"))
             print(f"- Strongest gap-and-go: {g['symbol']} "
-                  f"({g['gap_pct']:+.1f}% gap, "
-                  f"{g['rel_vol'] * 100:.2f}% of avg daily volume, "
+                  f"({g['gap_pct']:+.1f}% gap, {rv_desc}, "
                   f"{g['vwap_dist_pct']:+.2f}% vs VWAP).")
         if fade:
             f = fade[0]
@@ -354,16 +573,23 @@ def main():
     print("Bias is not a prediction -- check headlines, then manage the open.")
 
     if args.json_out:
-        # Sort near-misses by conviction proxy (|gap| x rel_vol), top 5
+        # Keep the closest near-misses using the same score as candidates.
         near_sorted = sorted(
             near,
-            key=lambda n: abs(n["gap_pct"] or 0) * (n["rel_vol"] or 0),
+            key=lambda n: n.get("conviction") or 0,
             reverse=True)[:5]
         with open(args.json_out, "w") as f:
-            json.dump({"run": RUN_TS, "universe": len(names),
+            volume_method = ("premarket_same_time_bucket_baseline_with_gap_atr_fallback"
+                             if MODE == "premarket" else
+                             "regular_session_time_prorated_daily_average")
+            json.dump({"run": RUN_TS, "mode": MODE, "universe": len(names),
                        "settings": {"gap_min_pct": GAP_MIN_PCT,
-                                    "volume_role": "context_only",
-                                    "volume_metric": "premarket_volume_pct_of_avg_daily",
+                                    "volume_method": volume_method,
+                                    "rel_vol_min": (OPEN_REL_VOL_MIN
+                                                    if MODE == "opening_range"
+                                                    else PREMARKET_REL_VOL_MIN),
+                                    "premarket_rel_vol_lookback_sessions": PREMARKET_LOOKBACK,
+                                    "premarket_rel_vol_bucket_minutes": PREMARKET_BUCKET,
                                     "price_min": PRICE_MIN,
                                     "atr_pct_min": ATR_PCT_MIN,
                                     "atr_pct_max": ATR_PCT_MAX},
