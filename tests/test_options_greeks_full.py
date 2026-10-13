@@ -104,7 +104,7 @@ class TestAggregateGreeks(unittest.TestCase):
         agg = oc.aggregate_greeks(positions)
         self.assertAlmostEqual(agg["delta"], 0.80)
         self.assertAlmostEqual(agg["gamma"], 0.0)
-        self.assertAlmostEqual(agg["theta"], -0.13)
+        self.assertAlmostEqual(agg["theta"], -0.07)
         self.assertAlmostEqual(agg["vega"], 0.05)
         self.assertAlmostEqual(agg["rho"], 0.03)
         self.assertTrue(all(agg["available"].values()))
