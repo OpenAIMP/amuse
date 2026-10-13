@@ -1,0 +1,117 @@
+name: Leveraged-ETF screen
+
+# Screens the lev_etf universe (29 leveraged ETFs, issue #32) through the
+# stock screener (regime) and spread screener (income structures).
+# Runs weekdays at 10:30am ET, after the open settles — leveraged ETFs are
+# short-term spread vehicles (21-60 DTE) that need live quotes; nightly or
+# weekend runs would return empty on stale chains.
+# Independent of master.yml.
+# NOTE: the GitHub App lacks the `workflows` permission, so this file must be
+# created/edited via the GitHub web UI -- it cannot be pushed through the API.
+on:
+  schedule:
+    # Weekdays 10:30am ET (14:30 UTC; drifts an hour with DST).
+    - cron: "30 14 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      names:
+        description: "Comma-separated watchlist override (blank = lev_etf universe)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  leverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore prior watch state
+        uses: actions/cache/restore@v4
+        with:
+          path: state/
+          key: screen-state
+          restore-keys: |
+            screen-state-
+
+      - name: Load universe
+        run: |
+          if [ -n "${{ inputs.names }}" ]; then
+            echo "ARGS=--names ${{ inputs.names }}" >> $GITHUB_ENV
+            echo "SRC=custom" >> $GITHUB_ENV
+            echo "DETAIL=$(echo "${{ inputs.names }}" | tr ',' '\n' | grep -c . | tr -d ' ') names" >> $GITHUB_ENV
+          else
+            echo "ARGS=--universe lev_etf" >> $GITHUB_ENV
+            echo "SRC=lev_etf" >> $GITHUB_ENV
+            echo "DETAIL=$(PYTHONPATH=src python3 -c "import universes; print(str(len(universes.UNIVERSES['lev_etf']))+' names')")" >> $GITHUB_ENV
+          fi
+          chmod +x bin/public-mcp
+          mkdir -p state reports
+
+      - name: Stock screener (regime)
+        env:
+PUBLIC_API_KEY: <redacted>
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          python3 src/stock_screener.py $ARGS \
+            --json-out reports/stock-levetf.json | tee reports/stock-levetf.txt
+
+      - name: Spread screener (income structures)
+        env:
+PUBLIC_API_KEY: <redacted>
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+        run: |
+          python3 src/spread_screener.py $ARGS \
+            --iv-history state/iv_history.jsonl \
+            --json-out reports/spread-levetf.json | tee reports/spread-levetf.txt
+
+      - name: Save watch state
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: state/
+          key: screen-state-${{ github.run_id }}
+
+      - name: Upload run outputs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: leverage-screen-${{ github.run_id }}
+          path: reports/
+          retention-days: 90
+
+      - name: Render leverage report
+        if: always()
+        run: |
+          mkdir -p docs/reports
+          STAMP=$(date -u +%F-%H%M)
+          echo "STAMP=$STAMP" >> $GITHUB_ENV
+          python3 src/render_report.py --stock reports/stock-levetf.json \
+            --spreads reports/spread-levetf.json \
+            --report-id leverage-$SRC-$STAMP --source "$SRC" --source-detail "$DETAIL"
+          python3 src/render_hub.py
+          ls docs/index.html
+
+      - name: Publish dashboard to GitHub Pages
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- bin/public-mcp 2>/dev/null || true
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: update leverage screen (#37)"
+          git pull --rebase --strategy-option=theirs
+          python3 src/render_hub.py
+          git add docs/
+          git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
+          git push
