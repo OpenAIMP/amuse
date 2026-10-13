@@ -37,6 +37,7 @@ from indicators import atr_pct, bollinger, anchored_vwap
 from indicators import find_pivots
 from indicators import gap_pct as calc_gap_pct
 from indicators import vwap as calc_vwap
+from indicators import adx, stochastic, volume_confirmations
 
 
 def _apply_gates(path=None):
@@ -329,6 +330,9 @@ def evaluate(sym, bars):
                                           MACD_SIGNAL)
     if macd_hist is None:
         flags.append("macd unknown")
+    adx_read = adx(bars)
+    stoch_read = stochastic(bars)
+    volume_read = volume_confirmations(bars)
 
     def ret(n):
         return (price / closes[-n - 1] - 1) * 100 if len(closes) > n else 0.0
@@ -358,6 +362,17 @@ def evaluate(sym, bars):
             "line": r2(macd_line),
             "signal": r2(macd_sig),
             "hist": r2(macd_hist),
+        },
+        # Supplemental confirmation context; these readings do not affect gates or score.
+        "confirmations": {
+            "adx14": ({k: r1(v) for k, v in adx_read.items()}
+                       if adx_read else None),
+            "stochastic_14_3": ({k: r1(v) for k, v in stoch_read.items()}
+                                 if stoch_read else None),
+            "volume": ({"mfi14": r1(volume_read["mfi"]),
+                        "obv_direction_20d": volume_read["obv_direction"],
+                        "ad_direction_20d": volume_read["ad_direction"]}
+                       if volume_read else None),
         },
     }
     # ---- issue #18 readouts ----

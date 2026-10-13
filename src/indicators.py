@@ -50,6 +50,88 @@ def macd(closes, fast=12, slow=26, signal=9):
     return macd_line, sig, macd_line - sig
 
 
+def adx(bars, period=14):
+    """Wilder ADX and +DI/-DI for OHLCV bar dicts; ADX is strength, not direction."""
+    if len(bars) < 2 * period + 1:
+        return None
+    tr, plus_dm, minus_dm = [], [], []
+    for prev, cur in zip(bars, bars[1:]):
+        up = cur["high"] - prev["high"]
+        down = prev["low"] - cur["low"]
+        tr.append(max(cur["high"] - cur["low"],
+                      abs(cur["high"] - prev["close"]),
+                      abs(cur["low"] - prev["close"])))
+        plus_dm.append(up if up > down and up > 0 else 0.0)
+        minus_dm.append(down if down > up and down > 0 else 0.0)
+
+    def smooth(values):
+        current = sum(values[:period])
+        result = [current]
+        for value in values[period:]:
+            current = current - current / period + value
+            result.append(current)
+        return result
+
+    tr_s, plus_s, minus_s = smooth(tr), smooth(plus_dm), smooth(minus_dm)
+    dx = []
+    for t, p, m in zip(tr_s, plus_s, minus_s):
+        pdi, mdi = (100 * p / t, 100 * m / t) if t else (0.0, 0.0)
+        dx.append(100 * abs(pdi - mdi) / (pdi + mdi) if pdi + mdi else 0.0)
+    if len(dx) < period:
+        return None
+    value = sum(dx[:period]) / period
+    for item in dx[period:]:
+        value = (value * (period - 1) + item) / period
+    t, p, m = tr_s[-1], plus_s[-1], minus_s[-1]
+    return {"adx": value, "plus_di": 100 * p / t if t else 0.0,
+            "minus_di": 100 * m / t if t else 0.0}
+
+
+def stochastic(bars, period=14, smooth=3):
+    """Slow Stochastic %K/%D from daily OHLC bars."""
+    if len(bars) < period + smooth - 1:
+        return None
+    ks = []
+    for end in range(len(bars) - smooth + 1, len(bars) + 1):
+        window = bars[end - period:end]
+        low = min(b["low"] for b in window)
+        high = max(b["high"] for b in window)
+        close = bars[end - 1]["close"]
+        ks.append(100 * (close - low) / (high - low) if high > low else 50.0)
+    return {"k": ks[-1], "d": sum(ks[-smooth:]) / smooth}
+
+
+def volume_confirmations(bars, period=14, lookback=20):
+    """MFI(14) and 20-day OBV / Accumulation-Distribution directions."""
+    if len(bars) < max(period + 1, lookback + 1):
+        return None
+    obv = [0.0]
+    ad = []
+    positive, negative = [], []
+    for prev, cur in zip(bars, bars[1:]):
+        close, high, low, volume = (cur["close"], cur["high"],
+                                    cur["low"], cur["volume"])
+        obv.append(obv[-1] + (volume if close > prev["close"]
+                              else -volume if close < prev["close"] else 0.0))
+        ad.append(((2 * close - high - low) / (high - low) * volume)
+                  if high > low else 0.0)
+        typical = (close + high + low) / 3.0
+        prev_typical = (prev["close"] + prev["high"] + prev["low"]) / 3.0
+        (positive if typical > prev_typical else negative).append(typical * volume)
+    pos, neg = sum(positive[-period:]), sum(negative[-period:])
+    mfi = 100.0 if neg == 0 and pos else 50.0 if neg == 0 else 100 - 100 / (1 + pos / neg)
+    ad_line = []
+    for flow in ad:
+        ad_line.append(flow + (ad_line[-1] if ad_line else 0.0))
+
+    def direction(series):
+        old, new = series[-lookback - 1], series[-1]
+        return "rising" if new > old else "falling" if new < old else "flat"
+
+    return {"mfi": mfi, "obv_direction": direction(obv),
+            "ad_direction": direction(ad_line)}
+
+
 def sma_cross(closes, fast_n, slow_n, lookback):
     """Detect SMA fast/slow cross within the last `lookback` sessions.
 
