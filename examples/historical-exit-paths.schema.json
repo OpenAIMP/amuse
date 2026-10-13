@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Amuse historical bull-put exit mark paths",
+  "description": "Local, source-attributed observations for replaying the configured exit rules. This schema contains no market data or account positions.",
+  "type": "object",
+  "required": ["schema_version", "source", "positions"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source": {"type": "string", "minLength": 1},
+    "positions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/position"}
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp with explicit UTC offset."
+    },
+    "position": {
+      "type": "object",
+      "required": ["id", "strategy", "entry_asof", "entry_credit", "contracts", "multiplier", "fees_per_contract_round_trip", "slippage_per_contract_round_trip", "legs", "observations"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "underlying": {"type": "string", "minLength": 1},
+        "strategy": {"const": "bull_put_spread"},
+        "entry_asof": {"$ref": "#/$defs/timestamp"},
+        "entry_credit": {"type": "number", "exclusiveMinimum": 0, "description": "Per-share credit actually recorded at entry."},
+        "contracts": {"type": "integer", "minimum": 1},
+        "multiplier": {"type": "integer", "minimum": 1, "default": 100},
+        "fees_per_contract_round_trip": {"type": "number", "minimum": 0, "description": "Explicit dollar estimate per spread contract."},
+        "slippage_per_contract_round_trip": {"type": "number", "minimum": 0, "description": "Explicit dollar estimate per spread contract."},
+        "legs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+          "required": ["osi", "side", "type", "strike", "expiry"],
+            "properties": {
+              "osi": {"type": "string", "pattern": "^.+[0-9]{6}[CP][0-9]{8}$"},
+              "side": {"enum": ["short", "long"]},
+              "type": {"const": "put"},
+              "strike": {"type": "number", "exclusiveMinimum": 0},
+              "expiry": {"type": "string", "format": "date"}
+            }
+          }
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/observation"}
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "required": ["asof", "short_quote_asof", "long_quote_asof", "underlying_asof", "short_ask", "long_bid", "underlying", "source"],
+      "properties": {
+        "asof": {"$ref": "#/$defs/timestamp"},
+        "short_quote_asof": {"$ref": "#/$defs/timestamp"},
+        "long_quote_asof": {"$ref": "#/$defs/timestamp"},
+        "underlying_asof": {"$ref": "#/$defs/timestamp"},
+        "short_ask": {"type": "number", "minimum": 0, "description": "Observed ask for the short put, per share."},
+        "long_bid": {"type": "number", "minimum": 0, "description": "Observed bid for the long put, per share."},
+        "underlying": {"type": "number", "exclusiveMinimum": 0},
+        "source": {"type": "string", "minLength": 1, "description": "Provider/file provenance for this observation."}
+      }
+    }
+  }
+}

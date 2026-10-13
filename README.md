@@ -491,6 +491,31 @@ Data fields and sources: [Public real-time quotes](https://public.com/api/docs/r
 [Public option chain](https://public.com/api/docs/resources/market-data/get-option-chain),
 and the [Treasury daily yield XML feed](https://home.treasury.gov/treasury-daily-interest-rate-xml-feed).
 
+### Historical exit-policy evaluation
+
+The local evaluator replays the configured bull-put exits over a user-supplied
+historical dataset. It does not download historic options data or create
+synthetic marks. Use the schema at
+[`examples/historical-exit-paths.schema.json`](examples/historical-exit-paths.schema.json)
+and run:
+
+```sh
+bash bin/evaluate-historical-exits.sh historical-paths.json
+```
+
+Each position needs exact OSI put identifiers, entry credit/time, its mark
+observations' short-leg asks, long-leg bids, underlying prices, native source
+timestamps, and explicit round-trip fee/slippage assumptions. By default, all
+three quote timestamps must be within five minutes of the observation and
+observation gaps cannot exceed 72 hours. The report separates scored,
+incomplete, and invalid paths and reports costs, outcome statistics, and
+realized mark-P&L drawdown. Mark-based exits are not fills; no-triggers and
+unobserved intervals remain unresolved. Assignment uncertainty is counted and
+disclosed, but actual early assignment is not modeled. No profitability
+conclusion should be drawn from a small or incomplete sample. Inputs and
+reports remain under the ignored local `reports/` directory and must not be
+published to GitHub Pages.
+
 Marks and stress results are Black–Scholes model estimates, not executable
 quotes. Missing market inputs are reported and the result is marked incomplete.
 The daily HTML report displays the six-step recommendation and expected move.
