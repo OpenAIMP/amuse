@@ -1,7 +1,7 @@
 # Options framework implementation status
 
 **Reviewed:** 2026-10-13
-**Repository revision:** PR #40 (`codex/options-decision-engine`; pending merge)
+**Repository revision:** `main` at `c268d8d` (PR #40 merged)
 
 The complete framework with section-by-section status, rationale, and
 prioritized remaining work is in the
@@ -15,8 +15,9 @@ This is a qualitative judgment about breadth and integration, not a count of
 checklist items. Core screening is strongest; pricing utilities, portfolio
 risk calculations, and an advisory decision engine now exist, while live data
 integration, calibration, and out-of-sample profitability evidence remain
-limited or absent. PR #40 is pending merge, so this is the projected state
-after that change lands, not a claim about current `main`.
+limited or absent. This describes current `main` after PR #40 merged. The
+percentage remains a qualitative breadth/integration estimate, not a return
+measurement.
 
 | Framework area | Status | What the repository supports |
 |---|---|---|
