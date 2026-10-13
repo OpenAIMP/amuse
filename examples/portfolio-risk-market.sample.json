@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "source": "replace-with-provider-or-manual-source",
+  "asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+  "risk_free_rate": 0.04,
+  "risk_free_rate_asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+  "underlyings": {
+    "AAPL": {
+      "spot": 225.0,
+      "spot_asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+      "iv": 0.28,
+      "iv_asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+      "dividend_yield": 0.005
+    }
+  }
+}

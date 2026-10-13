@@ -10,17 +10,25 @@ Stdlib only. The ledger is a plain dict, serializable to JSON.
 
 import json
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 
 MULT = 100  # shares per contract
 
 
 def new_ledger():
-    return {"positions": []}
+    return {"schema_version": 1, "updated_at": _now_utc(), "positions": []}
 
 
 def _today():
     return date.today().isoformat()
+
+
+def _now_utc():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _touch(ledger):
+    ledger["updated_at"] = _now_utc()
 
 
 def open_position(ledger, underlying, strategy, legs, credit, contracts,
@@ -51,6 +59,7 @@ def open_position(ledger, underlying, strategy, legs, credit, contracts,
         "exit": None,
     }
     ledger["positions"].append(pos)
+    _touch(ledger)
     return pos
 
 
@@ -77,6 +86,7 @@ def close_position(ledger, pos_id, close_cost, reason, closed=None, note=""):
         "realized_pnl": realized,
         "note": note,
     }
+    _touch(ledger)
     return pos, realized
 
 
