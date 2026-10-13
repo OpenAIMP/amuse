@@ -92,7 +92,7 @@ class TestBatching(unittest.TestCase):
         self.assertEqual(self.fake.count("get_quotes"), 0)
         self.assertAlmostEqual(res["price"], 103.0)
         # gap = 103/100 - 1 = 3% >= 2% min; rel vol = 1.2M/1M = 1.2 < 1.5
-        self.assertIn("volume too thin", reasons)
+        self.assertIn("regular-session volume below time-normalized minimum", reasons)
 
     def test_screen_one_falls_back_without_map(self):
         res, reasons = dt.screen_one("AAA", None)
