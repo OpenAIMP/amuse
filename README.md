@@ -13,9 +13,9 @@ Screen → Regime → Timing → Strikes → Size → Preflight
 
 | Stage | Question it answers | Where it lives in the code |
 |---|---|---|
-| **Screen** | Which names are worth looking at? | `stock_screener.py`, `spread_screener.py`, `daytrade_screen.py`, `pmcc_quality.py` — run over `watchlist.txt` or `--universe` |
+| **Screen** | Which names are worth looking at? | `stock_screener.py`, `spread_screener.py`, `premarket_screen.py`, `intraday_screen.py`, `pmcc_quality.py` — run over `watchlist.txt` or `--universe` |
 | **Regime** | Bullish, bearish, or neutral — which strategy family? | Trend-structure, SMA50/200, and anchored-VWAP gates in `stock_screener.py`; the readout's regime census |
-| **Timing** | Is *now* a good entry, or wait? | `%B`, RSI14, and squeeze gates in `stock_screener.py`; gap, relative volume, and developing VWAP in `daytrade_screen.py` |
+| **Timing** | Is *now* a good entry, or wait? | `%B`, RSI14, and squeeze gates in `stock_screener.py`; gap, relative volume, and developing VWAP in `premarket_screen.py`; opening-range breakouts and session VWAP in `intraday_screen.py` |
 | **Strikes** | Where does the structure go? | Fib/pivot levels reported by `stock_screener.py`; delta-based short-strike selection in `spread_screener.py` (0.10–0.20Δ) and `pmcc_quality.py` (0.15–0.35Δ) |
 | **Size** | How much can this lose? | Every structure reports max loss (`spread_screener.py`, `pmcc_quality.py`); you apply the 1–2% rule |
 | **Preflight** | Anything that kills the trade? | Earnings/event gates fail closed in the screeners; buying power, fees, and your confirmation are human |
@@ -30,11 +30,11 @@ One matrix for the whole system — which stages each workflow implements, and
 which files implement them. (`render_report.py` / `render_hub.py` are
 pipeline, not loop stages: they publish whatever the loop produced.)
 
-| Stage | `daily-watch` | `daytrade-screen` | `monthly-screen` |
+| Stage | `daily-watch` | `premarket-screen` / `intraday-screen` | `monthly-screen` |
 |---|---|---|---|
-| **Screen** | `stock_screener`, `spread_screener` | `daytrade_screen` | `pmcc_quality` |
+| **Screen** | `stock_screener`, `spread_screener` | `premarket_screen`, `intraday_screen` | `pmcc_quality` |
 | **Regime** | `stock_screener` — trend / SMA / anchored-VWAP gates, regime census | bias label replaces the regime read | pair-universe selection in `pmcc_quality` |
-| **Timing** | `stock_screener` — %B / RSI14 / squeeze | `daytrade_screen` — gap / rel-vol / developing VWAP | — |
+| **Timing** | `stock_screener` — %B / RSI14 / squeeze | `premarket_screen` — gap / rel-vol / developing VWAP; `intraday_screen` — ORB / session VWAP | — |
 | **Strikes** | `spread_screener` — 0.10–0.20Δ short strikes | — | `pmcc_quality` — 0.15–0.35Δ short calls |
 | **Size** | max loss per structure reported — you apply the 1–2% rule | — | max loss per pair reported — you apply the 1–2% rule |
 | **Preflight** | event gates fail closed — you confirm | — | event gates fail closed — you confirm |
@@ -72,7 +72,7 @@ Indicators → Patterns → Strategies → Operating loop → Workflows
 - **The operating loop** sequences the decision: Screen finds, Regime +
   Timing qualify, Strikes place, Size + Preflight protect.
 - **The workflows** run the loop on three clocks: intraday
-  (`daytrade-screen`), daily (`daily-watch`), monthly (`monthly-screen`).
+  (`premarket-screen`, `intraday-screen`), daily (`daily-watch`), monthly (`monthly-screen`).
 
 **Worked example — XOM, 2026-10-11.** Indicators: RSI 64, %B 0.96 (near the
 top of the band, not over), 16.8% above anchored VWAP, mixed swing structure.
@@ -82,69 +82,8 @@ directional income. Loop: Screen surfaced it → Regime said neutral → Timing
 said okay → Strikes at 155/150P × 185/190C → Size and Preflight yours.
 Workflow: `daily-watch` priced both; the archive keeps the report.
 
-## How this helps make money
-
-The screeners don't generate profit — they enforce the process that does.
-Premium-selling P&L is arithmetic: `win rate × average credit − loss rate ×
-average loss`. The system attacks both sides:
-
-- **Fewer losers.** The regime filter keeps you from selling puts into
-  downtrends; the %B gate keeps you from chasing extended names; the event
-  gate keeps earnings from detonating a short-premium position. Most retail
-  options losses are unforced errors — the screeners veto them before sizing
-  is even discussed.
-- **Bigger, safer credits.** Conservative fills (short bid minus long ask, never
-  midpoints) mean the credits you see are collectible. Strike placement behind
-  Fib/pivot structure means the market has to break something real before your
-  short strike is threatened. Defined risk on every structure means no single
-  trade can breach the 1–2% rule.
-- **Repetition.** The edge compounds by running daily: weekday screens, the
-  PMCC exception watch, the pre-market scan. Small high-probability credits,
-  collected consistently, logged in the journal, reviewed monthly.
-
-What the system never does: place orders, predict direction, or promise
-profit. A quiet screen (no qualifiers) is a correct output, not a malfunction
-— cash is a position.
-
-## Why and how to use it
-
-**Why.** You want a rules-based way to find defined-risk options income
-without staring at screens or trading on gut feel. The system does the heavy
-analytical work on schedule — screening hundreds of names, pricing structures
-with honest fills, and telling you in plain English what passed and what
-didn't — so your job narrows to judgment: selection, sizing, confirmation.
-
-**How, day to day.**
-
-1. Morning: open the archive homepage, read the latest daily report. The
-   readout gives you the regime and the top structures in one pass.
-2. Shortlist where the two tables agree: a high-regime-score name carrying a
-   high-return-on-risk structure.
-3. Apply the 1–2% sizing rule to the reported max loss, check the event
-   flags, confirm buying power — then it's your call.
-4. Monthly: read the PMCC report for longer-horizon positions; log every
-   decision in the Trading Workbook.
-
-**Questions it answers.**
-
-- Which names have a regime that supports selling premium?
-- What defined-risk structures are priced right now — credit, max loss,
-  breakeven?
-- What's moving abnormally this morning?
-- Which LEAPS pairs are worth holding for months?
-- What changed since yesterday?
-- Why did *nothing* qualify today?
-
-**Questions it doesn't answer.**
-
-- Will this trade make money? Probabilities are market-implied, not forecasts.
-- How many contracts? `ledger.py` sizes from the 2%-max-loss rule — but you
-  still confirm before anything is real.
-- When do I exit? Bull put spreads now have a defined exit policy (below);
-  other structures still need theirs.
-- Is my book within risk limits? `ledger.py` enforces the 35% heat cap on
-  paper positions; live-book tracking is still on you.
-- What will the market do tomorrow? Nothing here predicts — ever.
+## Where the strategy lives
+> Strategy, P&L philosophy, and operating discipline live in the [Trading Playbook](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N) (Google Doc). This README documents the system technically: code, gates, workflows, and data.
 
 ## Repository layout
 
@@ -169,7 +108,7 @@ amuse/
 ```bash
 export PUBLIC_API_KEY=...
 bash bin/run-local.sh test      # unit suite
-bash bin/run-local.sh daytrade  # pre-market screen + report
+bash bin/run-local.sh premarket # pre-market screen + report
 bash bin/run-local.sh daily     # stock + spread screens + report
 bash bin/run-local.sh monthly   # PMCC screen + report
 bash bin/run-local.sh all       # everything, then rebuild the hub
@@ -234,70 +173,21 @@ The workflow step (added to daily-watch.yml before rendering):
 `docs/news.json` is committed so Pages always has a fallback; `reports/news.json`
 is a build artifact like the other screen outputs.
 
-## How value is created
+## What the system does
 
-### Concepts
-
-The domain ideas the system is built on. Each one is implemented somewhere,
-not just described:
-
-- **Defined risk** — every structure has a known max loss before it is shown
-  to you. No naked legs, ever.
-- **Net credit** — premium collected up front; the trade wins if the structure
-  decays or the underlying stays put.
-- **Delta as market-implied probability** — short strikes at 0.10–0.20Δ use
-  the market's estimate, never a forecast.
-- **Return on risk** — credit ÷ max loss; how structures are ranked.
-- **Friction** — (bid/ask spreads) ÷ credit. Wide markets eat the edge, so it
-  is capped at 3×.
-- **Regime / timing / strikes** — the operating loop's separation of concerns:
-  where it is safe, when to enter, how to structure.
-- **Expectancy** — win rate × average win − loss rate × average loss, net of
-  fees. The only number that decides whether this is income-generating
-  (issue #12).
-- **Heat** — total max loss across open positions, capped at 35% of account.
-
-### Capabilities
-
-What the system does, end to end:
+End-to-end capabilities (each implemented in code, not just described):
 
 1. Screens stocks for regime and timing (RSI, %B, VWAP, ATR, pivots).
 2. Prices defined-risk income structures with conservative fills.
-3. Scans pre-market for day-trade momentum setups.
+3. Scans pre-market for gap momentum setups and intraday for opening-range breakouts.
 4. Ranks PMCC pairs monthly and watches them daily for exceptions.
 5. Applies exit rules (profit / stop / time / no-assignment) to open positions.
 6. Tracks every paper position in a ledger with realized P&L net of fees.
-7. Sizes positions from the 2% rule and enforces the heat cap.
+7. Sizes positions from the risk rule and enforces the heat cap.
 8. Publishes every run to a permanent, timestamped archive.
 
-### Competencies — what it is good at
-
-- **Veto-based selection.** Most of the value comes from rejecting bad trades
-  (downtrend, extended, earnings inside the window), not from picking winners.
-- **Honest fills.** Short-bid-minus-long-ask: the credits shown are collectible.
-- **Reproducibility.** Every threshold in `gates.yaml`; every run archived with
-  its inputs. Any result can be re-derived.
-- **No prediction.** Bias labels and probabilities are market-implied; the
-  system never forecasts direction.
-
-### Value proposition
-
-For a trader learning to run an options book like a portfolio manager: it
-replaces gut feel with a repeatable daily process — screen, filter, price,
-size, exit, review — where every step is defined, tested, and logged. The
-product is not picks; it is the discipline.
-
-### Value chain
-
-Raw market data → **screen** (find) → **regime/timing gates** (qualify) →
-**structure pricing** (price) → **exit policy** (manage) → **ledger**
-(track) → **sizing/heat** (protect) → **archive/review** (learn).
-
-Each stage adds value only if the previous one held: pricing means nothing
-without the regime veto; exits mean nothing without the ledger measuring
-them; the ledger means nothing without out-of-sample proof (issue #11). The
-chain is only as strong as its weakest documented link — which is why code,
-config, docs, and tests change together.
+Concepts, competencies, the value proposition, and the value chain are documented
+in the Trading Playbook (Sections 19–20).
 
 ## Screeners
 
@@ -305,7 +195,8 @@ config, docs, and tests change together.
 |---|---|---|
 | `stock_screener.py` | Technical screen with the indicator pack (below). Composite score 0–40 = base 0–30 + signals 0–10. Ends with a plain-English `READOUT` — the leader and why, rejections grouped by theme, regime census. | `daily-watch` |
 | `spread_screener.py` | Income-structure selector: bull put spreads, iron condors, and defined-risk Jade Lizards (bull put spread + far-OTM call wing for bullish regimes). 21–60 DTE, short 0.10–0.20Δ, conservative **short-bid minus long-ask** fills, width auto-scales to price (`min(5, max(1, round(spot/25)))`). Ranked by return-on-risk, with its own readout. | `daily-watch` |
-| `daytrade_screen.py` | Pre-market day-trading screen over the S&P 500: gap %, relative volume, developing VWAP distance, ATR range position. Bias stated as bias ("gap-and-go" / "fade risk"), never prediction. | `daytrade-screen` |
+| `premarket_screen.py` | Pre-market gap screen: gap %, time-prorated relative volume, developing VWAP distance, ATR range position. Bias stated as bias ("gap-and-go" / "fade risk"), never prediction. | `premarket-screen` |
+| `intraday_screen.py` | Intraday 15-min opening-range breakouts, session-VWAP reclaim/loss, time-prorated relative volume, conviction ranking, near-miss diagnostics. | `intraday-screen` |
 | `pmcc_quality.py` | PMCC pair-quality: 0.80–0.95Δ LEAPS (270–800 DTE) × 0.15–0.35Δ short calls (21–60 DTE), evaluated as pairs with liquidity, friction, capital, and earnings gates. | `monthly-screen` |
 | `pmcc_watch.py` | Daily exception monitor: diffs today's screen vs cached state, reports only new qualifiers, dropouts, or 1.5+ pt yield shifts. | `daily-watch` |
 | `render_report.py` | Renders dated report pages (plus `.meta.json` sidecars) from screener JSONs. | all three |
@@ -318,7 +209,7 @@ config, docs, and tests change together.
 scheduled case, and a full multi-universe sweep in CI would be hours of API
 calls. `semis.py` is kept for reference only.
 
-### The screeners compared — what each one does for your P&L
+### The screeners compared
 
 | | Stock screen | Day-trade screen | Monthly PMCC screen |
 |---|---|---|---|
@@ -327,15 +218,14 @@ calls. `semis.py` is kept for reference only.
 | **Data** | Daily bars, a year of history | Intraday bars, today's session | Option chains + Greeks |
 | **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend | Gap %, rel volume, developing VWAP, ATR range | Delta gates, liquidity, friction, capital, earnings |
 | **Output** | Ranked 0–40 + readout narrative | Ranked by gap × volume, gap-and-go / fade bias | Pairs ranked by 30-day premium-to-debit |
-| **How it makes money** | Avoids losers: premium only where regime agrees — the veto list is worth as much as the leaderboard | Catches abnormal morning moves for same-day trades | Durable income: a few pairs generating monthly premium with less daily attention |
 
 **Strategies vs patterns, per screener.** `spread_screener.py` implements the
 three income *strategies* (bull put spreads, iron condors, Jade Lizards) —
 those are the actual trade structures. `pmcc_quality.py` implements the PMCC
 *strategy*. `stock_screener.py` implements no strategy; it implements
 *patterns* (trend, squeeze, VWAP positioning) that classify regime and timing.
-`daytrade_screen.py` implements one intraday *pattern* (gap + volume + VWAP →
-momentum bias). `pmcc_watch.py` implements monitoring, not a strategy.
+`premarket_screen.py` implements one pre-market *pattern* (gap + volume + VWAP →
+momentum bias); `intraday_screen.py` implements the intraday ORB pattern. `pmcc_watch.py` implements monitoring, not a strategy.
 
 **How they combine into a daily pick.** The stock screen answers *where* it's
 safe to sell premium; the spread screen answers *what* to sell (priced
@@ -353,7 +243,7 @@ made by you, reading both tables — see the overlap note below.
   pattern — categorized rejections, conservative fills, plain-English readout,
   JSON output — but each file implements it independently.
 - **VWAP and ATR are computed twice.** `stock_screener` (session VWAP from
-  15-minute bars, ATR14% from daily bars) and `daytrade_screen` (developing
+  15-minute bars, ATR14% from daily bars), `premarket_screen` (developing
   VWAP, intraday ATR) use the same indicators on different bar sets for
   different horizons — intentionally not deduplicated.
 - **Short-premium selection overlaps** between `spread_screener` (0.10–0.20Δ
@@ -393,7 +283,7 @@ the tape but never reject a name. Value is explicitly a technical 52-week-range
 proxy: the data feed has no fundamentals (no earnings, P/E, or balance-sheet
 data), so it must never be read as intrinsic-value analysis.
 
-### Day-trade screener (`daytrade_screen.py`) — intraday momentum
+### Pre-market screener (`premarket_screen.py`) — gap momentum
 
 | Signal | Role | Gate / read |
 |---|---|---|
@@ -406,6 +296,14 @@ data), so it must never be read as intrinsic-value analysis.
 
 Ranked by |gap| × relative volume. No news/catalyst feed — gaps are
 technical-only.
+
+### Intraday screener (`intraday_screen.py`) — opening-range breakouts
+
+15-minute opening-range breakouts with session-VWAP reclaim/loss signals, time-prorated
+relative volume (the old full-day-average comparison made the 1.5× gate unreachable midday),
+conviction ranking, and near-miss diagnostics so the report never returns blank.
+ORB reads 'broke out and holding' rather than breaking-this-minute; sustained VWAP
+position (≥70% of session) confirms the move.
 
 ### Structure pricers (`spread_screener.py`, `pmcc_quality.py`) — defined-risk gates
 
@@ -485,34 +383,9 @@ read is IV-vs-HV plus skew/term-structure — useful, but not a full rank.
 
 ## Risk management
 
-### Exit policy — bull put spreads (issue #9)
+### Exit policy and ledger (issues #9, #10)
 
-Entries without exits is half a system. The first strategy with a complete
-policy is the bull put spread, implemented as pure logic in `exits.py` and
-tuned in `gates.yaml` under `exits:`:
-
-- **Take profit:** close when the buy-back costs 50% of the credit (keep half).
-- **Stop loss:** close when the buy-back costs 2× the credit — a fraction of
-  the spread's max loss, never the full width.
-- **Time exit:** never hold past 7 DTE; close or roll before gamma run-up.
-- **No assignment:** short leg ITM inside 2 DTE → close the spread, never take
-  the shares.
-
-Priority: assignment risk > time exit > profit target > stop loss > hold.
-These are starting values to be validated out-of-sample (issue #11), not
-proven optima. Other structures still need their policies.
-
-### Position ledger and sizing (issue #10)
-
-`ledger.py` records every position with its fill assumptions and closes it
-with a reason, computing realized P&L net of fees. Before opening, two gates:
-
-- **Per-trade:** one spread's max loss ≤ 2% of account (→ contracts).
-- **Heat cap:** total open max loss ≤ 35% of account.
-
-Tuned in `gates.yaml` under `ledger:` (`max_loss_pct`, `heat_cap_pct`,
-`fee_per_contract`). `test_ledger.py` includes end-to-end lifecycle tests:
-entry → exit signal → ledger close → realized P&L, using the real gate values.
+Exit rules, the position ledger, and sizing discipline are documented in the Trading Playbook (Section 21). Tuned values live in `gates.yaml` under `exits:` and `ledger:`.
 
 ### What the system measures today
 
@@ -605,9 +478,10 @@ on the GitHub Pages site, configured by the repo's `CNAME` file (Pages serves
 
 | Workflow | Schedule | Scripts it runs, in order | Publishes |
 |---|---|---|---|
-| `master.yml` | Weekdays 9:45am ET | Calls `daytrade-screen` → `daily-watch` → `monthly-screen` (on the 3rd) | (via the called workflows) |
+| `master.yml` | Weekdays 9:45am ET | Calls `daily-watch` → `monthly-sch` → `monthly-screen` (on the 3rd) | (via the called workflows) |
 | `daily-watch.yml` | Called by `master.yml`; manual via Actions tab | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
-| `daytrade-screen.yml` | Called by `master.yml`; manual via Actions tab | `daytrade_screen` → `render_report` → `render_hub` | `docs/reports/daytrade-<source>-<date>.html` |
+| `premarket-screen.yml` | Own cron (9:00am ET weekdays); manual via Actions tab | `premarket_screen` → `render_report` → `render_hub` | `docs/reports/premarket-<source>-<date>.html` |
+| `intraday-screen.yml` | Own crons (11am + 2pm ET weekdays); manual via Actions tab | `intraday_screen` → `render_report` → `render_hub` | `docs/reports/intraday-<source>-<date>.html` |
 | `monthly-screen.yml` | Called by `master.yml` on the 3rd; manual via Actions tab | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |
 
 `master.yml` calls the other three as reusable workflows (`workflow_call`) —
@@ -617,7 +491,7 @@ workflows keep no schedules of their own, so nothing runs twice; their
 `workflow_dispatch` triggers remain for one-off manual runs.
 
 `daily-watch.yml` accepts `names` and `universe` inputs on manual runs;
-`daytrade-screen.yml` accepts `names` and `limit`; `monthly-screen.yml`
+`premarket-screen.yml` / `intraday-screen.yml` accept `names` and `limit`; `monthly-screen.yml`
 accepts `names`. Run outputs are kept as workflow artifacts for 90 days.
 Publish steps do `git pull --rebase` before pushing, so the three workflows
 never clobber each other's commits.
@@ -628,15 +502,33 @@ report's footer timestamp is the freshness check.
 
 ## Companion documents
 
-The [Trading System](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N)
-Google Drive folder holds everything around the code:
+Strategy and operating documentation lives in Google Docs (single source of truth);
+this README holds technical information only.
 
-| Folder | Contents |
-|---|---|
-| Docs | Trading Playbook (living document; the `.docx` is the working copy), Trading System Flow slide deck, plus the original method notes: `options-book-playbook.md`, `pmcc-screening-method.md`, `broker-connectivity.md`, `starter-allocation-framework.md` |
-| Sheets | Trading Workbook — the trade journal / tracker / watchlist |
-| Reports | Archived screener run outputs (also kept as 90-day workflow artifacts) |
-| Code | Options Lab - PMCC Screener (early scripts + notes) |
+| Document | Location | Role |
+|---|---|---|
+| Trading Playbook (Google Doc) | Drive Trading System folder | **The** living trading document: strategy, rules, allocation, methods, lessons (22 sections) |
+| Options Lab — Trading Guide & Discussion Archive | Drive Trading System folder | Append-only history of past discussions; not a reference |
+| Trading System Flow (slide deck) | Drive Trading System folder | 10-slide visual overview |
+| Trading Workbook | Drive Sheets | Trade journal / tracker / watchlist |
+| Archive | Drive Trading System folder | Feedback-01, Feedback-02 (inputs, not live docs) |
+
+Dashboard: https://amuse.openaimp.com — published reports only.
+
+## Broker connectivity
+
+Where the trading operation can reach, as of Oct 11, 2026. Checked, not assumed.
+
+| Broker | Status | Notes |
+|---|---|---|
+| **Public.com** | ✅ Connected | Custom MCP connector, API-key auth. Quotes, chains, greeks, accounts, orders. The automation backbone — the key doesn't expire, so scheduled scans run untouched. |
+| **Schwab** | ⚠️ Connectable with friction | OAuth 2.0 verified, connect link ready. Refresh tokens die after **7 days, hard, non-rolling** — weekly manual re-auth required. Fine for on-demand questions; hostile to autonomous monitoring. |
+| **E*TRADE** | ❌ Out | OAuth 1.0a with request signing — not supported by the connector (API key or OAuth 2.0 only). Tokens expire at midnight ET daily. |
+| **IBKR** | ❌ Out | OAuth 2.0 API access is FA/organizational accounts only. Individual accounts need the local Client Portal Gateway with daily re-auth. Architecturally incompatible. |
+| **Moomoo** | ⚠️ Partial | Regulated US brokerage (FINRA, SIPC). No web trading terminal — browser route is dead. Official MCP server exists but no verified OAuth-MCP path through current tooling. Viable path: TradingView broker integration (live Gold-partner broker; single-leg options order panel once the user links their account). |
+
+**Standing rule: never place, cancel, or replace an order on any connected account without explicit human confirmation.**
+Screening, monitoring, and order *staging* are automated; the final submit is always human.
 
 ## Setup
 
@@ -668,9 +560,9 @@ Variations — other universes, other report kinds:
 ```bash
 python3 src/stock_screener.py --universe nasdaq100 --json-out /tmp/stock.json
 python3 src/stock_screener.py --screener stock_screener.py --universes sp100,nasdaq100
-python3 src/daytrade_screen.py --limit 20 --json-out /tmp/dt.json
-python3 src/render_report.py --daytrade /tmp/dt.json \
-  --report-id daytrade-sp500-2026-10-13 --source sp500 --source-detail "503 names"
+python3 src/premarket_screen.py --limit 20 --json-out /tmp/pm.json
+python3 src/render_report.py --premarket /tmp/pm.json \
+  --report-id premarket-sp500-2026-10-13 --source sp500 --source-detail "503 names"
 python3 src/pmcc_quality.py --names T,VZ,XOM --json-out /tmp/pmcc.json
 python3 src/render_report.py --pmcc /tmp/pmcc.json \
   --report-id pmcc-custom-2026-10 --source custom --source-detail "3 names"
