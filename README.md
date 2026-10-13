@@ -223,6 +223,22 @@ calls. `semis.py` is kept for reference only.
 | **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend | Gap %, rel volume, developing VWAP, ATR range | Delta gates, liquidity, friction, capital, earnings |
 | **Output** | Ranked 0–40 + readout narrative | Ranked by gap × volume, gap-and-go / fade bias | Pairs ranked by 30-day premium-to-debit |
 
+### When to run each screener
+
+| Screener | Run when | Expect | Don't expect much when |
+|---|---|---|---|
+| `stock_screener.py` | Anytime — it reads daily bars | Ranked regime scores (0–40) plus the plain-English readout | — |
+| `spread_screener.py` | Weekday market hours, ideally morning | Priced structures (bull puts, condors, Jade Lizards) or an honest zero with rejection reasons | Nights / weekends: quotes are stale, spreads go wide, and the conservative gates reject everything |
+| `premarket_screen.py` | ~9:00 AM ET on weekdays | Gap-bias list (gap %, rel volume, developing VWAP) | Any other time: no developing session, no fresh quote |
+| `intraday_screen.py` | 11 AM / 2 PM ET on weekdays | Opening-range breakouts, VWAP reclaim/loss, conviction ranking | Market closed: reports "no intraday bars" |
+| `pmcc_quality.py` | Monthly (the 3rd), during market hours | Ranked LEAPS pairs by 30-day premium-to-debit | Nights / weekends: same stale-chain problem as the spread screener |
+| `pmcc_watch.py` | Daily | Silence, unless a qualifier appeared/dropped or a yield shifted ≥1.5 pts | — |
+
+Manual runs use `--universe <key>` (e.g. `lev_etf`, `sp500`, `nasdaq100`) or
+`--names TQQQ,SOXL` to target specific tickers; `--names` wins when both are
+given. The scheduled workflows already encode the right times — see
+`.github/workflows/`.
+
 **Strategies vs patterns, per screener.** `spread_screener.py` implements the
 three income *strategies* (bull put spreads, iron condors, Jade Lizards) —
 those are the actual trade structures. `pmcc_quality.py` implements the PMCC
