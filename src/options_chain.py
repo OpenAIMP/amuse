@@ -126,7 +126,8 @@ def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
     return out, diag, rejected
 
 
-def greeks(symbols, account_id, signed=True, batch_size=50):
+def greeks(symbols, account_id, signed=True, batch_size=50,
+           include_risk_metrics=False):
     """Return ({symbol: (delta, iv)}, errors).
 
     Per-contract failures are logged, not raised. Delta validated on
@@ -154,7 +155,17 @@ def greeks(symbols, account_id, signed=True, batch_size=50):
                 if not (math.isfinite(delta) and math.isfinite(iv)
                         and lo <= delta <= hi and iv > 0):
                     raise ValueError(f"delta={delta} iv={iv} out of range")
-                out[x["symbol"]] = (delta, iv)
+                result = (delta, iv)
+                if include_risk_metrics:
+                    metrics = []
+                    for key in ("theta", "vega"):
+                        try:
+                            value = float(x["greeks"][key])
+                            metrics.append(value if math.isfinite(value) else None)
+                        except (KeyError, TypeError, ValueError):
+                            metrics.append(None)
+                    result += tuple(metrics)
+                out[x["symbol"]] = result
             except (KeyError, TypeError, ValueError) as exc:
                 errors.append(f"invalid greeks for {x.get('symbol', '?')}: {exc}")
     return out, errors
