@@ -127,15 +127,10 @@ benefits should remain labeled as hypotheses until that evidence is reviewed.
 Dashboard PR #47 renders the six-step recommendation,
 candidate gate statuses, one-standard-deviation expected move, and Kelly
 sizing availability on the HTML report linked from `docs/index.html`. The hub
-entry previews the recommendation, expected move, Kelly status, and risk
-availability/coverage. The report also renders Greeks, scenario P&amp;L,
-freshness, and priced-leg coverage when a portfolio-risk JSON is provided. If
-sizing availability on the HTML report linked from `docs/index.html`. The hub
-entry previews the recommendation, expected move, Kelly status, and risk
-availability/coverage. The report also renders Greeks, scenario P&amp;L,
-freshness, and priced-leg coverage when a portfolio-risk JSON is provided
-(dashboard implementation in [PR #47](https://github.com/OpenAIMP/amuse/pull/47)). If
-that input is absent, the page labels
+entry previews the recommendation, expected move, Kelly status, and
+portfolio-risk availability/coverage before opening the report. The report
+also renders Greeks, scenario P&amp;L, freshness, and priced-leg coverage when
+a portfolio-risk JSON is provided. If that input is absent, the page labels
 portfolio risk as unavailable rather than implying zero exposure. The Actions
 workflow has no canonical ledger or live timestamped market snapshot, so it
 does not invent portfolio-level risk values.

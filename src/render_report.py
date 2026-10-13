@@ -1246,7 +1246,8 @@ def spread_bits(spreads):
     return bits
 
 
-def build_blurb(rtype, stock, spreads, pmcc, premarket, intraday=None):
+def build_blurb(rtype, stock, spreads, pmcc, premarket, intraday=None,
+                decision=None, portfolio_risk=None):
     if rtype == "premarket":
         cands = (premarket or {}).get("candidates") or []
         if not cands:
@@ -1274,12 +1275,29 @@ def build_blurb(rtype, stock, spreads, pmcc, premarket, intraday=None):
     bits = spread_bits(spreads)
     if bits:
         parts.append(", ".join(bits))
+    if decision:
+        parts.append(f"Decision: {decision.get('summary') or 'no recommendation'}")
+        selected = decision.get("selected_candidate") or {}
+        move = selected.get("expected_move_1sd")
+        if move is not None:
+            parts.append(f"1σ move ${num(move, 2)}")
+    else:
+        parts.append("Decision unavailable")
+    if portfolio_risk:
+        priced, total = portfolio_risk.get("legs_priced"), portfolio_risk.get("open_legs")
+        coverage = portfolio_risk.get("leg_coverage")
+        parts.append(f"Portfolio risk {'complete' if portfolio_risk.get('complete') else 'incomplete'}"
+                     + (f", {float(coverage) * 100:.0f}% legs priced" if isinstance(coverage, (int, float))
+                        else (f", {priced} priced legs" if priced is not None else "")))
+    else:
+        parts.append("Portfolio risk not supplied")
     if not parts:
         return "No qualifiers — quiet screen"
     return "; ".join(parts)
 
 
-def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None):
+def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None,
+                decision=None, portfolio_risk=None):
     if rtype == "premarket":
         cands = (premarket or {}).get("candidates") or []
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
@@ -1292,13 +1310,28 @@ def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None):
     if rtype == "pmcc":
         return {"pairs": len((pmcc or {}).get("pairs") or {})}
     res = (spreads or {}).get("results") or {}
-    return {
+    stats = {
         "stocks": len((stock or {}).get("passing") or []),
         "bull_puts": len(res.get("bull_puts") or {}),
         "iron_condors": len(res.get("iron_condors") or {}),
         "asym_condors": len(res.get("asym_condors") or {}),
         "pmcc_pairs": len((pmcc or {}).get("pairs") or {}),
     }
+    if decision:
+        stats["decision_candidates"] = decision.get("candidate_count", 0)
+        selected = decision.get("selected_candidate") or {}
+        stats["recommendation"] = selected.get("recommendation") or "NO TRADE"
+        sizing = selected.get("kelly_sizing") or {}
+        stats["Kelly"] = sizing.get("status") or "UNSIZED"
+    else:
+        stats["decision"] = "not supplied"
+    if portfolio_risk:
+        stats["risk_complete"] = bool(portfolio_risk.get("complete"))
+        if portfolio_risk.get("leg_coverage") is not None:
+            stats["risk_coverage_pct"] = round(float(portfolio_risk["leg_coverage"]) * 100, 1)
+    else:
+        stats["portfolio_risk"] = "not supplied"
+    return stats
 
 
 def write_meta_sidecar(html_path, rid, rtype, rdate, title, blurb, stats,
@@ -1523,8 +1556,10 @@ def main():
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
 
     if report_mode:
-        blurb = build_blurb(rtype, stock, spreads, pmcc, premarket, intraday)
-        stats = build_stats(rtype, stock, spreads, pmcc, premarket, intraday)
+        blurb = build_blurb(rtype, stock, spreads, pmcc, premarket, intraday,
+                            decision, portfolio_risk)
+        stats = build_stats(rtype, stock, spreads, pmcc, premarket, intraday,
+                            decision, portfolio_risk)
         write_meta_sidecar(out, rid, rtype, rdate,
                            f"{title} · {rdate}", blurb, stats,
                            source=source, source_detail=source_detail)

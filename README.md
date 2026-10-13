@@ -482,7 +482,9 @@ is explicitly labeled as a proxy; the engine does not place orders.
 The daily report is archived under `docs/reports/` and linked from
 `docs/index.html`, so the recommendation, per-candidate expected move, Kelly
 availability, and all six gate statuses are visible alongside the existing
-screen results.
+screen results. The hub entry previews the recommendation, expected move,
+Kelly status, and portfolio-risk availability/coverage before the report is
+opened.
 The [comprehensive framework assessment](docs/comprehensive-options-market-analysis-framework.md)
 tracks the rationale, expected mechanism, impact measures, current evidence,
 and remaining implementation steps for these additions. Benefits are not
