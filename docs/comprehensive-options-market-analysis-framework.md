@@ -1,7 +1,7 @@
 # Comprehensive Options & Market Analysis Framework
 
 **Implementation review:** 2026-10-13
-**Code reviewed:** `origin/main` at `2d060e9`
+**Code reviewed:** `origin/main` at `ea9685f` plus pending PR #40 (`873b58b`)
 
 This document begins with the framework blueprint reconstructed from the
 nine-part description supplied in chat, then assesses how much of each part
@@ -81,11 +81,14 @@ is implemented, proposed, or unvalidated.
 
 ## Implementation status assessment
 
-**Overall estimate: about 45% implemented.** This is a qualitative estimate
-of breadth and integration, not a count of checklist items. Amuse is strongest
-at technical screening, defined-risk structure pricing, and paper sizing.
-Portfolio-wide risk, a unified decision engine, independent pricing, and
-performance validation remain substantial gaps.
+**Overall estimate: about 50% implemented with PR #40 included.** This is a
+qualitative estimate of breadth and integration, not a count of checklist
+items. It describes the proposed post-PR state; PR #40 is pending merge.
+Amuse remains strongest at technical screening and defined-risk structures.
+It now has reusable option math, optional book-level risk analysis, and a
+joined advisory decision report. The daily pipeline still lacks a canonical
+account/position feed, book-risk calculations need supplied market context,
+and no out-of-sample result establishes that these changes increase returns.
 
 ## Status key
 
@@ -94,6 +97,52 @@ performance validation remain substantial gaps.
 - **Partial:** useful pieces exist, but coverage, integration, or automation is
   incomplete.
 - **Missing:** no corresponding implementation was found in the repository.
+
+## PR #40 — what changed, expected impact, and how to measure it
+
+These additions are **additive**: they preserve the stock/spread screeners,
+provider quotes, existing gates, and human preflight. The new code consumes
+existing screen output or an explicitly supplied ledger/market snapshot; it
+does not send orders or silently change existing entry/exit thresholds.
+
+The economic mechanisms below are hypotheses about how better process can
+protect or improve net returns. The impact column separates available evidence
+from unmeasured benefit: implementation alone does not prove that any strategy
+has an edge.
+
+**Measured trading impact to date: none.** The code and documentation change
+does not include a persisted decision-to-outcome journal or a before/after
+paper-trading cohort. The measures below are the evidence to collect next;
+benefits should remain labeled as hypotheses until that evidence is reviewed.
+
+| Change | What it does now | Expected benefit / mechanism | Measure of impact | Status and limitation |
+|---|---|---|---|---|
+| Black–Scholes math (`src/options_math.py`) | Prices European calls/puts and returns delta, gamma, theta, vega, and rho; defines one-standard-deviation expected move and fractional Kelly calculation. | Creates a repeatable valuation basis; makes IV/time risk explicit; supplies bounded sizing math when outcome estimates are credible. | Compare model marks with contemporaneous market marks and realized fills by expiry/moneyness/IV; measure expected-move coverage; compare paper/out-of-sample returns and drawdown across sizing methods. | Math is implemented. Candidate ranking does not yet compare modeled fair value with executable quotes. No calibration, IV solver, transaction costs, or profitability result. Kelly utility does not make its inputs reliable. |
+| Portfolio Greeks and scenario stress (`src/portfolio_risk.py`) | Reprices open ledger legs from supplied per-symbol spot/IV and aggregates signed Greeks; estimates book value changes for baseline plus four spot/vol shocks; reports missing inputs. | Exposes directional and volatility sensitivity that per-trade max loss misses; helps users see modeled portfolio loss before taking added risk. | Track input freshness/coverage, risk warnings, scenario loss versus realized loss, concentration, and whether risk review changed or prevented an addition. | Calculation is implemented but optional/manual because scheduled automation has no canonical live ledger/marks. Scenarios shock every symbol uniformly. Black–Scholes omits skew, early exercise, execution costs, and dependencies; it is not a loss guarantee. |
+| Six-step decision engine (`src/decision_engine.py`) | Joins regime, horizon/events, technical timing, volatility, spread economics, and risk/sizing into ranked WATCH/CONSIDER/NO TRADE results with reasons. Runs after daily screeners. | Makes handoffs and vetoes consistent and visible; can reduce missed conflicts and unsuitable entries, and focus review on stronger-aligned candidates. | Persist each recommendation and input; measure overrides, pass-through, paper fills, costs, realized expectancy, drawdown, and results versus the prior manual/screener-only process by strategy and regime. | Advisory only. Daily run has no account/ledger, so sizes normally remain unavailable and candidates are WATCH/NO TRADE. Events are only as good as upstream flags. Delta-derived win probability/EV are proxies, not calibrated forecasts. |
+| Fractional Kelly with ledger caps | Uses realized closed outcomes by strategy only after 30 trades; applies fractional Kelly, caps at 2% account risk, and checks existing per-trade/35% heat limits if account and ledger are supplied. | Connects allocation to observed payoff history while keeping conservative hard limits; could reduce allocation when observed expectancy is weak. | Paper compare with fixed 0.5%, 1%, and 2% risk baselines; track net return, drawdown, tail losses, estimation error, and stability across time windows. | Calculation/gates exist, but account/ledger are not wired into scheduled runs. Thirty trades is a minimum gate, not statistical validation; Kelly is sensitive to noisy and regime-dependent estimates. |
+
+### Gradual improvement path
+
+1. **Make inputs operational:** maintain timestamped ledger and market
+   snapshots; reject stale/missing quotes and report coverage. This is needed
+   before automated book-risk output can be trusted.
+2. **Record decisions before outcomes:** persist six-step rationale, prices,
+   model inputs, overrides, and later fills/exits to create an auditable
+   baseline and avoid reconstructing signals after the result is known.
+3. **Paper trade and calibrate:** compare theoretical prices and expected
+   moves with market/fill data; measure fill friction, EV calibration, stress
+   accuracy, and strategy outcomes across regimes, including fees and slippage.
+4. **Promote only evidence-backed changes:** require walk-forward/out-of-sample
+   results, acceptable drawdown/tail risk, and stable performance before
+   tuning thresholds or allowing Kelly to influence actual allocation. Keep
+   hard risk caps and human order preflight.
+
+This is a feedback process, **not self-modifying code**: the engine does not
+learn weights, optimize thresholds, or update itself from profits/losses.
+Outcome attribution and automated monitoring remain future work. Success means
+better net, risk-adjusted results after costs over a credible evaluation
+period—not more signals or higher paper EV alone.
 
 ## 1. Technical analysis and opportunity lenses
 
@@ -133,15 +182,16 @@ conservative fills. The framework's broader distinctions—especially
 fundamental value, crowding, portfolio context, and execution conditions—are
 not fully modeled.
 
-There is no single synthesis layer that answers *Value, Timing, Crowding,
-Regime, Risk,* and *Execution* together for each proposed trade. Screeners
-run separately; a person compares stock regime output with spread candidates.
-The reports explain individual outputs but do not produce a master trade
-decision with one traceable rationale.
+PR #40 introduces a single advisory synthesis for stock regime, horizon/event
+flags, technical timing, volatility, spread economics, and optional ledger
+risk. It produces one traceable rationale across those inputs. It still does
+not model fundamental value, crowding, cross-asset context, or execution
+quality as a complete set of decision dimensions, so this is partial synthesis
+rather than all 15 analysis disciplines.
 
-**Why this rating:** the staged flow in `README.md` describes how the tools
-should be used, while separate screeners implement individual stages. The
-spread screener does not take the stock screener's regime result as an input.
+**Why this rating:** `src/decision_engine.py` now joins the stock and spread
+screen outputs. The absent data lenses and missing scheduled account/ledger
+inputs keep the synthesis incomplete.
 
 ## 3. PM decision guidebook
 
@@ -205,25 +255,29 @@ metrics, historical volatility, IV rank, IV/HV, skew, term structure, and
 return-on-risk ranking. The rank is built forward from snapshots and is
 trusted only after the configured minimum history is available.
 
-The repository does **not** implement an independent Black–Scholes pricer or
-IV solver, an expected-move model using the proposed formula, portfolio-level
-Greek aggregation, formal expected value based on validated outcomes, or
-fractional Kelly sizing. It also has no five-scenario portfolio stress test.
-Reported return on risk is a screening ratio, not expected return.
+PR #40 adds an independent European Black–Scholes pricer with Greeks, the
+expected-move formula, and a fractional-Kelly utility. The portfolio module
+uses the pricer to aggregate ledger Greeks and scenario marks when supplied
+with market context. The six-step engine can use expected move and realized
+ledger outcomes. These are now implemented calculations, but expected return
+is still not validated and Kelly sizing is generally unavailable in scheduled
+runs because no account/ledger is passed. Reported screen EV remains a
+delta-based proxy, not a historical forecast.
 
 | Proposed measure | Framework formula/definition | Amuse status |
 |---|---|---|
-| Black–Scholes | Price from underlying price `S`, strike `K`, time `T`, rate `r`, volatility `σ` (and dividend yield where applicable) | **Missing:** broker Greeks/prices are consumed; no independent pricing or IV solver |
-| Portfolio Greeks | Sum signed leg/position Greeks, scaled by quantity and contract multiplier | **Missing at portfolio level:** some structure Greeks are reported, but not book-wide aggregation |
-| Expected move | `S × IV × √(DTE / 365)` | **Missing:** ATR/range measures exist; this options-implied formula is not calculated |
+| Black–Scholes | Price from underlying price `S`, strike `K`, time `T`, rate `r`, volatility `σ` (and dividend yield where applicable) | **Implemented as a utility:** European pricing/Greeks; no IV solver, market quote calibration, or candidate fair-value ranking |
+| Portfolio Greeks | Sum signed leg/position Greeks, scaled by quantity and contract multiplier | **Implemented with supplied inputs:** aggregates open-ledger legs; not connected to a canonical live book or scheduled market snapshot |
+| Expected move | `S × IV × √(DTE / 365)` | **Implemented as a utility:** decision report adds a one-standard-deviation range when stock price, IV, and DTE are available; not a calibrated forecast |
 | IV Rank | Current IV's location within its trailing IV distribution | **Partial:** `src/vol.py` computes percentile versus accumulated snapshots and requires a minimum history; no historical IV endpoint |
 | Volatility risk premium | `IV − HV` (or an explicitly chosen ratio) | **Partial:** IV/HV comparison exists; the framework's subtraction is not a separate portfolio decision model |
-| Expected value | `P(win) × average win − P(loss) × average loss − costs` | **Missing as a validated edge estimate:** ledger reports realized win rate and average outcomes, but does not use them to forecast candidates |
-| Fractional Kelly | A capped fraction of a Kelly allocation based on validated outcome probabilities and payoff odds | **Missing:** no validated probability/payoff estimate feeds position sizing |
+| Expected value | `P(win) × average win − P(loss) × average loss − costs` | **Partial:** screen EV is delta-derived; realized strategy history is used for Kelly inputs after 30 closed trades, but no calibrated candidate EV including costs exists |
+| Fractional Kelly | A capped fraction of a Kelly allocation based on validated outcome probabilities and payoff odds | **Implemented with safeguards:** ledger history + account required, fractional/capped at 2%, existing heat gate applied; no scheduled inputs or statistical validation |
 
-**Why this rating:** see `src/vol.py`, `src/spread_screener.py`, and
-`src/ledger.py`. Greek data comes from the market-data provider; it is not
-recomputed or aggregated across open positions.
+**Why this rating:** see `src/options_math.py`, `src/portfolio_risk.py`,
+`src/decision_engine.py`, `src/vol.py`, `src/spread_screener.py`, and
+`src/ledger.py`. The new calculations improve consistency and visibility;
+their predictive benefit remains to be measured.
 
 ## 6. Entry, exit, and volatility triggers
 
@@ -264,58 +318,62 @@ optimization engine.
 
 ## 8. Multi-leg valuation and portfolio stress
 
-**Status: Partial at trade level; missing at portfolio level.**
+**Status: Partial; portfolio calculations implemented, operational coverage incomplete.**
 
 The screeners price supported multi-leg strategies and calculate maximum loss,
-breakevens, and some per-structure Greeks. They do not provide a universal
-valuation model for arbitrary signed legs, aggregate portfolio Greeks across
-positions, or calculate the proposed five-scenario P&L matrix.
+breakevens, and some per-structure Greeks. PR #40 adds Black–Scholes signed-leg
+valuation in the open-ledger portfolio report, aggregates portfolio Greeks,
+and calculates five theoretical scenarios from supplied market inputs.
 
-The proposed generic position value is `V_position = Σ(q_i × V_i)`, where
-`q_i` is the signed quantity and `V_i` the value of leg `i`. The proposed
-stress grid reprices the book under five market scenarios, including the
-framework's underlying and volatility shocks (for example, ±10% underlying
-and ±50% implied volatility). Neither the generic signed-leg valuation nor
-that scenario grid is implemented at portfolio level.
+The position value is `V_position = Σ(q_i × V_i)`, where `q_i` is the signed
+quantity and `V_i` the model value of leg `i`. The stress grid reprices the
+book under a base case and four combinations of ±10% underlying and ±50% IV.
+Results are theoretical and require per-symbol spot/IV data plus valid ledger
+legs; missing inputs are surfaced rather than treated as zero.
 
-There is no portfolio concentration or correlation analysis, and no combined
-underlying/volatility shock view. The 35% heat cap sums position maximum loss;
-it does not model correlated losses or changing Greeks.
+There is still no sector concentration or correlation model. All underlyings
+receive the same percentage shock in a given scenario, a useful sensitivity
+view but not a correlation forecast. The 35% heat cap sums position maximum
+loss; it does not model correlated losses or changing Greeks.
 
-**Why this rating:** `src/ledger.py` calculates open heat from recorded max
-loss, while no portfolio scenario or Greek aggregation module is present.
+**Why this rating:** `src/portfolio_risk.py` now performs model-based
+aggregation/stress; `src/ledger.py` still calculates open heat from recorded
+max loss. Data collection, freshness checks, and operational coverage remain
+manual.
 
 ## 9. Overall unified master decision framework
 
 **Status: Partial.**
 
-The six-stage operating loop and separate scheduled workflows exist. Signals,
-strategy prices, event flags, risk amounts, and reports are available across
-the application. What is missing is the proposed unified algorithm that
-consumes all relevant evidence, applies portfolio constraints, explains
-rejections, and emits a consistent action/size/management plan. The
-quick-reference formulas and triggers also need to distinguish implemented
-rules from proposed ones.
+PR #40 adds an advisory algorithm joining the stock and spread screen outputs,
+applying regime, horizon/event, timing, volatility, structure, and optional
+ledger/account gates, and explaining missing inputs/reasons. Its ranked output
+is WATCH/CONSIDER/NO TRADE; it does not place orders. Scheduled runs have no
+account/ledger, so sizing remains unavailable there. Exit management and
+preflight are not folded into the engine, and some analysis disciplines have
+no data source.
 
-The target **six-step master algorithm** can be summarized as: qualify market
-regime; establish thesis and horizon; assess timing and volatility; select and
-price a defined-risk structure; apply portfolio risk, size, and event gates;
-then define execution, exit, and review conditions. Amuse has separate code
-for several steps, but this sequence is not yet executed end-to-end by one
-decision service.
+The implemented advisory six-step flow covers: qualify stock/regime; check
+horizon and available event flags; assess technical timing; assess volatility;
+check structure economics; apply optional account/ledger risk and sizing. It
+explains its gates and ranks candidates. The broader target also calls for a
+thesis, richer horizon strategy matrix, live buying-power preflight, defined
+exits, and post-trade review; those are not executed end-to-end by this
+service.
 
-**Why this rating:** README describes a human-operated process across
-independent screeners; no common decision engine joins their outputs.
+**Why this rating:** `src/decision_engine.py` joins the screeners and runs in
+daily workflow/local daily path. It is an advisory integration, not an
+autonomous execution or full portfolio-manager system.
 
 ## Remaining work by priority
 
 ### Priority 0 — Establish trustworthy risk and validation before expanding
 live use
 
-1. **Portfolio exposure and stress view:** aggregate open positions' Greeks,
-   concentration, and loss under explicit underlying/volatility scenarios.
-   Reconcile this with the existing heat cap so correlated positions are
-   visible.
+1. **Operationalize portfolio inputs:** connect a timestamped open ledger and
+   reliable per-leg/symbol market snapshot to the new Greek/stress utility;
+   reject stale values and measure input coverage. Add sector/correlation
+   concentration only when supported by dependable data.
 2. **Validate the risk rules:** add an options-aware historical evaluation
    using real historical option quotes where available, or clearly disclosed
    price-surface assumptions. Test exit rules, slippage, fees, and regime
@@ -326,34 +384,41 @@ live use
 
 ### Priority 1 — Complete the decision and management loop
 
-4. **Unified decision record:** join regime, timing, vol, structure, event
-   flags, sizing, and preflight in one explainable result; retain the human
-   confirmation step.
-5. **Strategy-specific exits:** define and validate management rules for
+4. **Persist decision/outcome records:** capture engine inputs, ranked
+   candidates, reasons, overrides, fills, fees, exits, and P&L so impact can
+   be evaluated without survivorship or hindsight bias.
+5. **Complete decision coverage:** connect account/ledger inputs through a
+   controlled workflow and add explicit freshness/completeness checks; bring
+   preflight and exit plans into the review record while retaining human
+   order confirmation.
+6. **Strategy-specific exits:** define and validate management rules for
    condors, asymmetric condors, PMCCs, and any new strategy. Decide explicitly
    whether the bull-put time exit remains 7 DTE or changes to 21 DTE; document
    the rationale and validate either value.
-6. **Journal and attribution:** connect entries/exits to signal snapshots so
-   realized results can be attributed by regime, strategy, and rule.
+7. **Journal and attribution:** analyze net results by regime, strategy,
+   candidate rank, sizing method, and rule; compare with the former
+   screener-only/manual process.
 
 ### Priority 2 — Add statistical decision measures after outcome data exists
 
-7. **Expected value and sizing:** estimate win/loss distributions after
-   collecting validated outcomes. Only then consider fractional Kelly, with
-   conservative caps and uncertainty handling.
-8. **Independent valuation and move estimates:** add an independently checked
-   option-pricing/IV method and a documented expected-move calculation.
-9. **Quantitative scoring:** separate market-implied probability, observed
-   historical outcomes, and model forecasts; avoid presenting one as another.
+8. **Calibrate valuation and expected moves:** compare Black–Scholes prices
+   and implied ranges with market quotes/realized observations; only use
+   pricing differences as candidate-ranking signals after documenting fit,
+   inputs, and limits.
+9. **Expected value and sizing:** validate win/loss distributions, costs, and
+   probability calibration before considering Kelly for actual allocation;
+   test against fixed fractional baselines and include estimation uncertainty.
+10. **Quantitative scoring:** separate market-implied probability, observed
+   historical outcomes, and model forecasts; do not conflate these measures.
 
 ### Priority 3 — Extend the opportunity lenses where reliable data is available
 
-10. Add order-flow imbalance, sentiment/crowding, cross-asset correlation,
+11. Add order-flow imbalance, sentiment/crowding, cross-asset correlation,
     and options-flow signals with explicit data provenance and missing-data
     behavior.
-11. Extend execution-quality measures beyond quote friction when fill data
+12. Extend execution-quality measures beyond quote friction when fill data
     becomes available; compare estimated and realized fills.
-12. Add a structured catalyst calendar and distinguish event risk from
+13. Add a structured catalyst calendar and distinguish event risk from
     headline context.
 
 ## Assessment limits

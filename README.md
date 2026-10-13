@@ -434,10 +434,49 @@ Exit rules, the position ledger, and sizing discipline are documented in the Tra
 | Max loss / credit / breakeven | Gates (≤$1,000 per spread, ≤$10,000 per PMCC pair) + reported; structures ranked by return-on-risk |
 | Realized volatility | ATR% as a stock-screen gate; formal 20/60-day HV in `vol.py` |
 
+### Pricing, portfolio risk, and unified decisions
+
+`src/options_math.py` provides European Black–Scholes prices/Greeks, the
+one-standard-deviation expected-move formula, and fractional Kelly sizing.
+Rates and volatility are annual decimals; Greeks are per share, theta is per
+calendar day, and vega/rho are per 1.00 change in IV/rate (divide by 100 for
+one percentage point).
+
+`src/portfolio_risk.py` aggregates open-ledger Greeks and estimates P&L across
+five reproducible spot/volatility scenarios. It requires a current market
+context JSON with `risk_free_rate`, optional `asof`, and per-symbol `spot`,
+`iv`, and optional `dividend_yield`. Example:
+
+```sh
+python3 src/portfolio_risk.py --ledger ledger.json --market market.json --out reports/portfolio-risk.json
+```
+
+Marks and stress results are Black–Scholes model estimates, not executable
+quotes. Missing market inputs are reported and the result is marked incomplete.
+
+`src/decision_engine.py` consumes the daily stock and spread-screen JSON and
+outputs a six-step advisory decision (regime, horizon/catalysts, timing,
+volatility, structure economics, and risk/sizing). The daily workflow writes
+`reports/decision.json` and `reports/decision.md`; local daily runs write the
+same reports with a run timestamp. A `CONSIDER` label requires the first five
+gates and a Kelly size. Sizing is withheld until there are at least 30 closed
+ledger trades for that strategy and an account value. Kelly uses realized
+ledger outcomes and is capped at 2% account risk. Without sufficient history,
+the engine can still identify a `WATCH` candidate but does not fabricate a
+position size. Current screener win probability/EV remains delta-derived and
+is explicitly labeled as a proxy; the engine does not place orders.
+The [comprehensive framework assessment](docs/comprehensive-options-market-analysis-framework.md)
+tracks the rationale, expected mechanism, impact measures, current evidence,
+and remaining implementation steps for these additions. Benefits are not
+counted as trading performance until measured net of costs and evaluated
+out-of-sample.
+
 Risk is managed today through **defined-risk structures only** (no naked
 legs), conservative fills, liquidity/friction/earnings gates, and the human
-1–2% sizing rule and 30–40% heat cap. What the code enforces ends at the
-structure level; the book level is human.
+1–2% sizing rule and 30–40% heat cap. The optional decision-engine account and
+ledger inputs also apply the existing trade-risk and portfolio-heat gates;
+without those inputs, sizing stays unapproved and the book-level decision
+remains with the user.
 
 ### Gaps to fix
 
@@ -449,9 +488,10 @@ structure level; the book level is human.
   Not yet in `pmcc_quality.py`.
 - **No long-premium structures.** A complete system needs debit strategies
   for low-vol regimes; today the only honest answer to cheap premium is cash.
-- **No portfolio Greeks.** Per-structure Greeks are fetched but never
-  aggregated — no net delta/gamma/vega/theta across the book, no scenario
-  P&L (±10% underlying, ±50% vol), no concentration view.
+- **Portfolio Greeks and scenarios are now available** in
+  `src/portfolio_risk.py`; they need an open-position ledger and explicit
+  current market inputs. They are not part of the scheduled screen because
+  that pipeline has no canonical live-book/mark source.
 - **Gamma/Vega/Theta don't drive decisions.** They're reported, not gating.
 
 ### MCP data limitations

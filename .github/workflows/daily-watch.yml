@@ -100,6 +100,19 @@ jobs:
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           fi
 
+      - name: Unified six-step decision report
+        if: always()
+        run: |
+          if [ -s reports/stock-screen.json ] && [ -s reports/spread-screen.json ]; then
+            python3 src/decision_engine.py \
+              --stock reports/stock-screen.json \
+              --spreads reports/spread-screen.json \
+              --json-out reports/decision.json \
+              --markdown-out reports/decision.md
+          else
+            echo "Decision report skipped: required screener output is missing."
+          fi
+
       - name: PMCC exception watch
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}

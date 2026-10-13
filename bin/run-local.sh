@@ -35,6 +35,11 @@ run_daily() {
   python3 src/spread_screener.py --names "$WATCHLIST" \
     --json-out "reports/spread-screen-$STAMP.json" \
     | tee "reports/spread-screen-$STAMP.txt"
+  python3 src/decision_engine.py \
+    --stock "reports/stock-screen-$STAMP.json" \
+    --spreads "reports/spread-screen-$STAMP.json" \
+    --json-out "reports/decision-$STAMP.json" \
+    --markdown-out "reports/decision-$STAMP.md"
   python3 src/render_report.py \
     --stock "reports/stock-screen-$STAMP.json" \
     --spreads "reports/spread-screen-$STAMP.json" \
