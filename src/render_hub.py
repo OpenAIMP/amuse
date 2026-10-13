@@ -33,6 +33,7 @@ TYPE_LABELS = {
     "intraday": "Intraday breakouts",
     "daytrade": "Pre-market gap (legacy)",
     "pmcc": "Monthly PMCC",
+    "leverage": "Leveraged ETFs",
 }
 # preferred source order inside each type group; unknown keys go alphabetical
 SOURCE_ORDER = ["watchlist", "nasdaq100", "sp100", "sp500", "dow30", "custom"]
