@@ -26,12 +26,11 @@ import json
 import os
 import math
 import re
-import subprocess
 import sys
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/bin/public-mcp")
+
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
 if not ACCT:
     raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
@@ -40,6 +39,12 @@ NAMES = ["T", "VZ", "BAC", "PFE", "KO", "MRK", "BMY", "SBUX", "DIS", "XOM"]
 # ---- screening configuration (design choices, printed in every report) ----
 # Tunables live in gates.yaml; this block binds them to module constants.
 import gates as _gates_mod
+import mcp_client
+from mcp_client import McpError
+from market_data import daily_bars, quotes
+from options_chain import dte, eligible_expirations
+from options_chain import parse_chain
+from options_chain import greeks as chain_greeks
 import vol as _vol
 
 
@@ -73,142 +78,6 @@ RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
 
 
-def dte(exp):
-    return (date.fromisoformat(exp) - RUN_DATE).days
-
-
-def eligible_expirations(expirations, minimum, maximum):
-    return sorted({e for e in expirations if minimum <= dte(e) <= maximum})
-
-
-# ---- MCP plumbing: every transport/parse failure becomes McpError ----
-class McpError(RuntimeError):
-    pass
-
-
-def mcp_call(tool, args):
-    try:
-        proc = subprocess.run([CLI, "call", tool, json.dumps(args)],
-                              capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired as e:
-        raise McpError(f"{tool}: CLI timed out: {e}")
-    if proc.returncode != 0:
-        raise McpError(f"{tool}: CLI failed: {proc.stderr[:300]}")
-    try:
-        d = json.loads(proc.stdout)
-    except json.JSONDecodeError as e:
-        raise McpError(f"{tool}: CLI returned non-JSON output: {e}")
-    if not isinstance(d, dict) or "content" not in d or not d["content"]:
-        raise McpError(f"{tool}: unexpected response shape")
-    if d.get("isError"):
-        raise McpError(f"{tool}: {json.dumps(d)[:300]}")
-    try:
-        return json.loads(d["content"][0]["text"])
-    except (json.JSONDecodeError, KeyError, TypeError, IndexError) as e:
-        raise McpError(f"{tool}: unparseable content payload: {e}")
-
-
-OSI_RE = re.compile(r"^(.+?)(\d{6})([CP])(\d{8})$")
-
-
-def parse_osi(osi):
-    """Return (expiration_iso, is_call, strike) or raise ValueError."""
-    m = OSI_RE.match(osi)
-    if not m:
-        raise ValueError(f"unparseable OSI: {osi}")
-    yy, mm, dd = int(m.group(2)[:2]), int(m.group(2)[2:4]), int(m.group(2)[4:6])
-    exp = date(2000 + yy, mm, dd).isoformat()
-    return exp, m.group(3) == "C", round(int(m.group(4)) / 1000.0, 3)
-
-
-def optional_int(value):
-    if value is None:
-        return None
-    return int(value)
-
-
-def parse_options(sym, exp, min_liquidity, want):
-    """Return ({osi: contract}, diagnostics). want in {"puts","calls"}.
-
-    Contract keyed by full OSI symbol; type and expiration validated from the
-    symbol itself. Bid/ask preserved; no midpoints stored for decisions.
-    """
-    assert want in ("puts", "calls")
-    p = mcp_call("get_option_chain",
-                 {"symbol": sym, "expiration_date": exp, "account_id": ACCT})
-    if not isinstance(p, dict):
-        raise McpError(f"get_option_chain: expected object payload for {sym} {exp}")
-    want_call = (want == "calls")
-    out, diag = {}, {"bad_symbol": 0, "wrong_type_or_expiry": 0, "bad_quote": 0,
-                     "wide_spread": 0, "liquidity_unknown": 0,
-                     "insufficient_liquidity": 0}
-    for c in p.get(want, []):
-        try:
-            osi = c["instrument"]["symbol"]
-            c_exp, is_call, k = parse_osi(osi)
-        except (ValueError, KeyError, TypeError):
-            diag["bad_symbol"] += 1
-            continue
-        if is_call != want_call or c_exp != exp:
-            diag["wrong_type_or_expiry"] += 1
-            continue
-        try:
-            bid, ask = float(c["bid"] or 0), float(c["ask"] or 0)
-        except (TypeError, ValueError):
-            diag["bad_quote"] += 1
-            continue
-        if not (math.isfinite(bid) and math.isfinite(ask)) or bid <= 0 or ask < bid:
-            diag["bad_quote"] += 1
-            continue
-        mid = (bid + ask) / 2
-        if (ask - bid) / mid > MAX_SPREAD_PCT:
-            diag["wide_spread"] += 1
-            continue
-        oi = optional_int(c.get("openInterest"))
-        vol = optional_int(c.get("volume"))
-        if oi is None and vol is None:
-            diag["liquidity_unknown"] += 1
-            continue
-        if (oi or 0) < min_liquidity and (vol or 0) < min_liquidity:
-            diag["insufficient_liquidity"] += 1
-            continue
-        out[osi] = {"sym": osi, "strike": k, "bid": bid, "ask": ask, "mid": mid,
-                    "spread": ask - bid, "spread_pct": (ask - bid) / mid,
-                    "expiration": exp}
-    return out, diag
-
-
-def greeks(syms):
-    """Return (symbol -> (delta, iv), errors). Per-contract failures are logged.
-
-    Delta validated on [-1, 1] (not [0, 1]) because put deltas may be signed.
-    """
-    out, errors = {}, []
-    syms = list(dict.fromkeys(syms))
-    for i in range(0, len(syms), GREEKS_BATCH):
-        batch = syms[i:i + GREEKS_BATCH]
-        try:
-            g = mcp_call("get_option_greeks",
-                         {"osi_symbols": batch, "account_id": ACCT})
-        except (McpError, subprocess.TimeoutExpired) as exc:
-            errors.append(f"greeks batch failed ({len(batch)} contracts): {exc}")
-            continue
-        if not isinstance(g, dict):
-            errors.append("greeks batch returned non-object payload")
-            continue
-        for x in g.get("greeks", []):
-            try:
-                delta = float(x["greeks"]["delta"])
-                iv = float(x["greeks"]["impliedVolatility"])
-                if not (math.isfinite(delta) and math.isfinite(iv)
-                        and -1 <= delta <= 1 and iv > 0):
-                    raise ValueError(f"delta={delta} iv={iv} out of range")
-                out[x["symbol"]] = (delta, iv)
-            except (KeyError, TypeError, ValueError) as exc:
-                errors.append(f"invalid greeks for {x.get('symbol', '?')}: {exc}")
-    return out, errors
-
-
 def vol_read_for(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
     """Cheap-vs-expensive read for one underlying (issue #7).
 
@@ -228,18 +97,8 @@ def vol_read_for(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
 
 def _vol_read_inner(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
     # HV from one year of daily bars.
-    closes = []
     try:
-        p = mcp_call("get_price_history",
-                     {"symbol": sym, "account_id": ACCT,
-                      "period": "YEAR", "aggregation": "ONE_DAY"})
-        for b in p.get("regularMarket", {}).get("bars", []):
-            try:
-                c = float(b["close"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if math.isfinite(c) and c > 0:
-                closes.append(c)
+        closes = [b["close"] for b in daily_bars(sym, ACCT, "YEAR")]
     except Exception:
         closes = []
     hv20 = _vol.realized_vol(closes, VOL_CFG["hv_short"]) if closes else None
@@ -689,7 +548,7 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
     width = width_arg if width_arg is not None \
         else min(WIDTH_MAX, max(WIDTH_MIN, round(spot / WIDTH_DIVISOR)))
     try:
-        raw = mcp_call("get_option_expirations",
+        raw = mcp_client.mcp_call("get_option_expirations",
                        {"symbol": sym, "account_id": ACCT})
         exps = eligible_expirations(
             sorted(set(re.findall(r"20\d\d-\d\d-\d\d", json.dumps(raw)))),
@@ -702,8 +561,10 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         puts_by_exp, calls_by_exp = {}, {}
         diag_p, diag_c = {}, {}
         for exp in exps:
-            pc, dp = parse_options(sym, exp, MIN_LIQUIDITY, "puts")
-            cc, dc = parse_options(sym, exp, MIN_LIQUIDITY, "calls")
+            pc, dp = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
+                             MAX_SPREAD_PCT, "puts")
+            cc, dc = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
+                             MAX_SPREAD_PCT, "calls")
             puts_by_exp[exp], calls_by_exp[exp] = pc, cc
             for k, v in dp.items():
                 diag_p[k] = diag_p.get(k, 0) + v
@@ -717,7 +578,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         call_syms = [c["sym"] for cc in calls_by_exp.values()
                      for c in cc.values()
                      if spot < c["strike"] <= spot * 1.40]
-        g, gerr = greeks(put_syms + call_syms)
+        g, gerr = chain_greeks(put_syms + call_syms, ACCT,
+                               signed=True, batch_size=GREEKS_BATCH)
         for pc in puts_by_exp.values():
             for c in pc.values():
                 if c["sym"] in g:
@@ -964,27 +826,7 @@ def main():
     else:
         print("Vol assessment: OFF (--no-vol)")
 
-    spot_map = {}
-    q = mcp_call("get_quotes", {"symbols": names, "account_id": ACCT})
-    if not isinstance(q, (dict, list)):
-        raise McpError("get_quotes: expected object or list payload")
-
-    def qwalk(o):
-        if isinstance(o, dict):
-            s = o.get("instrument", {}).get("symbol")
-            if s in names and "last" in o:
-                try:
-                    v = float(o["last"])
-                    if math.isfinite(v) and v > 0:
-                        spot_map[s] = v
-                except (TypeError, ValueError):
-                    pass
-            for v in o.values():
-                qwalk(v)
-        elif isinstance(o, list):
-            for v in o:
-                qwalk(v)
-    qwalk(q)
+    spot_map = quotes(names, ACCT)
 
     bull_puts, condors, asym_condors = [], [], []
     stock_notes = {}
