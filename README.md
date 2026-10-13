@@ -85,10 +85,9 @@ Workflow: `daily-watch` priced both; the archive keeps the report.
 ## Where the strategy lives
 > Strategy, P&L philosophy, and operating discipline live in the [Trading Playbook](https://drive.google.com/drive/folders/1L5SorZ65H3wueSJjEUO8qAE5VumaEt6N) (Google Doc). This README documents the system technically: code, gates, workflows, and data.
 
-For a code-backed comparison against the broader options framework, see the
-[implementation status assessment](docs/implementation-status.md). It records
-the review date, current coverage, material threshold differences, and the
-largest remaining gaps.
+For the full options framework with code-backed implementation status,
+rationale, threshold differences, and prioritized remaining work, see the
+[comprehensive framework assessment](docs/comprehensive-options-market-analysis-framework.md).
 
 ## Repository layout
 

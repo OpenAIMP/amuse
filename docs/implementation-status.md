@@ -3,6 +3,10 @@
 **Reviewed:** 2026-10-13
 **Repository revision:** `2d060e9` (`origin/main` at review time)
 
+The complete framework with section-by-section status, rationale, and
+prioritized remaining work is in the
+[comprehensive framework assessment](comprehensive-options-market-analysis-framework.md).
+
 ## Summary
 
 Amuse implements a capable options screening and paper-risk workflow. It does
