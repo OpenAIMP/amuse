@@ -67,14 +67,18 @@ class TestParseChain(unittest.TestCase):
         real = mcp_client.mcp_call
         mcp_client.mcp_call = self._fake_chain
         try:
-            out, diag = oc.parse_chain("XOM", "2026-01-16", "TEST",
-                                       min_liquidity=10,
-                                       max_spread_pct=0.25, want="puts")
+            out, diag, rejected = oc.parse_chain("XOM", "2026-01-16", "TEST",
+                                                  min_liquidity=10,
+                                                  max_spread_pct=0.25, want="puts")
         finally:
             mcp_client.mcp_call = real
         # 95 put passes; 90 put has zero bid -> bad_quote
         self.assertEqual(sorted(out), ["XOM260116P00095000"])
         self.assertEqual(diag["bad_quote"], 1)
+        # issue #38: rejected contracts are captured, not just counted
+        self.assertEqual(len(rejected), 1)
+        self.assertEqual(rejected[0]["gate"], "bad_quote")
+        self.assertEqual(rejected[0]["strike"], 90.0)
         c = out["XOM260116P00095000"]
         self.assertAlmostEqual(c["strike"], 95.0)
         self.assertAlmostEqual(c["mid"], 1.25)
