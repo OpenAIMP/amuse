@@ -1,0 +1,41 @@
+# Undervalued universe: historically low-P/E sectors (issue #30)
+# Banks, energy, healthcare value names. Updated 2026-10-12.
+# NOTE: true P/E filtering arrives with issue #31. This list seeds
+# the universe with names that typically screen cheap on multiples.
+JPM
+BAC
+WFC
+C
+GS
+MS
+USB
+PNC
+TFC
+COF
+XOM
+CVX
+COP
+EOG
+MPC
+PSX
+VLO
+OXY
+PFE
+MRK
+BMY
+ABBV
+AMGN
+GILD
+BIIB
+REGN
+VRTX
+T
+VZ
+WBA
+KHC
+KMB
+CL
+GIS
+CPB
+SJM
+CAG
