@@ -33,7 +33,7 @@ from zoneinfo import ZoneInfo
 
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
 if not ACCT:
-    raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
+    raise SystemExit("PUBLIC_ACCOUNT_ID is not set; set the environment variable locally or configure the GitHub Actions repository secret (#23)")
 
 ET = ZoneInfo("America/New_York")
 MARKET_OPEN_MIN = 9 * 60 + 30   # 9:30 ET in minutes since midnight
