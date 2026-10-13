@@ -141,6 +141,18 @@ measure freshness and priced-leg coverage. Then persist overrides and connect
 recommendations to paper/live fills and costs. No return improvement can be
 claimed until evaluated out of sample after costs.
 
+### Workflow confidentiality and reliability
+
+The GitHub Actions follow-up in issue [#48](https://github.com/OpenAIMP/amuse/issues/48)
+removes the account-ID literal fallback, requires the repository secret,
+enables `pipefail` for screener output piped through `tee`, and runs the daily
+PMCC exception monitor after earlier step failures. This should prevent
+account identifiers from being newly exposed in workflow source and reduce
+false-green runs or missed monitoring. These are security/operational benefits;
+they do not establish a trading-performance improvement. After merge, track
+workflow failures accurately detected and PMCC runs completed after upstream
+failures.
+
 ### Gradual improvement path
 
 1. **Connect a dependable snapshot source:** replace manual spot/IV/rate

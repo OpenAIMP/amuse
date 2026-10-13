@@ -51,8 +51,10 @@ jobs:
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
         run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           STAMP=$(date -u +%F-%H%M)
           echo "STAMP=$STAMP" >> $GITHUB_ENV
           ARGS=""
