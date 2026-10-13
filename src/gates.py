@@ -78,6 +78,13 @@ DEFAULTS = {
         "max_loss_pct": 0.02, "heat_cap_pct": 0.35,
         "fee_per_contract": 0.65,
     },
+    "cross_stock": {
+        "min_correlation": 0.60, "min_observations": 30,
+        "max_net_delta_pct": 0.10, "max_beta_exposure_pct": 0.25,
+        "max_concentration_pct": 0.60,
+        "max_spread_pct": 0.25, "min_liquidity": 10,
+        "contract_multiplier": 100,
+    },
     "vol": {
         "hv_short": 20, "hv_long": 60,
         "ivr_sell": 50, "ivr_stand_down": 25,
