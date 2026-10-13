@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Options spread screener: bull put spreads + iron condors + asymmetric iron condors
+Options spread screener: bull put spreads, bear call spreads, bull call debit
+spreads, bear put debit spreads, iron condors + asymmetric iron condors
 (defined-risk variant).
 
 Two stages (same discipline as pmcc_quality.py v3):
@@ -53,7 +54,7 @@ def _apply_gates(path=None):
     global SPREAD_DTE_MIN, SPREAD_DTE_MAX, SHORT_DELTA_MIN, SHORT_DELTA_MAX
     global SPREAD_WIDTH, MAX_SPREAD_PCT, MIN_LIQUIDITY, MAX_SPREAD_LOSS
     global MAX_FRICTION, CALL_DISTANCE_MIN, WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR
-    global VOL_CFG
+    global VOL_CFG, DEBIT_LONG_DELTA_MIN, DEBIT_LONG_DELTA_MAX
     G = _gates_mod.load(path)["spreads"]
     SPREAD_DTE_MIN, SPREAD_DTE_MAX = G["dte_min"], G["dte_max"]
     SHORT_DELTA_MIN, SHORT_DELTA_MAX = G["short_delta_min"], G["short_delta_max"]
@@ -64,6 +65,8 @@ def _apply_gates(path=None):
     MAX_FRICTION = G["max_friction"]
     CALL_DISTANCE_MIN = G["call_distance_min"]
     WIDTH_MIN, WIDTH_MAX, WIDTH_DIVISOR = G["width_min"], G["width_max"], G["width_divisor"]
+    DEBIT_LONG_DELTA_MIN = G["debit_long_delta_min"]
+    DEBIT_LONG_DELTA_MAX = G["debit_long_delta_max"]
     VOL_CFG = _gates_mod.load(path)["vol"]
 
 
@@ -199,6 +202,8 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     """
     reasons, diag = [], {}
     sk, lk = short_c["strike"], long_c["strike"]
+    if width <= 0:
+        reasons.append("invalid width")
     if kind == "bull_put":
         if not (sk < spot):
             reasons.append("short put not OTM")
@@ -237,7 +242,7 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     _cd = credit * 100
     # bull put: best = above breakeven; worst = below long strike
     # bear call: best = below breakeven; worst = above long strike
-    _is_put = kind == "bull_put_spread"
+    _is_put = kind == "bull_put"
     return {
         "accepted": True,
         "kind": kind,
@@ -249,6 +254,7 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "short_delta": short_c["delta"],
         "credit_per_share": credit,
         "credit_total": credit * 100,
+        "max_profit_total": credit * 100,
         "max_loss_total": max_loss,
         "breakeven": breakeven,
         "return_on_risk": credit / (width - credit),
@@ -263,6 +269,86 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
                                      round(max_loss / _cd, 2) if _cd > 0 else None),
         "best_case_range": ([round(breakeven, 2), "and up"] if _is_put
                             else ["and down", round(breakeven, 2)]),
+        "worst_case_price": round(lk, 2),
+    }
+
+
+def evaluate_debit_vertical(spot, long_c, short_c, width, kind):
+    """Evaluate one debit vertical. kind in {"bull_call_debit", "bear_put_debit"}.
+
+    Conservative debit = long ask - short bid. Max loss is the debit paid;
+    max profit is width - debit. Same stable reason categories as
+    evaluate_vertical; numeric details go in diagnostics.
+    """
+    reasons, diag = [], {}
+    lk, sk = long_c["strike"], short_c["strike"]
+    if kind == "bull_call_debit":
+        expected_short = round(lk + width, 3)
+    else:  # bear_put_debit
+        expected_short = round(lk - width, 3)
+    if round(sk, 3) != expected_short:
+        reasons.append("short leg not at width")
+    if width <= 0:
+        reasons.append("invalid width")
+    if "delta" not in long_c or "delta" not in short_c:
+        reasons.append("delta unavailable")
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    ld, sd = abs(long_c["delta"]), abs(short_c["delta"])
+    if not (DEBIT_LONG_DELTA_MIN <= ld <= DEBIT_LONG_DELTA_MAX):
+        reasons.append("long delta outside range")
+        diag["long_delta"] = round(ld, 3)
+    debit = long_c["ask"] - short_c["bid"]
+    if debit <= 0:
+        reasons.append("nonpositive net debit")
+    elif width > 0 and debit >= width:
+        reasons.append("net debit not below width")
+        diag["debit"] = round(debit, 2)
+    max_loss = debit * 100 if debit > 0 else float("inf")
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("max loss over limit")
+        diag["max_loss"] = round(max_loss, 0)
+    friction = ((long_c["spread"] + short_c["spread"]) / debit
+                if debit > 0 else float("inf"))
+    if friction > MAX_FRICTION:
+        reasons.append("execution friction over limit")
+        diag["friction"] = round(friction, 2)
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    max_profit = (width - debit) * 100
+    if kind == "bull_call_debit":
+        breakeven = lk + debit
+    else:
+        breakeven = lk - debit
+    net_delta = long_c["delta"] - short_c["delta"]
+    # P(profit) ~ P(finish beyond breakeven): interpolate |delta| of the long
+    # leg (P at long strike) toward the short leg by the fraction of width paid.
+    _pwin = max(0.0, min(1.0, ld + (sd - ld) * (debit / width)))
+    ev = round(_pwin * max_profit - (1 - _pwin) * max_loss, 0)
+    loss_mult = round(max_loss / max_profit, 2) if max_profit > 0 else None
+    return {
+        "accepted": True,
+        "kind": kind,
+        "long_sym": long_c["sym"], "short_sym": short_c["sym"],
+        "long_strike": lk, "short_strike": sk,
+        "expiration": long_c["expiration"],
+        "dte": dte(long_c["expiration"]),
+        "width": width,
+        "long_delta": long_c["delta"],
+        "debit_per_share": debit,
+        "debit_total": debit * 100,
+        "max_profit_total": max_profit,
+        "max_loss_total": max_loss,
+        "breakeven": breakeven,
+        "return_on_risk": max_profit / max_loss,
+        "friction": friction,
+        "net_delta": net_delta,
+        "leg_spread_sum": long_c["spread"] + short_c["spread"],
+        "win_prob_est": round(_pwin, 3),
+        "expected_value": ev,
+        "loss_multiple": loss_mult,
+        "lucrative": lucrative_label(round(_pwin, 3), ev, loss_mult),
+        "best_case_range": ([round(sk, 2), "and up"] if kind == "bull_call_debit"
+                            else ["and down", round(sk, 2)]),
         "worst_case_price": round(lk, 2),
     }
 
@@ -454,7 +540,9 @@ def evaluate_asym_condor(spot, put_wing, call_wing, width):
     }
 
 
-def narrate_spreads(bull_puts, condors, asym_condors, rej_all):
+def narrate_spreads(bull_puts, condors, asym_condors, rej_all,
+                    bear_calls=None, bull_call_debits=None,
+                    bear_put_debits=None):
     """Plain-English readout. Every claim comes from computed values.
 
     Returns a list of lines; top 3 opportunities per strategy, or the
@@ -485,6 +573,45 @@ def narrate_spreads(bull_puts, condors, asym_condors, rej_all):
                          + ", ".join(f"{k} x{v}" for k, v in top) + ".")
         else:
             lines.append("No bull put spreads qualified.")
+
+    if bear_calls:
+        lines.append("Top bear call spreads:")
+        for r in bear_calls[:3]:
+            above = (r["short_strike"] / r["spot"] - 1) * 100
+            lines.append(
+                f"- {r['stock']} {r['expiration']} "
+                f"{r['short_strike']:.0f}/{r['long_strike']:.0f}C: "
+                f"RoR {r['return_on_risk']*100:.1f}% at {r['dte']} DTE, "
+                f"short strike {above:.0f}% above spot; {ev_text(r)}.")
+    else:
+        top = top_rejections(rej_all.get("bear_call", {}))
+        if top:
+            lines.append("No bear call spreads qualified — gates hit hardest: "
+                         + ", ".join(f"{k} x{v}" for k, v in top) + ".")
+        else:
+            lines.append("No bear call spreads qualified.")
+
+    for rows, title, key, label, side in (
+            (bull_call_debits, "Top bull call debit spreads:",
+             "bull_call_debit", "bull call debit spreads", "C"),
+            (bear_put_debits, "Top bear put debit spreads:",
+             "bear_put_debit", "bear put debit spreads", "P")):
+        if rows:
+            lines.append(title)
+            for r in rows[:3]:
+                lines.append(
+                    f"- {r['stock']} {r['expiration']} "
+                    f"{r['long_strike']:.0f}/{r['short_strike']:.0f}{side}: "
+                    f"RoR {r['return_on_risk']*100:.1f}% at {r['dte']} DTE, "
+                    f"debit ${r['debit_total']:.0f}, "
+                    f"breakeven {r['breakeven']:.2f}; {ev_text(r)}.")
+        else:
+            top = top_rejections(rej_all.get(key, {}))
+            if top:
+                lines.append(f"No {label} qualified — gates hit hardest: "
+                             + ", ".join(f"{k} x{v}" for k, v in top) + ".")
+            else:
+                lines.append(f"No {label} qualified.")
 
     if condors:
         lines.append("Top iron condors:")
@@ -532,14 +659,16 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
     """Price all structures for one underlying. Returns a result dict.
 
     Pure per-symbol work; safe to run in a thread pool (issue #14).
-    Keys: bp/ic/ac (top-3 accepted structure lists), notes (list),
+    Keys: bp/bc/bcd/bpd/ic/ac (top-3 accepted structure lists), notes (list),
     rejs ({kind: {reason: count}}), vol_veto (int), error (None or str),
     considered (issue #38: every evaluated structure with qualification),
     chain (issue #38: every retrieved contract with its gate status).
     """
-    out = {"bp": [], "ic": [], "ac": [], "notes": [],
+    out = {"bp": [], "bc": [], "bcd": [], "bpd": [], "ic": [], "ac": [],
+           "notes": [],
            "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {},
-                    "asym_condor": {}},
+                    "asym_condor": {}, "bull_call_debit": {},
+                    "bear_put_debit": {}},
            "vol_veto": 0, "error": None}
     spot = spot_map.get(sym)
     if spot is None or not math.isfinite(spot) or spot <= 0:
@@ -578,12 +707,14 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 diag_c[k] = diag_c.get(k, 0) + v
 
         # Greeks for strike-plausible candidates only (limits batch size).
+        # The window extends slightly past spot so near-the-money long legs
+        # of the debit spreads get greeks too.
         put_syms = [c["sym"] for pc in puts_by_exp.values()
                     for c in pc.values()
-                    if spot * 0.60 <= c["strike"] < spot]
+                    if spot * 0.60 <= c["strike"] <= spot * 1.15]
         call_syms = [c["sym"] for cc in calls_by_exp.values()
                      for c in cc.values()
-                     if spot < c["strike"] <= spot * 1.40]
+                     if spot * 0.85 <= c["strike"] <= spot * 1.40]
         g, gerr = chain_greeks(put_syms + call_syms, ACCT,
                                signed=True, batch_size=GREEKS_BATCH)
         for pc in puts_by_exp.values():
@@ -638,8 +769,11 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                 calls_by_strike[(c["expiration"], c["strike"])] = c
 
         bp_rej, bc_rej, ic_rej, ac_rej = {}, {}, {}, {}
+        bcd_rej, bpd_rej = {}, {}
         bp_n_rej = bc_n_rej = ic_n_rej = jl_n_rej = 0
+        bcd_n_rej = bpd_n_rej = 0
         bp_accepted, bc_accepted = [], []
+        bcd_accepted, bpd_accepted = [], []
         # Issue #38: qualify-don't-filter. Every evaluated structure lands
         # here with its qualification and reasons, accepted or not.
         considered = []
@@ -707,6 +841,48 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
             _record("bear_call", r["expiration"], r["short_strike"],
                     r["long_strike"], "accepted", [])
 
+        # Debit verticals: long near-the-money leg, short leg one width away.
+        def _debit_pass(kind, contracts_by_exp, by_strike, sign, rej, accepted):
+            n_rej = 0
+            for cmap in contracts_by_exp.values():
+                for l in cmap.values():
+                    if "delta" not in l:
+                        continue
+                    if not (DEBIT_LONG_DELTA_MIN <= abs(l["delta"])
+                            <= DEBIT_LONG_DELTA_MAX):
+                        continue
+                    target = round(l["strike"] + sign * width, 3)
+                    s = by_strike.get((l["expiration"], target))
+                    if s is None:
+                        n_rej += 1
+                        rej["short leg missing at width"] = \
+                            rej.get("short leg missing at width", 0) + 1
+                        _record(kind, l["expiration"], target, l["strike"],
+                                "rejected", ["short leg missing at width"])
+                        continue
+                    flags, event_reasons = spread_events(
+                        sym, l["expiration"], events)
+                    r = evaluate_debit_vertical(spot, l, s, width, kind)
+                    reasons = r.get("reasons", []) + event_reasons
+                    if reasons:
+                        n_rej += 1
+                        for reason in reasons:
+                            rej[reason] = rej.get(reason, 0) + 1
+                        _record(kind, l["expiration"], s["strike"],
+                                l["strike"], "rejected", reasons,
+                                r.get("diagnostics"))
+                        continue
+                    r.update({"stock": sym, "spot": spot, "events": flags})
+                    accepted.append(r)
+                    _record(kind, r["expiration"], r["short_strike"],
+                            r["long_strike"], "accepted", [])
+            return n_rej
+
+        bcd_n_rej = _debit_pass("bull_call_debit", calls_by_exp,
+                                calls_by_strike, 1, bcd_rej, bcd_accepted)
+        bpd_n_rej = _debit_pass("bear_put_debit", puts_by_exp,
+                                puts_by_strike, -1, bpd_rej, bpd_accepted)
+
         # Iron condors: cross accepted wings on the same expiration.
         ic_accepted = []
         for pw in bp_accepted:
@@ -766,33 +942,44 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        bcd_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        bpd_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
 
         # Vol assessment (issue #7): sits between Regime and Timing.
         # Cheap premium stands down -- structures are vetoed, not ranked.
-        if not no_vol and (bp_accepted or ic_accepted or ac_accepted):
+        if not no_vol and (bp_accepted or bc_accepted or ic_accepted
+                           or ac_accepted):
             vol_read = vol_read_for(sym, spot, puts_by_exp, calls_by_exp,
                                     exps, iv_hist_path)
             slim = {k: vol_read[k] for k in
                     ("iv", "hv", "iv_rank", "iv_vs_hv",
                      "skew_25d", "term_structure", "decision")}
-            for r in bp_accepted + ic_accepted + ac_accepted:
+            for r in (bp_accepted + bc_accepted + ic_accepted + ac_accepted
+                      + bcd_accepted + bpd_accepted):
                 r["vol"] = slim
             notes.append(
                 "vol: " + ", ".join(f"{k}={v}" for k, v in slim.items())
                 + f" ({vol_read['reason']})")
             if vol_read["decision"] == _vol.STAND_DOWN:
-                n_veto = (len(bp_accepted) + len(ic_accepted)
-                          + len(ac_accepted))
+                n_veto = (len(bp_accepted) + len(bc_accepted)
+                          + len(ic_accepted) + len(ac_accepted))
                 out["vol_veto"] += n_veto
                 notes.append(f"vol veto: {n_veto} structures stood down "
                              "(cheap premium)")
+                # Debit spreads buy premium: cheap premium is not a veto.
                 for c in considered:
-                    if c["qualification"] == "accepted":
+                    if (c["qualification"] == "accepted"
+                            and c["structure"] not in
+                            ("bull_call_debit", "bear_put_debit")):
                         c["qualification"] = "rejected"
                         c["reasons"] = ["vol veto: cheap premium"]
-                bp_accepted, ic_accepted, ac_accepted = [], [], []
+                bp_accepted, bc_accepted = [], []
+                ic_accepted, ac_accepted = [], []
 
         out["bp"] = bp_accepted[:3]
+        out["bc"] = bc_accepted[:3]
+        out["bcd"] = bcd_accepted[:3]
+        out["bpd"] = bpd_accepted[:3]
         out["ic"] = ic_accepted[:3]
         out["ac"] = ac_accepted[:3]
         out["considered"] = considered
@@ -806,6 +993,14 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                      f"{bc_n_rej} rejected")
         for reason, cnt in sorted(bc_rej.items(), key=lambda kv: (-kv[1], kv[0])):
             notes.append(f"  bear-call rejections: {reason} x{cnt}")
+        notes.append(f"bull call debits: {len(bcd_accepted)} accepted, "
+                     f"{bcd_n_rej} rejected")
+        for reason, cnt in sorted(bcd_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  bull-call-debit rejections: {reason} x{cnt}")
+        notes.append(f"bear put debits: {len(bpd_accepted)} accepted, "
+                     f"{bpd_n_rej} rejected")
+        for reason, cnt in sorted(bpd_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  bear-put-debit rejections: {reason} x{cnt}")
         notes.append(f"iron condors: {len(ic_accepted)} accepted, "
                      f"{ic_n_rej} rejected")
         for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
@@ -815,7 +1010,9 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         for reason, cnt in sorted(ac_rej.items(), key=lambda kv: (-kv[1], kv[0])):
             notes.append(f"  asym condor rejections: {reason} x{cnt}")
         for src, key in ((bp_rej, "bull_put"), (bc_rej, "bear_call"),
-                         (ic_rej, "iron_condor"), (ac_rej, "asym_condor")):
+                         (ic_rej, "iron_condor"), (ac_rej, "asym_condor"),
+                         (bcd_rej, "bull_call_debit"),
+                         (bpd_rej, "bear_put_debit")):
             for k, v in src.items():
                 out["rejs"][key][k] = out["rejs"][key].get(k, 0) + v
         out["notes"] = notes
@@ -902,28 +1099,28 @@ def main():
         print(quote_error, file=sys.stderr)
 
     bull_puts, condors, asym_condors = [], [], []
+    bear_calls, bull_call_debits, bear_put_debits = [], [], []
     stock_notes, diagnostics = {}, {}
     screened = []
     vol_veto_total = 0
     rej_all = {"bull_put": {}, "bear_call": {}, "iron_condor": {},
-               "asym_condor": {}}
+               "asym_condor": {}, "bull_call_debit": {}, "bear_put_debit": {}}
+
+    def _empty(error):
+        return {"bp": [], "bc": [], "bcd": [], "bpd": [], "ic": [],
+                "ac": [], "notes": [], "rejs": {k: {} for k in rej_all},
+                "vol_veto": 0, "error": error}
 
     def safe(sym):
         if quote_error:
-            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
-                          "rejs": {"bull_put": {}, "bear_call": {},
-                                   "iron_condor": {}, "asym_condor": {}},
-                          "vol_veto": 0, "error": quote_error})
+            return (sym, _empty(quote_error))
         try:
             return (sym, screen_spreads_sym(sym, spot_map, width_arg,
                                             events, iv_hist_path,
                                             args.no_vol))
         except Exception as e:  # one bad name never kills the run
-            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
-                          "rejs": {"bull_put": {}, "bear_call": {},
-                                   "iron_condor": {}, "asym_condor": {}},
-                          "vol_veto": 0,
-                          "error": f"unexpected error: {type(e).__name__}: {e}"})
+            return (sym, _empty(
+                f"unexpected error: {type(e).__name__}: {e}"))
 
     # Thread pool over names (issue #14). Merge in submission order in the
     # main thread: no shared-state locks, deterministic output.
@@ -936,7 +1133,8 @@ def main():
                             "chain": r.get("chain", []),
                             "notes": stock_notes[sym],
                             "error": r.get("error")}
-        accepted_count = len(r["bp"]) + len(r["ic"]) + len(r["ac"])
+        accepted_count = (len(r["bp"]) + len(r["bc"]) + len(r["bcd"])
+                          + len(r["bpd"]) + len(r["ic"]) + len(r["ac"]))
         if r["error"]:
             screened.append(evaluation_record({"symbol": sym}, error=r["error"]))
         else:
@@ -947,6 +1145,9 @@ def main():
             for k, v in d.items():
                 rej_all[key][k] = rej_all[key].get(k, 0) + v
         bull_puts.extend(r["bp"])
+        bear_calls.extend(r["bc"])
+        bull_call_debits.extend(r["bcd"])
+        bear_put_debits.extend(r["bpd"])
         condors.extend(r["ic"])
         asym_condors.extend(r["ac"])
         vol_veto_total += r["vol_veto"]
@@ -954,6 +1155,8 @@ def main():
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     asym_condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    for rows in (bear_calls, bull_call_debits, bear_put_debits):
+        rows.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     if vol_veto_total:
         print(f"\nVol vetoes: {vol_veto_total} structures stood down on cheap "
               "premium (issue #7).")
@@ -969,6 +1172,34 @@ def main():
               f"{r['credit_total']:>9.0f}{r['max_loss_total']:>10.0f}"
               f"{r['breakeven']:>11.2f}{r['return_on_risk']*100:>7.1f}"
               f"{r['friction']:>6.1f}{ev}")
+
+    print("\n=== BEAR CALL SPREADS (ranked by return on risk) ===")
+    print(f"{'sym':<5}{'exp':<12}{'strikes':<10}{'DTE':>4}{'Δsh':>6}"
+          f"{'credit$':>9}{'maxloss$':>10}{'breakeven':>11}{'RoR%':>7}{'fric':>6}")
+    for r in bear_calls[:24]:
+        ev = " !! " + "; ".join(r["events"]) if r["events"] else ""
+        print(f"{r['stock']:<5}{r['expiration']:<12}"
+              f"{r['short_strike']:.0f}/{r['long_strike']:.0f}C{'':<4}"
+              f"{r['dte']:>4}{abs(r['short_delta']):>6.2f}"
+              f"{r['credit_total']:>9.0f}{r['max_loss_total']:>10.0f}"
+              f"{r['breakeven']:>11.2f}{r['return_on_risk']*100:>7.1f}"
+              f"{r['friction']:>6.1f}{ev}")
+
+    for title, rows, side in (("BULL CALL DEBIT SPREADS", bull_call_debits, "C"),
+                              ("BEAR PUT DEBIT SPREADS", bear_put_debits, "P")):
+        print(f"\n=== {title} (ranked by return on risk) ===")
+        print(f"{'sym':<5}{'exp':<12}{'strikes':<10}{'DTE':>4}{'Δlong':>7}"
+              f"{'debit$':>8}{'maxprof$':>10}{'maxloss$':>10}{'breakeven':>11}"
+              f"{'RoR%':>7}{'fric':>6}")
+        for r in rows[:24]:
+            ev = " !! " + "; ".join(r["events"]) if r["events"] else ""
+            print(f"{r['stock']:<5}{r['expiration']:<12}"
+                  f"{r['long_strike']:.0f}/{r['short_strike']:.0f}{side}{'':<4}"
+                  f"{r['dte']:>4}{abs(r['long_delta']):>7.2f}"
+                  f"{r['debit_total']:>8.0f}{r['max_profit_total']:>10.0f}"
+                  f"{r['max_loss_total']:>10.0f}"
+                  f"{r['breakeven']:>11.2f}{r['return_on_risk']*100:>7.1f}"
+                  f"{r['friction']:>6.1f}{ev}")
 
     print("\n=== IRON CONDORS (ranked by return on risk) ===")
     print(f"{'sym':<5}{'exp':<12}{'put wing':<11}{'call wing':<11}{'DTE':>4}"
@@ -998,8 +1229,10 @@ def main():
               f"{r['upside_distance_pct']:>6.1f}"
               f"{r['return_on_risk']*100:>7.1f}{ev}")
 
-    print("\n* return on risk = credit / max loss: a screening ratio, not an "
-          "expected return. Credits use conservative short-bid minus long-ask fills.")
+    print("\n* return on risk = credit / max loss (debit spreads: max profit / "
+          "debit): a screening ratio, not an expected return. Credits use "
+          "conservative short-bid minus long-ask fills; debits use long-ask "
+          "minus short-bid.")
     print("\nRejection notes:")
     for sym in names:
         for n in stock_notes.get(sym, ["no data"]):
@@ -1008,24 +1241,56 @@ def main():
     print("\n=== READOUT ===")
     readout = []
     try:
-        readout = narrate_spreads(bull_puts, condors, asym_condors, rej_all)
+        readout = narrate_spreads(
+            bull_puts, condors, asym_condors, rej_all,
+            bear_calls=bear_calls, bull_call_debits=bull_call_debits,
+            bear_put_debits=bear_put_debits)
         for line in readout:
             print(line)
     except Exception:
         print("readout unavailable")
 
     if args.json_out:
-        best = {"bull_puts": {}, "iron_condors": {}, "asym_condors": {}}
-        for r in bull_puts:
-            if r["stock"] not in best["bull_puts"]:
-                best["bull_puts"][r["stock"]] = {
+        best = {"bull_puts": {}, "iron_condors": {}, "asym_condors": {},
+                "bear_calls": {}, "bull_call_debits": {},
+                "bear_put_debits": {}}
+        for key, rows in (("bull_puts", bull_puts), ("bear_calls", bear_calls)):
+            for r in rows:
+                if r["stock"] in best[key]:
+                    continue
+                best[key][r["stock"]] = {
                     "expiration": r["expiration"],
                     "short_strike": r["short_strike"],
                     "long_strike": r["long_strike"],
                     "credit_total": round(r["credit_total"], 0),
                     "max_loss_total": round(r["max_loss_total"], 0),
+                    "net_delta": round(r["net_delta"], 3),
+                    "friction": round(r["friction"], 2),
                     "breakeven": round(r["breakeven"], 2),
                     "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
+                    "events": r["events"],
+                    "vol": r.get("vol"),
+                }
+        for key, rows in (("bull_call_debits", bull_call_debits),
+                          ("bear_put_debits", bear_put_debits)):
+            for r in rows:
+                if r["stock"] in best[key]:
+                    continue
+                best[key][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "long_strike": r["long_strike"],
+                    "short_strike": r["short_strike"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_profit_total": round(r["max_profit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "breakeven": round(r["breakeven"], 2),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "net_delta": round(r["net_delta"], 3),
+                    "friction": round(r["friction"], 2),
                     "win_prob_est": r.get("win_prob_est"),
                     "expected_value": r.get("expected_value"),
                     "loss_multiple": r.get("loss_multiple"),

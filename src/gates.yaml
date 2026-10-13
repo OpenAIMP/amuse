@@ -19,6 +19,8 @@ spreads:
   max_loss: 1000            # $ max loss gate per spread
   max_friction: 3.0         # combined leg spreads / net credit
   call_distance_min: 0.08   # asym condor: call-wing short strike >= 8% above spot
+  debit_long_delta_min: 0.40  # debit spreads: long (near-the-money) leg abs delta floor
+  debit_long_delta_max: 0.70  # debit spreads: long leg abs delta cap
 
 stock:
   price_min: 10.0
