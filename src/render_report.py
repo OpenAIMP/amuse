@@ -963,40 +963,95 @@ def premarket_section(data, report_mode=False):
         if report_mode:
             return ""
         return section("Pre-market gap screen", '<p class="empty">No data yet — run the pre-market screener.</p>')
-    cands = sorted(data.get("candidates") or [],
-                   key=lambda c: -((c.get("conviction") or 0)
-                                   if isinstance(c.get("conviction"), (int, float)) else -1))
+    all_rows = data.get("screened")
+    has_full_universe = isinstance(all_rows, list)
+    if has_full_universe:
+        status_order = {"qualified": 0, "rejected": 1,
+                        "incomplete_data": 2, "error": 3}
+        cands = sorted(all_rows, key=lambda c: (
+            status_order.get(c.get("qualification_status"), 4),
+            -((c.get("conviction") or 0)
+              if isinstance(c.get("conviction"), (int, float)) else -1),
+            str(c.get("symbol") or "")))
+    else:
+        # Older reports only persisted selected candidates and a capped list
+        # of near-misses, so they cannot show the full screened universe.
+        cands = sorted(data.get("candidates") or [],
+                       key=lambda c: -((c.get("conviction") or 0)
+                                       if isinstance(c.get("conviction"), (int, float)) else -1))
     rows = []
     for c in cands:
+        qualification = c.get("qualification_status", "qualified")
+        selected = c.get("selected", qualification == "qualified")
+        rank = c.get("candidate_rank")
+        rank_label = f" #{rank}" if isinstance(rank, int) else ""
+        if qualification == "qualified":
+            selection_label = (f"SELECTED{rank_label}" if selected else
+                               f"QUALIFIED · NOT SELECTED{rank_label}")
+            selection_class = "good" if selected else "warn"
+        else:
+            selection_label = "—"
+            selection_class = ""
+        status_label = {"qualified": "QUALIFIED", "rejected": "REJECTED",
+                        "incomplete_data": "INCOMPLETE DATA", "error": "ERROR"}.get(
+                            qualification, str(qualification).upper())
+        status_class = ("good" if qualification == "qualified" else
+                        "warn" if qualification in ("incomplete_data", "error") else "bad")
+        reasons = c.get("qualification_reasons") or c.get("missed") or []
+        details = "; ".join(str(reason) for reason in reasons) or "Passed all configured gates"
         rows.append(
             "<tr>"
             f"{sym_cell(c.get('symbol'))}"
+            f"<td><span class='badge {status_class}'>{esc(status_label)}</span></td>"
+            f"<td><span class='badge {selection_class}'>{esc(selection_label)}</span></td>"
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
+            f"<td class='num'>{num(c.get('prior_close'), 2)}</td>"
             f"<td class='num'>{num(c.get('gap_pct'), 2, '%')}</td>"
             f"<td class='num'>{num(c.get('rel_vol'), 1)}×</td>"
+            f"<td>{esc(c.get('session') or '—')}</td>"
             f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
             f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
+            f"<td class='num'>{num(c.get('range_atr'), 2)}</td>"
+            f"<td class='num'>{num(c.get('conviction'), 1)}</td>"
             f"<td>{bias_badge(c.get('bias'))}</td>"
+            f"<td>{esc(details)}</td>"
             "</tr>"
         )
+    if has_full_universe:
+        counts = {key: sum(1 for row in all_rows
+                           if row.get("qualification_status") == key)
+                  for key in ("qualified", "rejected", "incomplete_data", "error")}
+        selected_count = sum(1 for row in all_rows if row.get("selected"))
+        summary = (f"{len(all_rows)} symbols evaluated · {selected_count} selected · "
+                   f"{counts['qualified']} qualified · {counts['rejected']} rejected · "
+                   f"{counts['incomplete_data']} incomplete data · {counts['error']} errors")
+        summary_html = f'<p class="fine">{esc(summary)}</p>'
+    else:
+        summary_html = ('<p class="fine">Per-symbol evaluations were not saved for this legacy run; '
+                        f"{len(cands)} candidate rows are available from a universe of {esc(data.get('universe', 'unknown'))} symbols.</p>")
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th title='Underlying symbol. Click for quote pages.'>Symbol</th>"
+        "<th>Qualification</th><th>Selection</th>"
         "<th title='Last price at screen time.'>Price</th>"
+        "<th>Prior close</th>"
         "<th title='Overnight gap: (open / prior close − 1). Gate: at least 2% in either direction.'>Gap%</th>"
         "<th title='Pre-market volume vs its recent average. Gate: at least 1.5×.'>RelVol</th>"
+        "<th>Session data</th>"
         "<th title='Distance from the developing session VWAP (%). Sets gap-and-go vs fade bias.'>VWAP dist</th>"
         "<th title='Average True Range as % of price. Gate: 1–8%.'>ATR%</th>"
+        "<th>Range / ATR</th><th>Conviction</th>"
         "<th title='Gap-and-go vs fade bias from the developing-VWAP side. Not a prediction.'>Bias</th>"
+        "<th>Qualification details</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
-           '<tr><td colspan="7" class="empty">No gap candidates — quiet pre-market.</td></tr>')
+           f'<tr><td colspan="14" class="empty">No symbols evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
         + "</tbody></table></div>"
     )
     # Near-misses: rejected but close — explains an empty table (#26)
     near = data.get("near_misses") or []
     near_html = ""
-    if near:
+    if near and not has_full_universe:
         nrows = []
         for n in near:
             missed = "; ".join(n.get("missed") or [])
@@ -1032,7 +1087,7 @@ def premarket_section(data, report_mode=False):
         "Technical-only — check headlines before trading any candidate. "
         "Bias is not a prediction.</p>"
     )
-    return section("Pre-market gap screen", table + near_html + readout + fine)
+    return section("Pre-market gap screen", summary_html + table + near_html + readout + fine)
 
 
 def intraday_section(data, report_mode=False):
@@ -1364,7 +1419,12 @@ def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None,
     if rtype == "premarket":
         cands = (premarket or {}).get("candidates") or []
         gg = sum(1 for c in cands if "gap-and-go" in ((c or {}).get("bias") or ""))
+        counts = (premarket or {}).get("qualification_counts") or {}
         return {"candidates": len(cands), "gap_and_go": gg,
+                "qualified": counts.get("qualified", len(cands)),
+                "rejected": counts.get("rejected", 0),
+                "incomplete_data": counts.get("incomplete_data", 0),
+                "errors": counts.get("error", 0),
                 "screened": (premarket or {}).get("universe")}
     if rtype == "intraday":
         cands = (intraday or {}).get("candidates") or []
