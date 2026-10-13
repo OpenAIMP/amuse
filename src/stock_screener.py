@@ -439,6 +439,32 @@ def signal_score(m):
     return round(s, 1), detail
 
 
+def stock_verdict(metrics):
+    """Verdict for a passing stock: (verdict, reason). Issue #39.
+
+    Go for it: score >= 25, trend UP/RNG, bullish bias — actionable setup.
+    Watch: score >= 20 but missing a Go criterion — decent, not quite there.
+    Pass: score < 20 — below the actionable threshold.
+    """
+    score = metrics.get("score", 0) or 0
+    ind = metrics.get("indicators", {}) or {}
+    trend = (ind.get("structure") or {}).get("trend", "")
+    bias = (ind.get("tape") or {}).get("bias", "")
+    if score >= 25 and trend in ("UP", "RNG") and bias == "bullish":
+        return ("Go for it",
+                f"score {score:.1f}/40, {trend} trend, bullish bias")
+    if score >= 20:
+        gaps = []
+        if trend not in ("UP", "RNG"):
+            gaps.append(f"{trend or 'unknown'} trend")
+        if bias != "bullish":
+            gaps.append(f"{bias or 'no'} bias")
+        if score < 25:
+            gaps.append(f"score {score:.1f} < 25")
+        return ("Watch", "; ".join(gaps) if gaps else "decent setup")
+    return ("Pass", f"score {score:.1f} below 20")
+
+
 def narrate_stock(passing, rejected, names):
     """Plain-English readout. Every claim comes from computed values.
 
@@ -583,6 +609,9 @@ def screen_stock(sym):
         metrics["score_breakdown"] = {"base": base, "signals": sig,
                                       "detail": detail}
         metrics["symbol"] = sym
+        verdict, verdict_reason = stock_verdict(metrics)
+        metrics["verdict"] = verdict
+        metrics["verdict_reason"] = verdict_reason
     return (sym, ok, metrics, reasons)
 
 def main():
@@ -643,8 +672,18 @@ def main():
         elif ok:
             passing.append(metrics)
         else:
+            # Preserve top-level scalars for the verdict table (issue #39).
             rejected[sym] = {"reasons": reasons,
-                             "indicators": metrics.get("indicators")}
+                             "indicators": metrics.get("indicators"),
+                             "price": metrics.get("price"),
+                             "rsi14": metrics.get("rsi14"),
+                             "vs_sma50_pct": metrics.get("vs_sma50_pct"),
+                             "vs_sma200_pct": metrics.get("vs_sma200_pct"),
+                             "atr_pct": metrics.get("atr_pct"),
+                             "vol_ratio": metrics.get("vol_ratio"),
+                             "off_52w_high_pct": metrics.get("off_52w_high_pct"),
+                             "ret_1m_pct": metrics.get("ret_1m_pct"),
+                             "ret_3m_pct": metrics.get("ret_3m_pct")}
 
     passing.sort(key=lambda m: -m["score"])
 
