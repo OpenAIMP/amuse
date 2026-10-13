@@ -1,0 +1,11 @@
+# Quantum computing universe (issue #30)
+# Pure-play and major quantum computing stocks. Updated 2026-10-12.
+# NOTE: speculative, high volatility. Size accordingly.
+IONQ
+QBTS
+RGTI
+QUBT
+ARQQ
+QSI
+QMCO
+LAES
