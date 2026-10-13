@@ -72,23 +72,43 @@ def intraday_bars(symbol, account_id, period="DAY", aggregation="FIVE_MINUTES",
                   "trading_session_toggle": session})
     if not isinstance(p, dict):
         raise mcp_client.McpError(f"get_price_history intraday: bad payload for {symbol}")
-    rm = p.get("regularMarket", {})
-    expected = rm.get("expectedBars")
+    # Public returns extended-hours data in separate session objects. In
+    # particular, a before-open request puts all current bars in preMarket;
+    # reading regularMarket alone made the pre-market screener report
+    # "no intraday bars" for otherwise healthy symbols.
+    sections = {
+        "REGULAR_HOURS": ("regularMarket",),
+        "REGULAR_AND_EXTENDED_HOURS": ("preMarket", "regularMarket",
+                                       "afterMarket"),
+        "ALL_SESSIONS": ("preMarketOvernight", "preMarket",
+                         "regularMarket", "afterMarket",
+                         "postMarketOvernight"),
+    }.get(session, ("preMarket", "regularMarket", "afterMarket"))
+    expected_values = [p.get(name, {}).get("expectedBars") for name in sections]
+    expected_values = [value for value in expected_values
+                       if isinstance(value, (int, float))]
+    expected = sum(expected_values) if expected_values else None
     bars = []
-    for b in rm.get("bars", []):
-        try:
-            ts = datetime.fromisoformat(b["timestamp"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        row = _clean_ohlcv(b.get("open"), b.get("high"), b.get("low"),
-                           b.get("close"), b.get("volume"))
-        if row is None:
-            continue
-        o, h, l, c, v = row
-        if o is None:
-            continue  # intraday math needs the open
-        bars.append({"ts": ts, "open": o, "high": h, "low": l,
-                     "close": c, "volume": v})
+    seen = set()
+    for section in sections:
+        for b in p.get(section, {}).get("bars", []):
+            try:
+                ts = datetime.fromisoformat(b["timestamp"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if ts in seen:
+                continue
+            row = _clean_ohlcv(b.get("open"), b.get("high"), b.get("low"),
+                               b.get("close"), b.get("volume"))
+            if row is None:
+                continue
+            o, h, l, c, v = row
+            if o is None:
+                continue  # intraday math needs the open
+            seen.add(ts)
+            bars.append({"ts": ts, "open": o, "high": h, "low": l,
+                         "close": c, "volume": v})
+    bars.sort(key=lambda bar: bar["ts"])
     return bars, expected
 
 
