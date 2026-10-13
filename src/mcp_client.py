@@ -17,6 +17,17 @@ class McpError(RuntimeError):
     unknown data, never as zero."""
 
 
+def _stderr_summary(stderr, max_chars=1800, max_lines=12):
+    """Keep the traceback ending, where Python reports the root exception."""
+    lines = (stderr or "").strip().splitlines()
+    if not lines:
+        return "no stderr output"
+    summary = "\n".join(lines[-max_lines:])
+    if len(summary) > max_chars:
+        summary = "…" + summary[-(max_chars - 1):]
+    return summary
+
+
 def mcp_call(tool, args, timeout=120):
     """Call a Public MCP tool; return the parsed content payload.
 
@@ -29,7 +40,9 @@ def mcp_call(tool, args, timeout=120):
     except subprocess.TimeoutExpired as e:
         raise McpError(f"{tool}: CLI timed out: {e}")
     if proc.returncode != 0:
-        raise McpError(f"{tool}: CLI failed: {proc.stderr[:300]}")
+        raise McpError(
+            f"{tool}: CLI failed (exit {proc.returncode}); stderr tail:\n"
+            f"{_stderr_summary(proc.stderr)}")
     try:
         d = json.loads(proc.stdout)
     except json.JSONDecodeError as e:

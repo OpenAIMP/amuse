@@ -890,7 +890,16 @@ def main():
     else:
         print("Vol assessment: OFF (--no-vol)")
 
-    spot_map = quotes(names, ACCT)
+    quote_error = None
+    try:
+        spot_map = quotes(names, ACCT)
+    except McpError as e:
+        # A failed batch request is a data outage for every symbol. Preserve
+        # the full universe in diagnostics without amplifying the outage with
+        # one failing quote request per symbol.
+        spot_map = {}
+        quote_error = f"MCP error: batch underlying quotes failed: {e}"
+        print(quote_error, file=sys.stderr)
 
     bull_puts, condors, asym_condors = [], [], []
     stock_notes, diagnostics = {}, {}
@@ -900,6 +909,11 @@ def main():
                "asym_condor": {}}
 
     def safe(sym):
+        if quote_error:
+            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
+                          "rejs": {"bull_put": {}, "bear_call": {},
+                                   "iron_condor": {}, "asym_condor": {}},
+                          "vol_veto": 0, "error": quote_error})
         try:
             return (sym, screen_spreads_sym(sym, spot_map, width_arg,
                                             events, iv_hist_path,
