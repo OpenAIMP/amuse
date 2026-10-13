@@ -1,0 +1,16 @@
+{
+ "id": "leverage-lev_etf-2026-10-13-0613",
+ "type": "leverage",
+ "date": "lev_etf-2026-10-13-0613",
+ "title": "Options Lab \u2014 Screen \u00b7 lev_etf-2026-10-13-0613",
+ "blurb": "No qualifiers \u2014 quiet screen",
+ "stats": {
+  "stocks": 0,
+  "bull_puts": 0,
+  "iron_condors": 0,
+  "asym_condors": 0,
+  "pmcc_pairs": 0
+ },
+ "source": "lev_etf",
+ "source_detail": "29 names"
+}
