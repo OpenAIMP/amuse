@@ -15,6 +15,7 @@ from datetime import date
 import mcp_client
 
 OSI_RE = re.compile(r"^(.+?)(\d{6})([CP])(\d{8})$")
+GREEK_FIELDS = ("delta", "gamma", "theta", "vega", "rho")
 
 
 def parse_osi(osi):
@@ -126,15 +127,62 @@ def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
     return out, diag, rejected
 
 
-def greeks(symbols, account_id, signed=True, batch_size=50):
+def aggregate_greeks(legs, multiplier=1.0):
+    """Aggregate signed per-option Greeks; an unavailable input stays None.
+
+    Each leg is {"greeks": {field: value}, "quantity": signed quantity}.
+    The multiplier converts per-share Greeks into share/contract exposures.
+    """
+    if isinstance(multiplier, bool):
+        raise ValueError("multiplier must be finite and numeric")
+    try:
+        multiplier = float(multiplier)
+    except (TypeError, ValueError):
+        raise ValueError("multiplier must be finite and numeric")
+    if not math.isfinite(multiplier):
+        raise ValueError("multiplier must be finite and numeric")
+
+    legs = list(legs)
+    totals = {}
+    for field in GREEK_FIELDS:
+        total, valid = 0.0, True
+        for leg in legs:
+            if not isinstance(leg, dict):
+                valid = False
+                break
+            values = leg.get("greeks")
+            values = values if isinstance(values, dict) else {}
+            value, quantity = values.get(field), leg.get("quantity", 1.0)
+            if isinstance(value, bool) or isinstance(quantity, bool):
+                valid = False
+                break
+            try:
+                value, quantity = float(value), float(quantity)
+            except (TypeError, ValueError):
+                valid = False
+                break
+            if not (math.isfinite(value) and math.isfinite(quantity)):
+                valid = False
+                break
+            total += value * quantity * multiplier
+        totals[field] = total if valid else None
+    return totals
+
+
+def greeks(symbols, account_id, signed=True, batch_size=50,
+           include_all=False):
     """Return ({symbol: (delta, iv)}, errors).
 
     Per-contract failures are logged, not raised. Delta validated on
     [-1, 1] when signed=True (put deltas may be negative) or [0, 1] when
-    signed=False. Symbols are deduplicated and fetched in batches.
+    signed=False. Symbols are deduplicated and fetched in batches. With
+    include_all=True, values are {delta, iv, gamma, theta, vega, rho}; missing
+    or invalid optional Greeks are None and do not invalidate delta/IV.
     """
     out, errors = {}, []
     symbols = list(dict.fromkeys(symbols))
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
     lo, hi = (-1.0, 1.0) if signed else (0.0, 1.0)
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i + batch_size]
@@ -149,12 +197,40 @@ def greeks(symbols, account_id, signed=True, batch_size=50):
             continue
         for x in g.get("greeks", []):
             try:
-                delta = float(x["greeks"]["delta"])
-                iv = float(x["greeks"]["impliedVolatility"])
+                if not isinstance(x, dict):
+                    raise ValueError("greek entry must be an object")
+                symbol = x.get("symbol", "?")
+                values = x.get("greeks")
+                if not isinstance(values, dict):
+                    raise ValueError("greeks must be an object")
+                if isinstance(values.get("delta"), bool) or isinstance(
+                        values.get("impliedVolatility"), bool):
+                    raise ValueError("delta and IV must be numeric")
+                delta = float(values["delta"])
+                iv = float(values["impliedVolatility"])
                 if not (math.isfinite(delta) and math.isfinite(iv)
                         and lo <= delta <= hi and iv > 0):
                     raise ValueError(f"delta={delta} iv={iv} out of range")
-                out[x["symbol"]] = (delta, iv)
+                optional = {}
+                for field in GREEK_FIELDS[1:]:
+                    raw = values.get(field)
+                    if raw is None:
+                        optional[field] = None
+                    elif isinstance(raw, bool):
+                        optional[field] = None
+                        errors.append(f"invalid {field} for {symbol}: must be numeric")
+                    else:
+                        try:
+                            value = float(raw)
+                            if not math.isfinite(value):
+                                raise ValueError(f"{field} must be finite")
+                            optional[field] = value
+                        except (TypeError, ValueError) as exc:
+                            optional[field] = None
+                            errors.append(f"invalid {field} for {symbol}: {exc}")
+                out[symbol] = ({"delta": delta, "iv": iv, **optional}
+                               if include_all else (delta, iv))
             except (KeyError, TypeError, ValueError) as exc:
-                errors.append(f"invalid greeks for {x.get('symbol', '?')}: {exc}")
+                symbol = x.get("symbol", "?") if isinstance(x, dict) else "?"
+                errors.append(f"invalid greeks for {symbol}: {exc}")
     return out, errors

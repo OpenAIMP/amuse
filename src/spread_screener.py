@@ -42,7 +42,7 @@ import gates as _gates_mod
 import mcp_client
 from mcp_client import McpError
 from market_data import daily_bars, quotes
-from options_chain import dte, eligible_expirations
+from options_chain import aggregate_greeks, dte, eligible_expirations
 from options_chain import parse_chain
 from options_chain import greeks as chain_greeks
 from screening_common import evaluation_record, qualification_counts
@@ -77,6 +77,31 @@ EVENTS_FILE = _EVENTS_DEFAULT if _os.path.exists(_EVENTS_DEFAULT) else None  # c
 
 RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
+
+
+def _structure_greeks(*snapshots):
+    legs = [leg for snapshot in snapshots if isinstance(snapshot, dict)
+            for leg in snapshot.get("legs", [])]
+    aggregate_inputs = [
+        {"greeks": {key: leg.get(key) for key in
+                    ("delta", "gamma", "theta", "vega", "rho")},
+         "quantity": -1 if leg.get("position") == "short" else 1}
+        for leg in legs
+    ]
+    return {"legs": legs, "net": aggregate_greeks(aggregate_inputs, 100)}
+
+
+def _vertical_greeks(short_c, long_c):
+    return _structure_greeks({
+        "legs": [
+            {"symbol": short_c["sym"], "position": "short",
+             **{key: short_c.get(key) for key in
+                ("delta", "gamma", "theta", "vega", "rho")}},
+            {"symbol": long_c["sym"], "position": "long",
+             **{key: long_c.get(key) for key in
+                ("delta", "gamma", "theta", "vega", "rho")}},
+        ]
+    })
 
 
 def vol_read_for(sym, spot, puts_by_exp, calls_by_exp, exps, iv_history_path):
@@ -254,6 +279,7 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "return_on_risk": credit / (width - credit),
         "friction": friction,
         "net_delta": net_delta,
+        "greeks": _vertical_greeks(short_c, long_c),
         "leg_spread_sum": short_c["spread"] + long_c["spread"],
         "win_prob_est": round(_pwin, 3),
         "expected_value": round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
@@ -324,6 +350,8 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "return_on_risk": total_credit / (width - total_credit),
         "friction": friction,
         "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
+        "greeks": _structure_greeks(put_wing.get("greeks"),
+                                    call_wing.get("greeks")),
         "width": width,
         # --- probability estimates (#28): delta-based, labeled as estimates ---
         # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence
@@ -355,6 +383,8 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "return_on_risk": total_credit / (width - total_credit),
         "friction": friction,
         "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
+        "greeks": _structure_greeks(put_wing.get("greeks"),
+                                    call_wing.get("greeks")),
         "width": width,
         "put_short_delta": put_wing["short_delta"],
         "call_short_delta": call_wing["short_delta"],
@@ -585,15 +615,16 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                      for c in cc.values()
                      if spot < c["strike"] <= spot * 1.40]
         g, gerr = chain_greeks(put_syms + call_syms, ACCT,
-                               signed=True, batch_size=GREEKS_BATCH)
+                               signed=True, batch_size=GREEKS_BATCH,
+                               include_all=True)
         for pc in puts_by_exp.values():
             for c in pc.values():
                 if c["sym"] in g:
-                    c["delta"], c["iv"] = g[c["sym"]]
+                    c.update(g[c["sym"]])
         for cc in calls_by_exp.values():
             for c in cc.values():
                 if c["sym"] in g:
-                    c["delta"], c["iv"] = g[c["sym"]]
+                    c.update(g[c["sym"]])
         # Preserve valid as well as rejected contracts for the report audit.
         for side, by_exp in (("put", puts_by_exp), ("call", calls_by_exp)):
             for contracts in by_exp.values():
@@ -1030,6 +1061,7 @@ def main():
                     "expected_value": r.get("expected_value"),
                     "loss_multiple": r.get("loss_multiple"),
                     "lucrative": r.get("lucrative"),
+                    "greeks": r.get("greeks"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
@@ -1048,6 +1080,7 @@ def main():
                     "expected_value": r.get("expected_value"),
                     "loss_multiple": r.get("loss_multiple"),
                     "lucrative": r.get("lucrative"),
+                    "greeks": r.get("greeks"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
@@ -1067,6 +1100,7 @@ def main():
                     "expected_value": r.get("expected_value"),
                     "loss_multiple": r.get("loss_multiple"),
                     "lucrative": r.get("lucrative"),
+                    "greeks": r.get("greeks"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }

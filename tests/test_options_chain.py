@@ -111,6 +111,98 @@ class TestGreeks(unittest.TestCase):
             mcp_client.mcp_call = real
         self.assertEqual(set(out), {"C1"})
 
+    def test_full_greeks_preserve_valid_delta_iv_on_optional_failures(self):
+        def fake(tool, args):
+            return {"greeks": [
+                {"symbol": "FULL", "greeks": {
+                    "delta": -0.25, "impliedVolatility": 0.4, "gamma": 0.03,
+                    "theta": -0.02, "vega": 0.08, "rho": -0.01}},
+                {"symbol": "MISSING", "greeks": {
+                    "delta": 0.2, "impliedVolatility": 0.3}},
+                {"symbol": "INVALID", "greeks": {
+                    "delta": 0.1, "impliedVolatility": 0.2, "gamma": "nan",
+                    "theta": "bad", "vega": True, "rho": 0.01}},
+            ]}
+
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = fake
+        try:
+            out, errors = oc.greeks(["FULL", "MISSING", "INVALID"], "TEST",
+                                    include_all=True)
+        finally:
+            mcp_client.mcp_call = real
+        self.assertEqual(out["FULL"], {
+            "delta": -0.25, "iv": 0.4, "gamma": 0.03, "theta": -0.02,
+            "vega": 0.08, "rho": -0.01})
+        self.assertEqual(out["MISSING"], {
+            "delta": 0.2, "iv": 0.3, "gamma": None, "theta": None,
+            "vega": None, "rho": None})
+        self.assertEqual(out["INVALID"], {
+            "delta": 0.1, "iv": 0.2, "gamma": None, "theta": None,
+            "vega": None, "rho": 0.01})
+        self.assertTrue(any("gamma" in error for error in errors))
+        self.assertTrue(any("theta" in error for error in errors))
+        self.assertTrue(any("vega" in error for error in errors))
+
+    def test_legacy_delta_iv_tuple_is_unchanged(self):
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = self._fake_greeks
+        try:
+            out, _ = oc.greeks(["P1"], "TEST")
+        finally:
+            mcp_client.mcp_call = real
+        delta, iv = out["P1"]
+        self.assertEqual((delta, iv), (-0.15, 0.30))
+
+    def test_batches_deduplicated_symbols_and_validates_size(self):
+        batches = []
+
+        def fake(tool, args):
+            batches.append(args["osi_symbols"])
+            return {"greeks": [
+                {"symbol": symbol, "greeks": {
+                    "delta": 0.1, "impliedVolatility": 0.2}}
+                for symbol in args["osi_symbols"]]}
+
+        symbols = ["S0", "S1", "S2", "S3", "S4", "S0"]
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = fake
+        try:
+            out, errors = oc.greeks(symbols, "TEST", batch_size=2)
+        finally:
+            mcp_client.mcp_call = real
+        self.assertEqual([len(batch) for batch in batches], [2, 2, 1])
+        self.assertEqual(set(out), set(symbols))
+        self.assertEqual(errors, [])
+        with self.assertRaises(ValueError):
+            oc.greeks([], "TEST", batch_size=0)
+
+
+class TestAggregateGreeks(unittest.TestCase):
+    def test_signed_portfolio_aggregation_and_partial_unavailability(self):
+        out = oc.aggregate_greeks([
+            {"greeks": {"delta": 0.5, "gamma": 0.02, "theta": -0.01,
+                        "vega": 0.03, "rho": 0.04}, "quantity": 2},
+            {"greeks": {"delta": -0.2, "gamma": 0.01, "theta": -0.02,
+                        "vega": 0.02, "rho": None}, "quantity": -1},
+        ], multiplier=100)
+        self.assertEqual(out["delta"], 120.0)
+        self.assertEqual(out["gamma"], 3.0)
+        self.assertEqual(out["theta"], 0.0)
+        self.assertAlmostEqual(out["vega"], 4.0)
+        self.assertIsNone(out["rho"])
+
+    def test_invalid_greek_does_not_invalidate_other_metrics(self):
+        out = oc.aggregate_greeks([
+            {"greeks": {"delta": 0.1, "gamma": float("inf"),
+                        "theta": -0.1, "vega": "bad", "rho": 0.2}}
+        ])
+        self.assertEqual(out["delta"], 0.1)
+        self.assertIsNone(out["gamma"])
+        self.assertEqual(out["theta"], -0.1)
+        self.assertIsNone(out["vega"])
+        self.assertEqual(out["rho"], 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()
