@@ -465,6 +465,11 @@ ledger outcomes and is capped at 2% account risk. Without sufficient history,
 the engine can still identify a `WATCH` candidate but does not fabricate a
 position size. Current screener win probability/EV remains delta-derived and
 is explicitly labeled as a proxy; the engine does not place orders.
+The [comprehensive framework assessment](docs/comprehensive-options-market-analysis-framework.md)
+tracks the rationale, expected mechanism, impact measures, current evidence,
+and remaining implementation steps for these additions. Benefits are not
+counted as trading performance until measured net of costs and evaluated
+out-of-sample.
 
 Risk is managed today through **defined-risk structures only** (no naked
 legs), conservative fills, liquidity/friction/earnings gates, and the human
