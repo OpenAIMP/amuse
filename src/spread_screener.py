@@ -65,7 +65,9 @@ _apply_gates()
 GREEKS_BATCH = 40             # implementation setting, not a verified service limit
 REJECT_EARNINGS = True        # earnings inside the spread window rejects it
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
-EVENTS_FILE = None            # optional JSON: {"SYM": {"earnings": "YYYY-MM-DD", "exdiv": "YYYY-MM-DD"}}
+import os as _os
+_EVENTS_DEFAULT = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "earnings_dates.json")
+EVENTS_FILE = _EVENTS_DEFAULT if _os.path.exists(_EVENTS_DEFAULT) else None  # curated earnings dates (#33)
 
 RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
