@@ -533,7 +533,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
     Pure per-symbol work; safe to run in a thread pool (issue #14).
     Keys: bp/ic/ac (top-3 accepted structure lists), notes (list),
     rejs ({kind: {reason: count}}), vol_veto (int), error (None or str),
-    considered (issue #38: every evaluated structure with qualification).
+    considered (issue #38: every evaluated structure with qualification),
+    chain (issue #38: every retrieved contract with its gate status).
     """
     out = {"bp": [], "ic": [], "ac": [], "notes": [],
            "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {},
@@ -561,12 +562,15 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         # One chain call per expiration; parse puts and calls separately.
         puts_by_exp, calls_by_exp = {}, {}
         diag_p, diag_c = {}, {}
+        chain_rejected = []
         for exp in exps:
-            pc, dp = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
-                             MAX_SPREAD_PCT, "puts")
-            cc, dc = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
-                             MAX_SPREAD_PCT, "calls")
+            pc, dp, rp = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
+                                 MAX_SPREAD_PCT, "puts")
+            cc, dc, rc = parse_chain(sym, exp, ACCT, MIN_LIQUIDITY,
+                                 MAX_SPREAD_PCT, "calls")
             puts_by_exp[exp], calls_by_exp[exp] = pc, cc
+            chain_rejected.extend(rp)
+            chain_rejected.extend(rc)
             for k, v in dp.items():
                 diag_p[k] = diag_p.get(k, 0) + v
             for k, v in dc.items():
@@ -785,6 +789,7 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         out["ic"] = ic_accepted[:3]
         out["ac"] = ac_accepted[:3]
         out["considered"] = considered
+        out["chain"] = chain_rejected
 
         notes.append(f"bull puts: {len(bp_accepted)} accepted, "
                      f"{bp_n_rej} rejected")
