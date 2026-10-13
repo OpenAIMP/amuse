@@ -90,6 +90,10 @@ Workflow: `daily-watch` priced both; the archive keeps the report.
 ```
 amuse/
 ├── src/                # all code: screeners, renderers, gates, ledger, exits, vol
+│   ├── mcp_client.py   # the single MCP funnel: mcp_call + McpError (issue #36)
+│   ├── market_data.py  # canonical bar dicts: daily_bars, intraday_bars, quotes (issue #36)
+│   ├── indicators.py   # SMA/EMA/MACD/RSI/ATR/Bollinger/VWAP/pivots/gaps (issue #36)
+│   ├── options_chain.py# OSI parsing, DTE, chain parsing, greeks (issue #36)
 │   ├── universes/      # index constituent lists (sp500/sp100/nasdaq100/dow30/russell2000)
 │   ├── gates.yaml      # every tunable threshold (no code changes to retune)
 │   └── watchlist.txt   # the 20-name universe for the daily + monthly screens
@@ -233,19 +237,30 @@ strikes, credits, max loss). The best trade is where they agree: a
 high-return-on-risk structure on a high-regime-score name. That agreement is
 made by you, reading both tables — see the overlap note below.
 
+### Shared libraries (issue #36)
+
+All screeners are stdlib-only and import from four shared modules — no
+duplicated plumbing:
+
+| Module | Provides | Used by |
+|---|---|---|
+| `mcp_client.py` | `mcp_call` + `McpError`: the single MCP funnel. Every API call in the system goes through this one function. | all screeners |
+| `market_data.py` | Canonical bar dicts (`date`/`ts`, `open`, `high`, `low`, `close`, `volume`); `daily_bars`, `intraday_bars`, `quotes`, `quote` | all screeners |
+| `indicators.py` | Pure indicator math: SMA, EMA, MACD, RSI, ATR, Bollinger, VWAP, anchored VWAP, fractal pivots, gaps | stock, premarket, intraday |
+| `options_chain.py` | OSI parsing, DTE, `parse_chain`, `greeks` (with `signed` flag: put spreads validate delta on [-1, 1], PMCC calls on [0, 1]) | spread, pmcc |
+
+Screen-specific logic stays in each screener (gap bias, ORB detection,
+structure pricing, regime scoring). Tests patch the single funnel
+(`mcp_client.mcp_call`) rather than per-screener copies.
+
 ### Overlap between the screeners
 
-- **The spread screener does not read the stock screener's output.** Verified:
-  every screener imports stdlib only — no cross-imports, no shared modules.
+- **The spread screener does not read the stock screener's output.**
   Regime→structure agreement happens in the dashboard (tables side by side)
   and in the operating loop, not in code.
-- **Shared gate architecture, not shared code.** Every screener uses the same
-  pattern — categorized rejections, conservative fills, plain-English readout,
-  JSON output — but each file implements it independently.
-- **VWAP and ATR are computed twice.** `stock_screener` (session VWAP from
-  15-minute bars, ATR14% from daily bars), `premarket_screen` (developing
-  VWAP, intraday ATR) use the same indicators on different bar sets for
-  different horizons — intentionally not deduplicated.
+- **Shared libraries, not shared opinions.** Every screener draws MCP access,
+  bars, indicators, and chain parsing from the modules above — but each file
+  keeps its own screening logic, gates, and readouts.
 - **Short-premium selection overlaps** between `spread_screener` (0.10–0.20Δ
   shorts, 21–60 DTE, liquidity/friction/earnings gates) and `pmcc_quality`
   (0.15–0.35Δ shorts, 21–60 DTE, same gate families) — one philosophy, two
