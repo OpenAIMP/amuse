@@ -444,11 +444,20 @@ one percentage point).
 
 `src/portfolio_risk.py` aggregates open-ledger Greeks and estimates P&L across
 five reproducible spot/volatility scenarios. It requires a current market
-context JSON with `risk_free_rate`, optional `asof`, and per-symbol `spot`,
-`iv`, and optional `dividend_yield`. Example:
+context JSON (schema version 1) with `source`, UTC `asof`, explicit
+`risk_free_rate` and `risk_free_rate_asof`, and per-symbol `spot`/`iv` plus
+their UTC `spot_asof`/`iv_asof` timestamps; `dividend_yield` is optional.
+Observations older than 30 minutes are rejected by default (configurable with
+`--max-age-minutes`). Missing or stale inputs are excluded and make the report
+incomplete. Output includes each freshness check, ledger update time, and the
+share of open legs priced. Older ledgers without `updated_at` remain readable
+but their open-book report is marked incomplete until they are updated through
+the ledger functions. A schema example is in
+[`examples/portfolio-risk-market.sample.json`](examples/portfolio-risk-market.sample.json);
+replace its placeholder timestamps before running:
 
 ```sh
-python3 src/portfolio_risk.py --ledger ledger.json --market market.json --out reports/portfolio-risk.json
+python3 src/portfolio_risk.py --ledger ledger.json --market market.json --max-age-minutes 30 --out reports/portfolio-risk.json
 ```
 
 Marks and stress results are Black–Scholes model estimates, not executable
