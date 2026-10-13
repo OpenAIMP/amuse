@@ -306,33 +306,10 @@ def evaluate_condor(spot, put_wing, call_wing, width):
     if reasons:
         return {"accepted": False, "reasons": reasons,
                 "diagnostics": {"max_loss": round(max_loss, 0)}}
-    return {
-        "accepted": True,
-        "kind": "iron_condor",
-        "expiration": put_wing["expiration"],
-        "dte": put_wing["dte"],
-        "put_short_strike": put_wing["short_strike"],
-        "put_long_strike": put_wing["long_strike"],
-        "call_short_strike": call_wing["short_strike"],
-        "call_long_strike": call_wing["long_strike"],
-        "put_wing_credit": put_wing["credit_total"],
-        "call_wing_credit": call_wing["credit_total"],
-        "credit_total": total_credit * 100,
-        "max_loss_total": max_loss,
-        "breakeven_put": put_wing["short_strike"] - total_credit,
-        "breakeven_call": call_wing["short_strike"] + total_credit,
-        "return_on_risk": total_credit / (width - total_credit),
-        "friction": friction,
-        "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
-        "width": width,
-        # --- probability estimates (#28): delta-based, labeled as estimates ---
-        # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence
-        "put_short_delta": put_wing["short_delta"],
-        "call_short_delta": call_wing["short_delta"],
-    }
     # win probability and expected value from the short-leg deltas
     # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence.
     # These are ESTIMATES, not market facts -- see the hub guide.
+    # --- probability estimates (#28): delta-based, labeled as estimates ---
     pd = abs(put_wing["short_delta"])
     cd = abs(call_wing["short_delta"])
     p_win = max(0.0, min(1.0, (1 - pd) * (1 - cd)))
