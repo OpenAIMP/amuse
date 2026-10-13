@@ -313,6 +313,17 @@ anything that touches orders — Size and Preflight stay human.
 Deliberately **not** automated: Elliott Wave counting — too subjective; pivots
 and Fibs capture the objective machinery underneath it.
 
+The report's confirmation context includes ADX/+DI/-DI, slow Stochastic(14,3),
+MFI(14), and 20-day OBV and Accumulation/Distribution directions. They are
+diagnostic only: they do not change qualification, score, or trade decisions.
+ADX measures trend strength, not direction. RSI and Stochastic extremes can
+persist during strong trends, while volume divergences are warnings rather than
+proof of reversal. These indicator categories and interpretations follow
+Fidelity's [*Understanding Indicators in Technical Analysis* guide](https://www.fidelity.com/bin-public/060_www_fidelity_com/documents/learning-center/Understanding-Indicators-TA.pdf).
+The guide does not validate this system's thresholds or establish trading edge;
+it also cautions that technical analysis is only one approach and past
+performance does not guarantee future results.
+
 The Gap/Momentum/Value/Bias columns are *readouts*, not gates — they describe
 the tape but never reject a name. Value is explicitly a technical 52-week-range
 proxy: the data feed has no fundamentals (no earnings, P/E, or balance-sheet
