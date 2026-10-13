@@ -1,0 +1,18 @@
+{
+ "id": "leverage-lev_etf-2026-10-13-1055",
+ "type": "leverage",
+ "date": "lev_etf-2026-10-13-1055",
+ "title": "Options Lab \u2014 Screen \u00b7 lev_etf-2026-10-13-1055",
+ "blurb": "Decision unavailable; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 0,
+  "bull_puts": 0,
+  "iron_condors": 0,
+  "asym_condors": 0,
+  "pmcc_pairs": 0,
+  "decision": "not supplied",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "lev_etf",
+ "source_detail": "29 names"
+}
