@@ -130,6 +130,11 @@ sizing availability on the HTML report linked from `docs/index.html`. The hub
 entry previews the recommendation, expected move, Kelly status, and risk
 availability/coverage. The report also renders Greeks, scenario P&amp;L,
 freshness, and priced-leg coverage when a portfolio-risk JSON is provided. If
+sizing availability on the HTML report linked from `docs/index.html`. The hub
+entry previews the recommendation, expected move, Kelly status, and risk
+availability/coverage. The report also renders Greeks, scenario P&amp;L,
+freshness, and priced-leg coverage when a portfolio-risk JSON is provided
+(dashboard implementation in [PR #47](https://github.com/OpenAIMP/amuse/pull/47)). If
 that input is absent, the page labels
 portfolio risk as unavailable rather than implying zero exposure. The Actions
 workflow has no canonical ledger or live timestamped market snapshot, so it
