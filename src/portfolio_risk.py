@@ -5,6 +5,7 @@ import math
 from datetime import date, datetime, timezone
 
 from options_math import black_scholes
+from options_chain import aggregate_greeks
 
 SCENARIOS = {
     "base": (0.0, 1.0), "down_10_vol_down_50": (-0.10, 0.50),
@@ -181,7 +182,7 @@ def analyze_portfolio(ledger, market, asof=None, max_age_minutes=30,
     valuation_date = valuation_time.date() if valuation_time else now.date()
     rate = checked["risk_free_rate"] if checked["risk_free_rate"] is not None else 0.0
     underlyings = checked["underlyings"]
-    totals = {k: 0.0 for k in ("delta", "gamma", "theta", "vega", "rho")}
+    priced_greeks = []
     base_value = 0.0
     gaps, scenario_values = list(checked["gaps"]), {k: 0.0 for k in SCENARIOS}
     open_legs = sum(len(p.get("legs", [])) for p in ledger.get("positions", [])
@@ -215,8 +216,7 @@ def analyze_portfolio(ledger, market, asof=None, max_age_minutes=30,
                 div = float(ctx.get("dividend_yield", 0.0))
                 greek = black_scholes(spot, strike, t, rate, iv, kind, div)
                 base_value += greek["price"] * qty
-                for key in totals:
-                    totals[key] += greek[key] * qty
+                priced_greeks.append({"greeks": greek, "quantity": qty})
                 legs_priced += 1
                 for name, (spot_shift, vol_mult) in SCENARIOS.items():
                     shifted = black_scholes(spot * (1 + spot_shift), strike, t,
@@ -241,7 +241,8 @@ def analyze_portfolio(ledger, market, asof=None, max_age_minutes=30,
     coverage = (legs_priced / open_legs) if open_legs else 1.0
     no_legs_priced = open_legs > 0 and legs_priced == 0
     reported_greeks = (None if no_legs_priced else
-                       {k: round(v, 6) for k, v in totals.items()})
+                       {k: round(v, 6) for k, v in
+                        aggregate_greeks(priced_greeks).items()})
     reported_scenarios = ({name: {"portfolio_value": None, "pnl_vs_base": None}
                            for name in SCENARIOS} if no_legs_priced else scenarios)
     return {"asof": valuation_time.isoformat().replace("+00:00", "Z"),

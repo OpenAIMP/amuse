@@ -173,6 +173,17 @@ def pct(v, places=1):
     return num(v, places, "%")
 
 
+def spread_greek_cells(row):
+    """Render net Greeks for one standard 100-share-per-leg spread."""
+    greeks = row.get("greeks") if isinstance(row, dict) else None
+    net = greeks.get("net") if isinstance(greeks, dict) else None
+    net = net if isinstance(net, dict) else {}
+    return "".join(
+        f"<td class='num'>{num(net.get(key), 3)}</td>"
+        for key in ("delta", "gamma", "theta", "vega", "rho")
+    )
+
+
 def dte_between(asof_str, exp_str):
     try:
         a = dt.date.fromisoformat(asof_str)
@@ -628,8 +639,9 @@ def spread_tables(data):
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
+            f"{spread_greek_cells(r)}"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='12'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='18'>{esc(why)}</td></tr>" if why else "")
         )
     out.append("<h3>Bull put spreads <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
@@ -646,8 +658,13 @@ def spread_tables(data):
         "<th title='Loss multiple: max loss ÷ credit. How many times the credit you risk.'>Loss×</th>"
         "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
+        "<th title='Net delta in share-equivalents for one standard spread (100 shares per leg); — means unavailable.'>Δ</th>"
+        "<th title='Net gamma per $1 spot move for one standard spread; — means unavailable.'>Γ</th>"
+        "<th title='Net theta in dollars per calendar day for one standard spread; — means unavailable.'>Θ</th>"
+        "<th title='Net vega in dollars per 1.00 IV change for one standard spread; — means unavailable.'>Vega</th>"
+        "<th title='Net rho in dollars per 1.00 rate change for one standard spread; — means unavailable.'>Rho</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying bull puts.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="18" class="empty">No qualifying bull puts.</td></tr>')
         + "</tbody></table></div>"
     )
 
@@ -675,8 +692,9 @@ def spread_tables(data):
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
+            f"{spread_greek_cells(r)}"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='13'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='19'>{esc(why)}</td></tr>" if why else "")
         )
     out.append("<h3>Iron condors <span class='dim'>(ranked by return on risk)</span></h3>")
     out.append(
@@ -694,8 +712,13 @@ def spread_tables(data):
         "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
         "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
         "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
+        "<th title='Net delta in share-equivalents for one standard spread (100 shares per leg); — means unavailable.'>Δ</th>"
+        "<th title='Net gamma per $1 spot move for one standard spread; — means unavailable.'>Γ</th>"
+        "<th title='Net theta in dollars per calendar day for one standard spread; — means unavailable.'>Θ</th>"
+        "<th title='Net vega in dollars per 1.00 IV change for one standard spread; — means unavailable.'>Vega</th>"
+        "<th title='Net rho in dollars per 1.00 rate change for one standard spread; — means unavailable.'>Rho</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="13" class="empty">No qualifying condors.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="19" class="empty">No qualifying condors.</td></tr>')
         + "</tbody></table></div>"
     )
     # readout lines not tied to a symbol still get shown
@@ -718,6 +741,11 @@ def spread_tables(data):
             "<th title='Loss multiple: max loss ÷ credit.'>Loss×</th>"
         "<th title='Lucrative verdict: combines Win%, EV$, and Loss×. Lucrative = 70%+ win, positive EV, ≤3× loss. A screen, not a guarantee.'>Lucrative</th>"
             "<th title='Earnings or binary events inside the trade window: reject. Unknown earnings: flagged, not rejected.'>Events</th>"
+            "<th title='Net delta in share-equivalents for one standard spread (100 shares per leg); — means unavailable.'>Δ</th>"
+            "<th title='Net gamma per $1 spot move for one standard spread; — means unavailable.'>Γ</th>"
+            "<th title='Net theta in dollars per calendar day for one standard spread; — means unavailable.'>Θ</th>"
+            "<th title='Net vega in dollars per 1.00 IV change for one standard spread; — means unavailable.'>Vega</th>"
+            "<th title='Net rho in dollars per 1.00 rate change for one standard spread; — means unavailable.'>Rho</th>"
             "</tr></thead><tbody>"
             + "".join(ac_rows)
             + "</tbody></table></div>"
@@ -1298,6 +1326,7 @@ def norm_asym_condor(r, stock=None):
         "expected_value": r.get("expected_value"),
         "loss_multiple": r.get("loss_multiple"),
         "lucrative": r.get("lucrative"),
+        "greeks": r.get("greeks"),
         "events": r.get("events"),
         "why_key": r.get("stock") or stock,
     }
@@ -1337,8 +1366,9 @@ def asym_condor_rows(data, asof, readout):
             f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
             f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
             f"<td>{events_cell(r.get('events'))}</td>"
+            f"{spread_greek_cells(r)}"
             "</tr>"
-            + (f"<tr class='whyrow'><td colspan='14'>{esc(why)}</td></tr>" if why else "")
+            + (f"<tr class='whyrow'><td colspan='20'>{esc(why)}</td></tr>" if why else "")
         )
     return rows, [r.get("why_key") for r in ac_list if r.get("why_key")]
 
