@@ -30,6 +30,7 @@ TYPE_ORDER = ["daily", "premarket", "intraday", "pmcc"]
 TYPE_LABELS = {
     "daily": "Daily screen",
     "premarket": "Pre-market gap",
+    "intraday": "Intraday breakouts",
     "daytrade": "Pre-market gap (legacy)",
     "pmcc": "Monthly PMCC",
 }
