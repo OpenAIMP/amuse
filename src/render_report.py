@@ -409,6 +409,62 @@ def considered_table(res, asof):
     )
 
 
+def chain_table(res, asof):
+    """Issue #38: raw option chain data. Every contract retrieved, with its
+    quote and which gate it hit (or 'passed' for contracts that survived to
+    evaluation). Data is never excluded from the report."""
+    rows = []
+    for sym in sorted(res):
+        r = res[sym] or {}
+        chain = r.get("chain") or []
+        # Also include passed contracts that were evaluated
+        seen = set()
+        for c in chain:
+            c = c or {}
+            seen.add((c.get("expiration"), c.get("sym")))
+            spread_pct = None
+            if c.get("bid") and c.get("ask"):
+                try:
+                    mid = (c["bid"] + c["ask"]) / 2
+                    spread_pct = (c["ask"] - c["bid"]) / mid if mid else None
+                except (TypeError, ZeroDivisionError):
+                    pass
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td>{esc(c.get('type') or '')}</td>"
+                f"<td class='num'>{esc(c.get('expiration') or '')}</td>"
+                f"<td class='num'>{num(c.get('strike'), 2)}</td>"
+                f"<td class='num'>{num(c.get('bid'), 2)}</td>"
+                f"<td class='num'>{num(c.get('ask'), 2)}</td>"
+                f"<td class='num'>{pct((spread_pct or 0) * 100) if spread_pct is not None else '—'}</td>"
+                f"<td class='num'>{c.get('open_interest') if c.get('open_interest') is not None else '—'}</td>"
+                f"<td class='num'>{c.get('volume') if c.get('volume') is not None else '—'}</td>"
+                f"<td class='bad'>{esc(c.get('gate') or '')}</td>"
+                "</tr>"
+            )
+    if not rows:
+        return ""
+    return (
+        "<h3>Option chain data "
+        f"<span class='dim'>({len(rows)} contracts retrieved)</span></h3>"
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th title='Underlying symbol.'>Sym</th>"
+        "<th title='Put or call.'>Type</th>"
+        "<th title='Option expiration date.'>Exp</th>"
+        "<th title='Strike price.'>Strike</th>"
+        "<th title='Bid price.'>Bid</th>"
+        "<th title='Ask price.'>Ask</th>"
+        "<th title='Bid-ask spread as % of midpoint.'>Spread%</th>"
+        "<th title='Open interest.'>OI</th>"
+        "<th title='Volume.'>Vol</th>"
+        "<th title='Which gate rejected this contract, if any.'>Gate</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table></div>"
+    )
+
+
 def spread_tables(data):
     if not data:
         return section("Spread opportunities", '<p class="empty">No data yet — run the spread screener.</p>')
@@ -560,6 +616,9 @@ def spread_tables(data):
     considered_html = considered_table(res, asof)
     if considered_html:
         out.append(considered_html)
+    chain_html = chain_table(res, asof)
+    if chain_html:
+        out.append(chain_html)
     out.append('<p class="fine">Return on risk = credit ÷ max loss: a screening ratio, not an expected return. '
                'Credits use conservative short-bid minus long-ask fills.</p>')
     return section("Spread opportunities", "".join(out))
