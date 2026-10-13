@@ -22,6 +22,8 @@ import unittest
 from datetime import date, timedelta
 
 import premarket_screen as dt
+import mcp_client
+from market_data import quotes as batch_quotes
 
 
 def _daily_bars(n=60, close=100.0, drift=0.0):
@@ -74,14 +76,14 @@ class FakeMCP:
 class TestBatching(unittest.TestCase):
     def setUp(self):
         self.fake = FakeMCP({"AAA": 100.0, "BBB": 50.0, "CCC": 200.0})
-        self._real = dt.mcp_call
-        dt.mcp_call = self.fake
+        self._real = mcp_client.mcp_call
+        mcp_client.mcp_call = self.fake
 
     def tearDown(self):
-        dt.mcp_call = self._real
+        mcp_client.mcp_call = self._real
 
     def test_quotes_for_batches(self):
-        m = dt.quotes_for(["AAA", "BBB", "CCC"])
+        m = batch_quotes(["AAA", "BBB", "CCC"], "TEST")
         self.assertEqual(m, {"AAA": 100.0, "BBB": 50.0, "CCC": 200.0})
         self.assertEqual(self.fake.count("get_quotes"), 1)
 
@@ -105,10 +107,10 @@ class TestBatching(unittest.TestCase):
 class TestConcurrency(unittest.TestCase):
     def _run(self, names, workers):
         fake = FakeMCP({s: 103.0 for s in names})
-        real = dt.mcp_call
-        dt.mcp_call = fake
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = fake
         try:
-            qm = dt.quotes_for(names)
+            qm = batch_quotes(names, "TEST")
 
             def safe(sym):
                 return (sym,) + dt.screen_one(sym, qm)
@@ -117,7 +119,7 @@ class TestConcurrency(unittest.TestCase):
                     max_workers=workers) as ex:
                 return sorted(ex.map(safe, names), key=lambda r: r[0])
         finally:
-            dt.mcp_call = real
+            mcp_client.mcp_call = real
 
     def test_threaded_matches_sequential(self):
         names = ["AAA", "BBB", "CCC", "DDD", "EEE"]
@@ -196,11 +198,11 @@ class TestSpreadThreading(unittest.TestCase):
                 return {"regularMarket": {"bars": _daily_bars()}}
             raise AssertionError(f"unexpected tool {tool}")
 
-        self._real = sp.mcp_call
-        sp.mcp_call = fake_call
+        self._real = mcp_client.mcp_call
+        mcp_client.mcp_call = fake_call
 
     def tearDown(self):
-        self.sp.mcp_call = self._real
+        mcp_client.mcp_call = self._real
 
     def test_screen_spreads_sym_finds_bull_put(self):
         sp = self.sp
@@ -254,7 +256,7 @@ class TestStockRegression(unittest.TestCase):
 
     def test_screen_stock_no_evaluation_error(self):
         import stock_screener as st
-        real = st.mcp_call
+        real = mcp_client.mcp_call
 
         def fake(tool, args):
             if args.get("aggregation") == "ONE_DAY":
@@ -262,11 +264,11 @@ class TestStockRegression(unittest.TestCase):
             return {"regularMarket": {
                 "bars": _intraday_bars(), "expectedBars": 78}}
 
-        st.mcp_call = fake
+        mcp_client.mcp_call = fake
         try:
             sym, ok, metrics, reasons = st.screen_stock("AAA")
         finally:
-            st.mcp_call = real
+            mcp_client.mcp_call = real
         for r in reasons:
             self.assertFalse(r.startswith("evaluation error"),
                              f"regression: {r}")
@@ -401,14 +403,20 @@ class TestTapeReadouts(unittest.TestCase):
 
     def test_gap_up_down_flat(self):
         import stock_screener as st
-        mk = lambda o, pc: [(pc, pc, pc, 1, None), (100, 100, 100, 1, o)]
+        mk = lambda o, pc: [{"close": pc, "high": pc, "low": pc, "volume": 1,
+                          "open": None},
+                         {"close": 100, "high": 100, "low": 100,
+                          "volume": 1, "open": o}]
         self.assertEqual(st.gap_label(st.gap_pct(mk(103, 100))), "gap up")
         self.assertEqual(st.gap_label(st.gap_pct(mk(97, 100))), "gap down")
         self.assertEqual(st.gap_label(st.gap_pct(mk(100.5, 100))), "no gap")
 
     def test_gap_unknown_without_open(self):
         import stock_screener as st
-        bars = [(100, 100, 100, 1, None), (101, 101, 101, 1, None)]
+        bars = [{"close": 100, "high": 100, "low": 100, "volume": 1,
+             "open": None},
+            {"close": 101, "high": 101, "low": 101, "volume": 1,
+             "open": None}]
         self.assertIsNone(st.gap_pct(bars))
         self.assertIsNone(st.gap_label(None))
 
@@ -439,8 +447,9 @@ class TestTapeReadouts(unittest.TestCase):
 
     def test_evaluate_carries_tape(self):
         import stock_screener as st
-        bars = [(100 + i * 0.1, 101 + i * 0.1, 99 + i * 0.1, 1_000_000,
-                 100 + i * 0.1) for i in range(210)]
+        bars = [{"close": 100 + i * 0.1, "high": 101 + i * 0.1,
+                 "low": 99 + i * 0.1, "volume": 1_000_000,
+                 "open": 100 + i * 0.1} for i in range(210)]
         ok, m, _ = st.evaluate("T", bars)
         tape = m["indicators"]["tape"]
         for k in ("gap_pct", "gap", "momentum", "value_pct", "value",
