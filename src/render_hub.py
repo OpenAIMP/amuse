@@ -235,6 +235,13 @@ timestamped Public option/equity quotes and Treasury's daily rate feed:
 <code>bash bin/run-portfolio-risk.sh LEDGER.json</code>. Exact OSI identifiers
 are required for each option leg. Missing or stale inputs leave risk incomplete;
 holdings and reports stay local and are not written to public reports.</p>
+<p>Configured bull-put exits can be replayed locally against supplied,
+timestamped historical marks:
+<code>bash bin/evaluate-historical-exits.sh INPUT.json</code>. This reports
+coverage and mark-based outcomes after explicit costs; incomplete paths remain
+unresolved and the replay does not claim future profitability. See the
+<a href="comprehensive-options-market-analysis-framework.html">framework assessment</a>
+for data requirements and limitations.</p>
 </section>
 <section class="card"><h2>Reading the screens — notes &amp; lessons</h2>
 <h3>Pre-market gap vs intraday momentum</h3>

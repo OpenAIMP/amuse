@@ -1,7 +1,7 @@
 # Comprehensive Options & Market Analysis Framework
 
 **Implementation review:** 2026-10-13
-**Code reviewed:** `main` at merge commit `5b04714` (PR #51); issue #52 is in progress on its linked branch.
+**Code reviewed:** `main` at merge commit `85aa64c` (PR #53); issue #54 is in progress on its linked branch.
 
 This document begins with the framework blueprint reconstructed from the
 nine-part description supplied in chat, then assesses how much of each part
@@ -81,17 +81,18 @@ is implemented, proposed, or unvalidated.
 
 ## Implementation status assessment
 
-**Overall estimate: about 50% implemented after PR #49 merged.** This is a
+**Overall estimate: about 50% implemented after PR #53 merged.** This is a
 qualitative estimate of breadth and integration, not a count of checklist
 items or an estimate of trading performance.
 Amuse remains strongest at technical screening and defined-risk structures.
-It now has reusable option math, optional book-level risk analysis, and a
-joined advisory decision report. The daily pipeline still lacks a canonical
-account/position feed, book-risk calculations need supplied market context,
-and no out-of-sample result establishes that these changes increase returns.
-PRs #46–#49 improved risk freshness reporting, dashboard visibility, and
-workflow reliability/confidentiality without materially changing this breadth
-estimate. Issue #50 adds a local exit-review path; this has not yet merged.
+It now has reusable option math, optional book-level risk analysis, a local
+market-context collector, and a joined advisory decision report. The daily
+pipeline still lacks a canonical account/position feed, and no out-of-sample
+result establishes that these changes increase returns. PRs #46–#49 improved
+risk freshness reporting, dashboard visibility, and workflow
+reliability/confidentiality; PR #51 added local exit review; PR #53 added
+timestamped private risk inputs. These improve operation and risk visibility
+without materially changing this breadth estimate.
 
 ## Status key
 
@@ -121,7 +122,7 @@ benefits should remain labeled as hypotheses until that evidence is reviewed.
 | Change | What it does now | Expected benefit / mechanism | Measure of impact | Status and limitation |
 |---|---|---|---|---|
 | Black–Scholes math (`src/options_math.py`) | Prices European calls/puts and returns delta, gamma, theta, vega, and rho; defines one-standard-deviation expected move and fractional Kelly calculation. | Creates a repeatable valuation basis; makes IV/time risk explicit; supplies bounded sizing math when outcome estimates are credible. | Compare model marks with contemporaneous market marks and realized fills by expiry/moneyness/IV; measure expected-move coverage; compare paper/out-of-sample returns and drawdown across sizing methods. | Math is implemented. Candidate ranking does not yet compare modeled fair value with executable quotes. No calibration, IV solver, transaction costs, or profitability result. Kelly utility does not make its inputs reliable. |
-| Portfolio Greeks and scenario stress (`src/portfolio_risk.py`, issue [#42](https://github.com/OpenAIMP/amuse/issues/42)) | Requires a versioned snapshot with source and UTC timestamps for the snapshot, rate, spot, and IV; rejects stale observations (30-minute default), reports ledger timestamp and open-leg coverage, and excludes unavailable legs. | Makes stale/partial exposure harder to mistake for current whole-book risk; exposes directional/volatility sensitivity before adding risk. | Track priced-leg coverage, stale/missing-input frequency, risk reports blocked by freshness checks, and modeled scenario loss versus subsequent realized book changes. | Freshness/coverage controls are implemented, but snapshot values remain user-supplied and portfolio reports are not scheduled. Dashboard issue [#45](https://github.com/OpenAIMP/amuse/issues/45) renders supplied output and labels missing output. Staleness metrics are emitted per run but not yet persisted/aggregated. Uniform shocks and Black–Scholes limitations remain. |
+| Portfolio Greeks and scenario stress (`src/portfolio_risk.py`, issues [#42](https://github.com/OpenAIMP/amuse/issues/42) and [#52](https://github.com/OpenAIMP/amuse/issues/52)) | Requires timestamped spot and exact-OSI contract IV; the local collector supplies Public quote observations and Treasury's daily 3-month rate. Rejects stale observations, reports priced-leg coverage, and preserves missing-source gaps. | Makes stale/partial exposure harder to mistake for current whole-book risk; exposes directional/volatility sensitivity before adding risk. | Track priced-leg coverage, stale/missing-input frequency, risk reports blocked by freshness checks, and modeled scenario loss versus subsequent realized book changes. | PR #53 implements local collection; snapshots/reports remain user-run and private, not scheduled. Dashboard issue [#45](https://github.com/OpenAIMP/amuse/issues/45) renders supplied output and labels missing output. Metrics are emitted per run but not persisted/aggregated. The daily rate is a proxy; uniform shocks and Black–Scholes limitations remain. |
 | Six-step decision engine (`src/decision_engine.py`) | Joins regime, horizon/events, technical timing, volatility, spread economics, and risk/sizing into ranked WATCH/CONSIDER/NO TRADE results with reasons. Runs after daily screeners. Dashboard PR [#47](https://github.com/OpenAIMP/amuse/pull/47) adds recommendation, six gates, expected move, and Kelly-sizing visibility to archived HTML and hub summary. | Makes handoffs and vetoes consistent and visible; can reduce missed conflicts and unsuitable entries, and focus review on stronger-aligned candidates. | Track share of daily pages with complete decision section; then persist inputs/overrides, pass-through, paper fills, costs, realized expectancy, drawdown, and results versus prior manual/screener-only process. | Advisory only. Daily run has no account/ledger, so sizes normally remain unavailable and candidates are WATCH/NO TRADE. Events are only as good as upstream flags. Delta-derived win probability/EV are proxies, not calibrated forecasts. |
 | Fractional Kelly with ledger caps | Uses realized closed outcomes by strategy only after 30 trades; applies fractional Kelly, caps at 2% account risk, and checks existing per-trade/35% heat limits if account and ledger are supplied. | Connects allocation to observed payoff history while keeping conservative hard limits; could reduce allocation when observed expectancy is weak. | Paper compare with fixed 0.5%, 1%, and 2% risk baselines; track net return, drawdown, tail losses, estimation error, and stability across time windows. | Calculation/gates exist, but account/ledger are not wired into scheduled runs. Thirty trades is a minimum gate, not statistical validation; Kelly is sensitive to noisy and regime-dependent estimates. |
 
@@ -178,11 +179,48 @@ unsupported. Issue [#9](https://github.com/OpenAIMP/amuse/issues/9) still owns
 complete entry-to-exit policy validation, and [#11](https://github.com/OpenAIMP/amuse/issues/11)
 owns out-of-sample comparison.
 
+### Local market context for portfolio risk (issue #52, merged in PR #53)
+
+`src/portfolio_context.py` collects underlying last prices and native quote
+timestamps, exact-OSI option IV and quote timestamps, and the latest available
+Treasury 3-month par yield. `src/portfolio_risk.py` consumes that snapshot with
+a 30-minute quote window and separate 7-day rate window. A local wrapper writes
+the snapshot and risk report under ignored `reports/`; the public dashboard
+only explains how to run it. Missing exact contracts, stale observations, and
+unsupported adjusted deliverables remain explicit gaps.
+
+**Benefit and evidence:** this replaces manually assembled market context with
+source-attributed values and should improve fresh priced-leg coverage. Measure
+snapshot completeness, missing/stale quote rates, Treasury freshness, and
+priced-leg coverage over repeated local runs. No return benefit is established;
+Treasury is a maturity proxy, dividends default to zero, and European exercise
+and standard deliverables are assumed.
+
+### Historical bull-put exit replay (issue #54, in progress)
+
+The branch adds a local evaluator for supplied historical, timestamped
+short-ask/long-bid and underlying observations. It replays the configured exit
+rules in chronological order, requires exact OSI contracts and explicit
+round-trip fee/slippage inputs, and stops scoring at missing, stale, or
+over-gapped observations. It reports scored-path coverage, net mark-based
+outcomes, and realized mark-P&L drawdown. Assignment uncertainty is disclosed,
+not modeled as an observed event. It does not fetch market history, infer
+fills, or publish position-level data. The report explicitly omits a hold-to-
+expiration baseline because its input format does not contain an independent
+settlement/fill path.
+
+**Benefit and evidence:** the intended benefit is to show whether configured
+rules would have triggered on the supplied sample after stated costs. Track
+dataset size and coverage, unresolved paths, outcomes by exit action, and
+estimated-versus-realized fills where available. A replay at observed marks is
+not an executable backtest and does not prove future profitability; no such
+claim is made.
+
 ### Gradual improvement path
 
-1. **Connect a dependable snapshot source:** replace manual spot/IV/rate
-   snapshot preparation with a documented feed, retain timestamps/provenance,
-   and measure freshness/coverage over repeated runs.
+1. **Measure the local snapshot feed:** retain timestamps/provenance from the
+   collector, monitor freshness and priced-leg coverage over repeated runs,
+   and add dependable sector/correlation inputs before concentration decisions.
 2. **Record decisions before outcomes:** persist six-step rationale, prices,
    model inputs, overrides, and later fills/exits to create an auditable
    baseline and avoid reconstructing signals after the result is known.
@@ -426,16 +464,17 @@ autonomous execution or full portfolio-manager system.
 ### Priority 0 — Establish trustworthy risk and validation before expanding
 live use
 
-1. **Operationalize portfolio inputs (issue #52, in progress):** collect
-   timestamped Public underlying quotes and exact-OSI contract IV with native
-   observation timestamps, and the daily Treasury 3-month yield with a
-   separate freshness window. Keep the ledger and generated snapshots local;
-   reject stale or incomplete inputs and measure market-data coverage. Sector/
-   correlation concentration still needs dependable data.
-2. **Validate the risk rules:** add an options-aware historical evaluation
-   using real historical option quotes where available, or clearly disclosed
-   price-surface assumptions. Test exit rules, slippage, fees, and regime
-   filters out of sample before treating thresholds as an edge.
+1. **Operationalize portfolio inputs (issue #52, complete in PR #53):** the
+   local collector now supplies timestamped Public underlying quotes and
+   exact-OSI contract IV plus the daily Treasury 3-month yield with separate
+   freshness windows. Keep the ledger and generated snapshots local; measure
+   completeness and priced-leg coverage over repeated runs. Sector/correlation
+   concentration still needs dependable data.
+2. **Validate the risk rules (issue #54, in progress):** replay configured
+   bull-put exits against supplied timestamped historical marks with explicit
+   costs and gap handling. A larger options-aware evaluation and out-of-sample
+   comparisons across exits, slippage, fees, and regimes remain necessary
+   before treating any threshold as an edge.
 3. **Close data-quality risks:** dependable earnings/dividend/ex-date inputs,
    stale quote handling, contract deliverable/corporate-action checks, and
    visible uncertainty when data is missing.
