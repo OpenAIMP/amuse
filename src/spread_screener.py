@@ -396,10 +396,33 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "win_prob_est": round(_pwin, 3),
         "expected_value": round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
         "loss_multiple": round(max_loss / _cd, 2) if _cd > 0 else None,
+        "lucrative": lucrative_label(round(_pwin, 3),
+                                     round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
+                                     round(max_loss / _cd, 2) if _cd > 0 else None),
         "best_case_range": ([round(breakeven, 2), "and up"] if _is_put
                             else ["and down", round(breakeven, 2)]),
         "worst_case_price": round(lk, 2),
     }
+
+
+def lucrative_label(win_prob, ev, loss_mult):
+    """Classify a spread as lucrative or not (#28).
+
+    Lucrative = high win probability AND positive expectancy AND
+    sane loss multiple. This is a screen, not a guarantee.
+    """
+    if win_prob is None or ev is None:
+        return "Unknown"
+    lm = loss_mult if loss_mult else 99
+    if win_prob >= 0.70 and ev > 0 and lm <= 3.0:
+        return "Lucrative"
+    if win_prob >= 0.60 and ev > 0 and lm <= 4.0:
+        return "Solid"
+    if ev is not None and ev <= 0:
+        return "Negative EV"
+    if lm > 4.0:
+        return "High risk"
+    return "Marginal"
 
 
 def evaluate_condor(spot, put_wing, call_wing, width):
@@ -476,6 +499,9 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "win_prob_est": round(p_win, 3),
         "expected_value": round(p_win * credit_dollars - (1 - p_win) * max_loss, 0),
         "loss_multiple": round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None,
+        "lucrative": lucrative_label(round(p_win, 3),
+                                     round(p_win * credit_dollars - (1 - p_win) * max_loss, 0),
+                                     round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None),
         # price ranges for the explainer
         "best_case_range": [round(put_wing["short_strike"] - total_credit, 2),
                             round(call_wing["short_strike"] + total_credit, 2)],
@@ -556,6 +582,10 @@ def evaluate_asym_condor(spot, put_wing, call_wing, width):
         "win_prob_est": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))), 3),
         "expected_value": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))) * total_credit * 100 - (1 - max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"]))))) * max_loss, 0),
         "loss_multiple": round(max_loss / (total_credit * 100), 2) if total_credit > 0 else None,
+        "lucrative": lucrative_label(
+            round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))), 3),
+            round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))) * total_credit * 100 - (1 - max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"]))))) * max_loss, 0),
+            round(max_loss / (total_credit * 100), 2) if total_credit > 0 else None),
         "best_case_range": [round(breakeven_put, 2), round(breakeven_call, 2)],
         "worst_case_put": round(put_wing["long_strike"], 2),
         "worst_case_call": round(call_wing["long_strike"], 2),
@@ -1062,6 +1092,10 @@ def main():
                     "max_loss_total": round(r["max_loss_total"], 0),
                     "breakeven": round(r["breakeven"], 2),
                     "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
@@ -1076,6 +1110,10 @@ def main():
                     "breakeven_put": round(r["breakeven_put"], 2),
                     "breakeven_call": round(r["breakeven_call"], 2),
                     "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
@@ -1091,6 +1129,10 @@ def main():
                     "breakeven_call": round(r["breakeven_call"], 2),
                     "upside_distance_pct": round(r["upside_distance_pct"], 1),
                     "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
