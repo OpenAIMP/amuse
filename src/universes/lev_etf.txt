@@ -24,7 +24,7 @@ TNA
 TZA
 ERX
 ERY
-# Volatility
 UVXY
 SVXY
 VXX
+
