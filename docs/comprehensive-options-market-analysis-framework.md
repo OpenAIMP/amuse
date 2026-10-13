@@ -1,7 +1,7 @@
 # Comprehensive Options & Market Analysis Framework
 
 **Implementation review:** 2026-10-13
-**Code reviewed:** `main` at merge commit `2dd5fd1` (PR #49); issue #50 is in progress on its linked PR branch.
+**Code reviewed:** `main` at merge commit `5b04714` (PR #51); issue #52 is in progress on its linked branch.
 
 This document begins with the framework blueprint reconstructed from the
 nine-part description supplied in chat, then assesses how much of each part
@@ -146,17 +146,18 @@ claimed until evaluated out of sample after costs.
 
 ### Workflow confidentiality and reliability
 
-The GitHub Actions follow-up in issue [#48](https://github.com/OpenAIMP/amuse/issues/48)
-removes the account-ID literal fallback, requires the repository secret,
-enables `pipefail` for screener output piped through `tee`, and runs the daily
-PMCC exception monitor after earlier step failures. This should prevent
-account identifiers from being newly exposed in workflow source and reduce
-false-green runs or missed monitoring. These are security/operational benefits;
-they do not establish a trading-performance improvement. After merge, track
-workflow failures accurately detected and PMCC runs completed after upstream
-failures.
+The workflow hardening from issue [#48](https://github.com/OpenAIMP/amuse/issues/48)
+was merged in [PR #49](https://github.com/OpenAIMP/amuse/pull/49). The active
+screening workflows read `PUBLIC_ACCOUNT_ID` only from the repository secret,
+fail explicitly when it is absent, and do not contain an account-ID fallback.
+Screener commands piped through `tee` enable `pipefail`, so a screener failure
+fails its step. The daily PMCC exception monitor has `if: always()` so it still
+runs after earlier step failures. These are security and operational benefits;
+they do not establish a trading-performance improvement. Track detected
+screener failures and PMCC runs completed after upstream failures from Actions
+history; no quantified reliability benefit is claimed here.
 
-### Local bull-put position review (issue #50)
+### Local bull-put position review (issue #50, merged in PR #51)
 
 `src/position_manager.py` applies the existing configured bull-put exit rules
 to open ledger entries only when a supplied mark snapshot and each position's
@@ -425,10 +426,12 @@ autonomous execution or full portfolio-manager system.
 ### Priority 0 — Establish trustworthy risk and validation before expanding
 live use
 
-1. **Operationalize portfolio inputs:** connect a timestamped open ledger and
-   reliable per-leg/symbol market snapshot to the new Greek/stress utility;
-   reject stale values and measure input coverage. Add sector/correlation
-   concentration only when supported by dependable data.
+1. **Operationalize portfolio inputs (issue #52, in progress):** collect
+   timestamped Public underlying quotes and exact-OSI contract IV with native
+   observation timestamps, and the daily Treasury 3-month yield with a
+   separate freshness window. Keep the ledger and generated snapshots local;
+   reject stale or incomplete inputs and measure market-data coverage. Sector/
+   correlation concentration still needs dependable data.
 2. **Validate the risk rules:** add an options-aware historical evaluation
    using real historical option quotes where available, or clearly disclosed
    price-surface assumptions. Test exit rules, slippage, fees, and regime

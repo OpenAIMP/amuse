@@ -1,7 +1,7 @@
 # Options framework implementation status
 
 **Reviewed:** 2026-10-13
-**Repository revision:** `main` at `2dd5fd1` (PR #49 merged); this review also records issue #50's linked branch, which is not merged yet.
+**Repository revision:** `main` at `5b04714` (PR #51 merged); issue #52 is the active implementation branch.
 
 The complete framework with section-by-section status, rationale, and
 prioritized remaining work is in the
@@ -14,7 +14,8 @@ overall rating remains **about 50% implemented**. This is a qualitative
 judgment about breadth and integration, not a count of checklist items. Core
 screening is strongest; pricing utilities, portfolio-risk calculations, and
 an advisory decision engine exist. PRs #46–#49 improved freshness controls,
-dashboard visibility, and workflow reliability/confidentiality; these improve
+dashboard visibility, and workflow reliability/confidentiality; PR #51 added
+local bull-put position review. These improve
 operation and reviewability but do not materially change breadth or prove
 returns. Live data integration, calibration, and out-of-sample profitability
 evidence remain limited or absent. The percentage is not a return measurement.
@@ -27,8 +28,25 @@ evidence remain limited or absent. The percentage is not a return measurement.
 | Strategy pricing and entry filters | **Mostly implemented** | Defined-risk spreads and condors, plus PMCC pairs, with conservative bid/ask assumptions, liquidity/friction/event gates, DTE and delta bands, max loss, breakeven, and return-on-risk ranking. |
 | Unified decision synthesis | **Partly implemented** | PR #40 adds an advisory engine joining regime, horizon/events, timing, volatility, spread economics, and risk/sizing into ranked WATCH/CONSIDER/NO TRADE output. PR #47 surfaces the decision, six gates, expected move, and Kelly status in archived reports and the hub. Daily runs lack an account/ledger by default, so they cannot size positions. |
 | Position sizing and book risk | **Partly implemented** | Existing ledger sizing and heat gates remain; PR #40 adds open-ledger Greeks and five model-based scenarios given current market context. PR #46 adds snapshot freshness and priced-leg coverage; PR #47 displays optional results. No scheduled canonical live-book feed, sector/correlation model, or automatic concentration check. |
-| Exits and management | **Partly implemented** | `src/exits.py` contains configured bull-put rules. The issue #50 branch adds a local manager that applies them to fresh explicit marks, reports coverage and actions, and never places orders; it is not merged yet. Other strategies lack exit policies, and marks are not automatically sourced. |
+| Exits and management | **Partly implemented** | `src/exits.py` contains configured bull-put rules. PR #51 adds a local manager that applies them to fresh explicit marks, reports coverage and actions, and never places orders. Other strategies lack exit policies, and marks are not automatically sourced. |
 | Valuation, performance, and learning | **Partly implemented** | PR #40 adds European Black–Scholes pricing/Greeks, expected move, and fractional Kelly utility. Kelly requires 30 realized trades per strategy and an account value; inputs are not out-of-sample validated. No options backtester or attribution loop. |
+
+## Issue #52 — live market context for private portfolio-risk snapshots (in progress)
+
+The linked branch adds a local collector for timestamped Public underlying
+quotes and exact-OSI option IV, plus the Treasury daily 3-month par yield.
+Quote timestamps and the daily rate observation use separate freshness limits.
+Exact contract mapping is required; unsupported adjusted deliverables and
+missing observations remain visible as gaps. The collector feeds the existing
+portfolio Greek/stress analyzer, while ledger data and generated snapshots
+remain local and are not published to Pages.
+
+**Expected benefit:** replace hand-entered market assumptions with traceable,
+fresh market observations and improve priced-leg coverage. **Evidence:** after
+merge, track snapshot completeness, stale/missing quote rates, rate freshness,
+and priced-leg coverage. This is an input quality and risk-visibility benefit,
+not evidence of improved returns; the rate is a maturity proxy and the pricing
+model omits dividends and early exercise.
 
 ## Impact interpretation
 
@@ -39,9 +57,9 @@ regime. Implementation completion is not evidence of positive edge. The full
 rationale, impact measures, caveats, and staged roadmap are in the
 [comprehensive framework assessment](comprehensive-options-market-analysis-framework.md).
 
-## Issue #50 — local bull-put exit review (in progress)
+## Issue #50 — local bull-put exit review (merged in PR #51)
 
-The linked branch adds `src/position_manager.py` and
+PR #51 added `src/position_manager.py` and
 `bin/manage-positions.sh`. Given an open ledger and current per-position
 buy-to-close asks with timestamps, the report applies the existing 50%-profit,
 2×-credit stop, configured 7-DTE time exit, and no-assignment rules. Stale or
