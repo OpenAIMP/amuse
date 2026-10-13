@@ -170,13 +170,52 @@ def workflow_strip():
     return '<div class="flow">' + "".join(cells) + "</div>"
 
 
+def verdict_badge(verdict):
+    v = (verdict or "").lower()
+    if v == "go for it":
+        cls = "good"
+    elif v == "watch":
+        cls = "warn"
+    else:
+        cls = "bad"
+    return f'<span class="badge {cls}">{esc(verdict) or "—"}</span>'
+
+
 def stock_section(data):
     if not data:
         return section("Stock screen", '<p class="empty">No data yet — run the stock screener.</p>')
-    passing = sorted(data.get("passing", []),
-                     key=lambda p: -(p.get("score") if isinstance(p.get("score"), (int, float)) else -1))
-    rows = []
+    # Combine passing + rejected into one ranked list (issue #39).
+    # Verdict sort: Go for it first, then Watch, then by score desc.
+    VERDICT_RANK = {"Go for it": 0, "Watch": 1, "Pass": 2}
+    passing = data.get("passing", []) or []
+    rejected = data.get("rejected", {}) or {}
+    all_rows = []
     for p in passing:
+        all_rows.append((p, None))
+    for sym, info in rejected.items():
+        info = info or {}
+        # Build a minimal row for rejected names; indicators may be partial/None.
+        row = {"symbol": sym,
+               "verdict": "Pass",
+               "verdict_reason": "; ".join(info.get("reasons", [])),
+               "indicators": info.get("indicators"),
+               "_rejected": True}
+        # Copy through scalar fields saved at the top level of the rejected entry.
+        for k in ("price", "rsi14", "vs_sma50_pct", "vs_sma200_pct",
+                  "atr_pct", "vol_ratio", "off_52w_high_pct",
+                  "ret_1m_pct", "ret_3m_pct", "score"):
+            if info.get(k) is not None:
+                row[k] = info[k]
+        all_rows.append((row, info.get("reasons", [])))
+    def _sort_key(item):
+        p, _ = item
+        v = p.get("verdict") or "Pass"
+        s = p.get("score")
+        s = s if isinstance(s, (int, float)) else -1
+        return (VERDICT_RANK.get(v, 2), -s)
+    all_rows.sort(key=_sort_key)
+    rows = []
+    for p, rej_reasons in all_rows:
         ind = p.get("indicators") or {}
         bb = ind.get("bollinger") or {}
         vw = ind.get("vwap") or {}
@@ -245,6 +284,7 @@ def stock_section(data):
             f"<td>{val_cell}</td>"
             f"<td>{bias_cell}</td>"
             f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/40</span></td>"
+            f"<td title='{esc(p.get('verdict_reason') or '')}'>{verdict_badge(p.get('verdict'))}</td>"
             "</tr>"
         )
     table = (
@@ -291,8 +331,11 @@ def stock_section(data):
         "MACD hist, RSI>50, pivot trend. 4+ of 6 = bullish, 2 or fewer = "
         "bearish, else neutral.'>Bias</th>"
         "<th>Score</th>"
+        "<th title='Actionable verdict: Go for it = strong setup (score 25+, UP/RNG trend, bullish bias); "
+        "Watch = decent but missing a Go criterion; Pass = below threshold or failed gates. "
+        "Hover for the reason.'>Verdict</th>"
         "</tr></thead><tbody>"
-        + ("".join(rows) if rows else '<tr><td colspan="19" class="empty">No qualifiers this run.</td></tr>')
+        + ("".join(rows) if rows else '<tr><td colspan="20" class="empty">No qualifiers this run.</td></tr>')
         + "</tbody></table></div>"
         '<details><summary><b>Column guide — what each value means for decisions</b></summary>'
         '<ul class="guide">'
