@@ -219,7 +219,7 @@ def build_page(title, subtitle, sections, backlink=""):
 </header>
 <section class="card"><h2>How a trade gets made</h2>{workflow_strip()}</section>
 {sections}
-<section class="card"><h2>Open-position review</h2>
+<section class="card"><h2>Private open-position review &amp; risk</h2>
 <p>The bull-put exit policy can be applied to a local ledger using fresh,
 timestamped buy-to-close marks. The review reports take-profit, stop-loss,
 time-exit, and assignment-risk actions; missing or stale marks are marked
@@ -230,6 +230,11 @@ folder and should not be published with this public dashboard. See the
 <a href="comprehensive-options-market-analysis-framework.html">framework assessment</a> for the mark-file format, coverage
 measures, and limits. This adds auditable rule coverage; it does not establish
 that the exit policy improves returns.</p>
+<p>Portfolio Greeks and scenario risk can also be generated locally from
+timestamped Public option/equity quotes and Treasury's daily rate feed:
+<code>bash bin/run-portfolio-risk.sh LEDGER.json</code>. Exact OSI identifiers
+are required for each option leg. Missing or stale inputs leave risk incomplete;
+holdings and reports stay local and are not written to public reports.</p>
 </section>
 <section class="card"><h2>Reading the screens — notes &amp; lessons</h2>
 <h3>Pre-market gap vs intraday momentum</h3>

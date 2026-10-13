@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "updated_at": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+  "positions": [
+    {
+      "id": "example-1",
+      "underlying": "AAPL",
+      "strategy": "bull_put_spread",
+      "legs": [
+        {"osi": "AAPL261218P00150000", "side": "short", "type": "put", "strike": 150, "expiry": "2026-12-18"},
+        {"osi": "AAPL261218P00145000", "side": "long", "type": "put", "strike": 145, "expiry": "2026-12-18"}
+      ],
+      "credit": 1.00,
+      "contracts": 1,
+      "max_loss": 4.00,
+      "dte_at_entry": 66,
+      "status": "open",
+      "exit": null
+    }
+  ]
+}

@@ -460,6 +460,37 @@ replace its placeholder timestamps before running:
 python3 src/portfolio_risk.py --ledger ledger.json --market market.json --max-age-minutes 30 --out reports/portfolio-risk.json
 ```
 
+For a locally sourced snapshot, add each option's exact OCC OSI symbol under
+the ledger leg's `osi` field. The OSI expiry, type, and strike must match the
+ledger fields; the root must match the underlying. Missing or adjusted
+contracts are not guessed and leave the report incomplete. Copy the sample
+ledger and replace its placeholder `updated_at` before use:
+[`examples/portfolio-ledger-context.sample.json`](examples/portfolio-ledger-context.sample.json).
+
+Set `PUBLIC_ACCOUNT_ID` and the Public API credential in your local environment,
+then run:
+
+```sh
+bash bin/run-portfolio-risk.sh ledger.json
+```
+
+`src/portfolio_context.py` reads native timestamps from the Public quote
+records for underlying prices and each exact option contract's IV. It fetches
+the latest 3-month rate from Treasury's daily par-yield feed. Quotes default to
+a 30-minute freshness window; the date-only Treasury observation has a
+separate 7-calendar-day window to span weekends and market holidays. Override
+both as needed with optional positional arguments. The model rate is a 3-month
+Treasury proxy; dividend yield defaults to zero because the provider has no
+reliable dividend feed in this workflow. Adjusted deliverables and early
+exercise are not modeled. Missing timestamps, quote/IV data, exact OSI
+identifiers, or rates are recorded as gaps, never replaced with retrieval time
+or zeros. The local JSON files are written under ignored `reports/`; do not
+publish them with GitHub Pages.
+
+Data fields and sources: [Public real-time quotes](https://public.com/api/docs/resources/market-data/get-quotes),
+[Public option chain](https://public.com/api/docs/resources/market-data/get-option-chain),
+and the [Treasury daily yield XML feed](https://home.treasury.gov/treasury-daily-interest-rate-xml-feed).
+
 Marks and stress results are Black–Scholes model estimates, not executable
 quotes. Missing market inputs are reported and the result is marked incomplete.
 The daily HTML report displays the six-step recommendation and expected move.
