@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import intraday_screen as ids
+from indicators import vwap
 
 ET = ZoneInfo("America/New_York")
 
@@ -26,13 +27,15 @@ def _daily_bars(n=60, close=100.0):
     out = []
     for i in range(n):
         c = close + 2.0 * (1 if i % 2 == 0 else -1)
-        out.append((base + timedelta(days=i), c, c * 1.01, c * 0.99,
-                    1_000_000))
+        out.append({"date": base + timedelta(days=i), "open": c,
+                    "high": c * 1.01, "low": c * 0.99, "close": c,
+                    "volume": 1_000_000})
     return out
 
 
 def _intraday_bar(ts, o, h, l, c, v):
-    return (ts, o, h, l, c, v)
+    return {"ts": ts, "open": o, "high": h, "low": l, "close": c,
+            "volume": v}
 
 
 def _today_at(h, m):
@@ -50,7 +53,7 @@ class TestORB(unittest.TestCase):
             _intraday_bar(_today_at(11, 0), 101.2, 103.5, 101, 103.2, 200_000),
         ]
         # monkeypatch the data sources
-        ids.daily_bars_for = lambda s: _daily_bars()
+        ids.daily_bars = lambda s, acct: _daily_bars()
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 103.2},
                                       now_et=_today_at(11, 0))
@@ -64,7 +67,7 @@ class TestORB(unittest.TestCase):
             _intraday_bar(_today_at(9, 35), 100, 100.5, 99.5, 99.8, 60_000),
             _intraday_bar(_today_at(11, 0), 99.8, 100, 98.5, 98.7, 200_000),
         ]
-        ids.daily_bars_for = lambda s: _daily_bars()
+        ids.daily_bars = lambda s, acct: _daily_bars()
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 98.7},
                                       now_et=_today_at(11, 0))
@@ -76,7 +79,7 @@ class TestORB(unittest.TestCase):
             _intraday_bar(_today_at(9, 35), 100.5, 101.5, 99.5, 100.8, 60_000),
             _intraday_bar(_today_at(11, 0), 100.8, 101, 100.2, 100.5, 80_000),
         ]
-        ids.daily_bars_for = lambda s: _daily_bars()
+        ids.daily_bars = lambda s, acct: _daily_bars()
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 100.5},
                                       now_et=_today_at(11, 0))
@@ -93,7 +96,7 @@ class TestVWAP(unittest.TestCase):
             _intraday_bar(_today_at(10, 0), 99.5, 100.2, 99.4, 100.0, 100_000),
             _intraday_bar(_today_at(11, 0), 100.0, 101.5, 100.0, 101.2, 300_000),
         ]
-        ids.daily_bars_for = lambda s: _daily_bars()
+        ids.daily_bars = lambda s, acct: _daily_bars()
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 101.2},
                                       now_et=_today_at(11, 0))
@@ -108,8 +111,8 @@ class TestVWAP(unittest.TestCase):
         ]
         # tp1 = (102+98+100)/3 = 100, tp2 = (104+100+102)/3 = 102
         # vwap = (100*1000 + 102*1000) / 2000 = 101
-        self.assertAlmostEqual(ids.session_vwap(bars), 101.0, places=6)
-        self.assertIsNone(ids.session_vwap([]))
+        self.assertAlmostEqual(vwap(bars), 101.0, places=6)
+        self.assertIsNone(vwap([]))
 
 
 class TestProratedVolume(unittest.TestCase):
@@ -120,7 +123,7 @@ class TestProratedVolume(unittest.TestCase):
             _intraday_bar(_today_at(9, 30), 100, 102, 99, 101, 200_000),
             _intraday_bar(_today_at(9, 35), 101, 103, 100, 102, 300_000),
         ]
-        ids.daily_bars_for = lambda s: _daily_bars()  # 1M avg
+        ids.daily_bars = lambda s, acct: _daily_bars()  # 1M avg
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 105.0},
                                       now_et=_today_at(11, 0))
@@ -133,7 +136,7 @@ class TestProratedVolume(unittest.TestCase):
             _intraday_bar(_today_at(9, 30), 100, 101, 99, 100, 10_000),
             _intraday_bar(_today_at(11, 0), 100, 101, 99, 100, 10_000),
         ]
-        ids.daily_bars_for = lambda s: _daily_bars()
+        ids.daily_bars = lambda s, acct: _daily_bars()
         ids.intraday_bars_today = lambda s: bars
         res, reasons = ids.screen_one("TEST", quote_map={"TEST": 100.5},
                                       now_et=_today_at(11, 0))
