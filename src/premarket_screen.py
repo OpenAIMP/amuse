@@ -26,16 +26,14 @@ verified against the API.
 import argparse
 import concurrent.futures
 import json
-import math
 import os
 import statistics
-import subprocess
 import sys
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-CLI = os.environ.get("PUBLIC_MCP_CLI", "/home/hatch/workspace/skills/public-mcp/bin/public-mcp")
+
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
 if not ACCT:
     raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
@@ -43,6 +41,11 @@ if not ACCT:
 # ---- screening configuration (design choices, printed in every report) ----
 # Tunables live in gates.yaml; this block binds them to module constants.
 import gates as _gates_mod
+from mcp_client import McpError
+from market_data import daily_bars, intraday_bars, quotes
+from market_data import quote as quote_one
+from indicators import atr as calc_atr
+from indicators import vwap as calc_vwap
 
 
 def _apply_gates(path=None):
@@ -64,172 +67,12 @@ RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds"
 RUN_DATE_ET = datetime.now(ZoneInfo("America/New_York")).date()
 
 
-class McpError(RuntimeError):
-    pass
-
-
-def mcp_call(tool, args):
-    try:
-        proc = subprocess.run([CLI, "call", tool, json.dumps(args)],
-                              capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired as e:
-        raise McpError(f"{tool}: CLI timed out: {e}")
-    if proc.returncode != 0:
-        raise McpError(f"{tool}: CLI failed: {proc.stderr[:300]}")
-    try:
-        d = json.loads(proc.stdout)
-    except json.JSONDecodeError as e:
-        raise McpError(f"{tool}: CLI returned non-JSON output: {e}")
-    if not isinstance(d, dict) or "content" not in d or not d["content"]:
-        raise McpError(f"{tool}: unexpected response shape")
-    if d.get("isError"):
-        raise McpError(f"{tool}: {json.dumps(d)[:300]}")
-    try:
-        return json.loads(d["content"][0]["text"])
-    except (json.JSONDecodeError, KeyError, TypeError, IndexError) as e:
-        raise McpError(f"{tool}: unparseable content payload: {e}")
-
-
-# ---- Universe: shared frozen constituents (see universes.py)
-try:
-    from universes import UNIVERSES
-    NASDAQ100 = UNIVERSES["nasdaq100"]
-except ImportError:  # pragma: no cover - standalone fallback
-    NASDAQ100 = []
-
-
-def quote_for(symbol):
-    """Return current price from get_quotes, or None."""
-    q = mcp_call("get_quotes", {"symbols": [symbol], "account_id": ACCT})
-    found = [None]
-
-    def walk(o):
-        if isinstance(o, dict):
-            s = o.get("instrument", {}).get("symbol")
-            if s == symbol and found[0] is None:
-                for k in ("last", "price", "mark"):
-                    v = o.get(k)
-                    try:
-                        v = float(v)
-                    except (TypeError, ValueError):
-                        continue
-                    if math.isfinite(v) and v > 0:
-                        found[0] = v
-                        return
-            for v in o.values():
-                walk(v)
-                if found[0] is not None:
-                    return
-        elif isinstance(o, list):
-            for v in o:
-                walk(v)
-                if found[0] is not None:
-                    return
-
-    walk(q)
-    return found[0]
-
-
-def quotes_for(symbols):
-    """Batch quotes for many symbols in ONE get_quotes call.
-
-    Returns {symbol: price}. Symbols missing from the payload are absent
-    from the map (caller treats as unknown quote, never as zero).
-    """
-    out = {}
-    q = mcp_call("get_quotes", {"symbols": list(symbols), "account_id": ACCT})
-
-    def walk(o):
-        if isinstance(o, dict):
-            s = o.get("instrument", {}).get("symbol")
-            if s in symbols and s not in out:
-                for k in ("last", "price", "mark"):
-                    v = o.get(k)
-                    try:
-                        v = float(v)
-                    except (TypeError, ValueError):
-                        continue
-                    if math.isfinite(v) and v > 0:
-                        out[s] = v
-                        break
-            for v in o.values():
-                walk(v)
-        elif isinstance(o, list):
-            for v in o:
-                walk(v)
-    walk(q)
-    return out
-
-
-def daily_bars_for(symbol):
-    """Return list of (date, close, high, low, volume), validated."""
-    p = mcp_call("get_price_history",
-                 {"symbol": symbol, "account_id": ACCT,
-                  "period": "YEAR", "aggregation": "ONE_DAY"})
-    if not isinstance(p, dict):
-        raise McpError(f"get_price_history daily: bad payload for {symbol}")
-    bars = []
-    for b in p.get("regularMarket", {}).get("bars", []):
-        try:
-            c, h, l = float(b["close"]), float(b["high"]), float(b["low"])
-            v = float(b["volume"])
-            day = datetime.fromisoformat(b["timestamp"]).date()
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not all(math.isfinite(x) for x in (c, h, l, v)):
-            continue
-        if c <= 0 or h <= 0 or l <= 0 or v < 0:
-            continue
-        bars.append((day, c, h, l, v))
-    return bars
-
-
-def intraday_bars_for(symbol):
-    """Return list of (date, open, high, low, close, volume) incl. pre-market."""
-    p = mcp_call("get_price_history",
-                 {"symbol": symbol, "account_id": ACCT,
-                  "period": "DAY", "aggregation": "FIVE_MINUTES",
-                  "trading_session_toggle": "REGULAR_AND_EXTENDED_HOURS"})
-    if not isinstance(p, dict):
-        raise McpError(f"get_price_history intraday: bad payload for {symbol}")
-    bars = []
-    for b in p.get("regularMarket", {}).get("bars", []):
-        try:
-            o, h, l, c = (float(b["open"]), float(b["high"]),
-                          float(b["low"]), float(b["close"]))
-            v = float(b["volume"])
-            day = datetime.fromisoformat(b["timestamp"]).date()
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not all(math.isfinite(x) for x in (o, h, l, c, v)):
-            continue
-        if o <= 0 or h <= 0 or l <= 0 or c <= 0 or v < 0:
-            continue
-        bars.append((day, o, h, l, c, v))
-    return bars
-
-
-def atr14(bars):
-    """Wilder's ATR(14) in price units. bars: (date, close, high, low, vol)."""
-    if len(bars) < 15:
-        return None
-    trs = []
-    for i in range(1, len(bars)):
-        h, l = bars[i][2], bars[i][3]
-        pc = bars[i - 1][1]
-        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
-    a = sum(trs[:14]) / 14
-    for tr in trs[14:]:
-        a = (a * 13 + tr) / 14
-    return a if math.isfinite(a) and a > 0 else None
-
-
 def screen_one(symbol, quote_map=None):
     """Compute all pre-market signals. Returns (result_dict, [reasons]).
 
     quote_map: optional {symbol: price} from a batched get_quotes call.
     When provided, no per-symbol quote call is made (issue #14). When None,
-    falls back to the single-symbol quote_for.
+    falls back to the single-symbol market_data.quote.
 
     result_dict has metrics when computable; reasons lists rejection
     categories (empty when the name qualifies). Never raises for data
@@ -242,19 +85,21 @@ def screen_one(symbol, quote_map=None):
            "prior_close": None, "session": None}
 
     try:
-        bars = daily_bars_for(symbol)
+        bars = daily_bars(symbol, ACCT)
     except McpError as e:
         return res, [f"daily bars failed: {e}"]
     # Drop an in-progress today: prior close = last COMPLETED daily bar.
-    completed = [b for b in bars if b[0] < RUN_DATE_ET] or bars
+    completed = [b for b in bars if b["date"] < RUN_DATE_ET] or bars
     if len(completed) < MIN_DAILY_BARS:
         return res, ["insufficient daily history"]
-    prior_close = completed[-1][1]
+    prior_close = completed[-1]["close"]
     res["prior_close"] = prior_close
-    vols = [b[4] for b in completed[-20:]]
+    vols = [b["volume"] for b in completed[-20:]]
     avg20_vol = statistics.fmean(vols) if all(v >= 0 for v in vols) else None
 
-    atr = atr14(completed)
+    atr = calc_atr([b["high"] for b in completed],
+              [b["low"] for b in completed],
+              [b["close"] for b in completed])
     if atr is None:
         return res, ["atr uncomputable"]
 
@@ -262,7 +107,7 @@ def screen_one(symbol, quote_map=None):
         if quote_map is not None:
             price = quote_map.get(symbol)
         else:
-            price = quote_for(symbol)
+            price = quote_one(symbol, ACCT)
     except McpError as e:
         return res, [f"quote failed: {e}"]
     if price is None:
@@ -285,15 +130,15 @@ def screen_one(symbol, quote_map=None):
     res["range_atr"] = (price - prior_close) / atr
 
     try:
-        ibars = intraday_bars_for(symbol)
+        ibars, _expected = intraday_bars(symbol, ACCT)
     except McpError as e:
         return res, [f"intraday bars failed: {e}"]
     if not ibars:
         return res, ["no intraday bars"]
-    latest_day = max(b[0] for b in ibars)
-    today_bars = [b for b in ibars if b[0] == latest_day]
-    res["session"] = latest_day.isoformat()
-    today_vol = sum(b[5] for b in today_bars)
+    latest_day = max(b["ts"] for b in ibars)
+    today_bars = [b for b in ibars if b["ts"] == latest_day]
+    res["session"] = latest_day.date().isoformat()
+    today_vol = sum(b["volume"] for b in today_bars)
     if avg20_vol and avg20_vol > 0:
         rel_vol = today_vol / avg20_vol
     else:
@@ -305,12 +150,7 @@ def screen_one(symbol, quote_map=None):
         reasons.append("volume too thin")
 
     # Developing session VWAP from today's bars (all sessions included).
-    num = den = 0.0
-    for (_d, o, h, l, c, v) in today_bars:
-        tp = (h + l + c) / 3.0
-        num += tp * v
-        den += v
-    vwap = num / den if den > 0 else None
+    vwap = calc_vwap(today_bars)
     if vwap and vwap > 0:
         res["vwap_dist_pct"] = (price / vwap - 1) * 100.0
         above = price >= vwap
@@ -388,7 +228,7 @@ def main():
     # one call per name. On batch failure, screen_one falls back per-name.
     quote_map = None
     try:
-        quote_map = quotes_for(names)
+        quote_map = quotes(names, ACCT)
         print(f"batched quotes: {len(quote_map)}/{len(names)} names priced",
               file=sys.stderr)
     except McpError as e:
