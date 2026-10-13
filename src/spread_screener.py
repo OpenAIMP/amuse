@@ -47,6 +47,7 @@ from options_chain import parse_chain
 from options_chain import greeks as chain_greeks
 from screening_common import evaluation_record, qualification_counts
 import vol as _vol
+from options_math import estimate_pop, expected_move_candidates
 
 
 def _apply_gates(path=None):
@@ -191,7 +192,22 @@ def spread_events(sym, exp, events):
     return flags, reasons
 
 
-def evaluate_vertical(spot, short_c, long_c, width, kind):
+def _pop_fields(spot, iv, days, be_low, be_high, rate=0.0, div_yield=0.0):
+    """Distribution POP fields, or None when inputs cannot support it."""
+    try:
+        if not (spot and iv and iv > 0 and days is not None and days > 0):
+            return None
+        est = estimate_pop(spot, iv, days, be_low, be_high, rate, div_yield)
+    except (TypeError, ValueError):
+        return None
+    return {"pop": est["pop"], "pop_method": est["method"],
+            "pop_assumptions": est["assumptions"],
+            "expected_move": est["expected_move"],
+            "pop_limitations": est["limitations"]}
+
+
+def evaluate_vertical(spot, short_c, long_c, width, kind, rate=0.0,
+                      div_yield=0.0):
     """Evaluate one vertical spread. kind in {"bull_put", "bear_call"}.
 
     Conservative credit = short bid - long ask. Stable reason categories;
@@ -234,10 +250,17 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     net_delta = long_c.get("delta", 0.0) - short_c["delta"]  # long minus short
     # probability estimates: P(short expires OTM) ≈ 1 - |delta|
     _pwin = max(0.0, min(1.0, 1 - abs(short_c["delta"])))
+    _dte = dte(short_c["expiration"])
+    _pop = _pop_fields(spot, short_c.get("iv"), _dte,
+                       breakeven if kind == "bull_put" else None,
+                       breakeven if kind == "bear_call" else None,
+                       rate, div_yield)
+    if _pop:
+        _pwin = _pop["pop"]
     _cd = credit * 100
     # bull put: best = above breakeven; worst = below long strike
     # bear call: best = below breakeven; worst = above long strike
-    _is_put = kind == "bull_put_spread"
+    _is_put = kind == "bull_put"
     return {
         "accepted": True,
         "kind": kind,
@@ -255,7 +278,9 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "friction": friction,
         "net_delta": net_delta,
         "leg_spread_sum": short_c["spread"] + long_c["spread"],
+        "iv": short_c.get("iv"),
         "win_prob_est": round(_pwin, 3),
+        "win_prob_delta": round(max(0.0, min(1.0, 1 - abs(short_c["delta"]))), 3),
         "expected_value": round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
         "loss_multiple": round(max_loss / _cd, 2) if _cd > 0 else None,
         "lucrative": lucrative_label(round(_pwin, 3),
@@ -264,6 +289,10 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "best_case_range": ([round(breakeven, 2), "and up"] if _is_put
                             else ["and down", round(breakeven, 2)]),
         "worst_case_price": round(lk, 2),
+        **(_pop or {"pop_method": "delta_approximation",
+                    "pop_limitations": ["1-|short delta| ignores credit and "
+                                        "the long leg; IV unavailable for "
+                                        "distribution POP"]}),
     }
 
 
@@ -287,7 +316,7 @@ def lucrative_label(win_prob, ev, loss_mult):
     return "Marginal"
 
 
-def evaluate_condor(spot, put_wing, call_wing, width):
+def evaluate_condor(spot, put_wing, call_wing, width, rate=0.0, div_yield=0.0):
     """Combine two accepted wings into an iron condor. Same expiration required."""
     reasons = []
     if put_wing["expiration"] != call_wing["expiration"]:
@@ -306,6 +335,18 @@ def evaluate_condor(spot, put_wing, call_wing, width):
     if reasons:
         return {"accepted": False, "reasons": reasons,
                 "diagnostics": {"max_loss": round(max_loss, 0)}}
+    credit_dollars = total_credit * 100
+    ivs = [v for v in (put_wing.get("iv"), call_wing.get("iv")) if v]
+    _pop = _pop_fields(spot, sum(ivs) / len(ivs) if ivs else None,
+                       put_wing["dte"],
+                       put_wing["short_strike"] - total_credit,
+                       call_wing["short_strike"] + total_credit,
+                       rate, div_yield)
+    p_delta = max(0.0, min(1.0, (1 - abs(put_wing["short_delta"]))
+                           * (1 - abs(call_wing["short_delta"]))))
+    p_win = _pop["pop"] if _pop else p_delta
+    ev = round(p_win * credit_dollars - (1 - p_win) * max_loss, 0)
+    lm = round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None
     return {
         "accepted": True,
         "kind": "iron_condor",
@@ -325,6 +366,15 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "friction": friction,
         "net_delta": put_wing["net_delta"] + call_wing["net_delta"],
         "width": width,
+        "win_prob_est": round(p_win, 3),
+        "win_prob_delta": round(p_delta, 3),
+        "expected_value": ev,
+        "loss_multiple": lm,
+        "lucrative": lucrative_label(round(p_win, 3), ev, lm),
+        **(_pop or {"pop_method": "delta_independence",
+                    "pop_limitations": ["product of (1-|delta|) assumes "
+                                        "independent wings; IV unavailable "
+                                        "for distribution POP"]}),
         # --- probability estimates (#28): delta-based, labeled as estimates ---
         # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence
         "put_short_delta": put_wing["short_delta"],
@@ -627,6 +677,24 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                     short_calls.append(c)
         notes.append(f"{len(short_puts)} put / {len(short_calls)} call "
                      f"short-leg candidates in delta range")
+
+        # Expected-move-driven placement guide (report only; delta, width
+        # and liquidity gates still decide what is accepted).
+        for exp in exps:
+            cands = [c for c in short_puts + short_calls
+                     if c["expiration"] == exp and c.get("iv")]
+            days = dte(exp)
+            if not cands or days <= 0:
+                continue
+            iv = sum(c["iv"] for c in cands) / len(cands)
+            strikes = [c["strike"] for c in list(puts_by_exp[exp].values())
+                       + list(calls_by_exp[exp].values())]
+            em = expected_move_candidates(spot, iv, days, strikes)
+            notes.append(
+                f"{exp}: expected move +/-{em['expected_move']['move']:.2f} "
+                f"(IV {iv:.0%}, {days} DTE); EM short puts "
+                f"{em['put_short_strikes']}, calls {em['call_short_strikes']}, "
+                f"widths {em['widths']}")
 
         # Index long legs by (expiration, strike) for exact-width pairing.
         puts_by_strike, calls_by_strike = {}, {}
