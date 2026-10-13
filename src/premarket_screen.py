@@ -36,7 +36,7 @@ from zoneinfo import ZoneInfo
 
 ACCT = os.environ.get("PUBLIC_ACCOUNT_ID") or ""
 if not ACCT:
-    raise SystemExit("PUBLIC_ACCOUNT_ID is not set; configure it as a repo variable/secret (#23)")
+    raise SystemExit("PUBLIC_ACCOUNT_ID is not set; set the environment variable locally or configure the GitHub Actions repository secret (#23)")
 
 # ---- screening configuration (design choices, printed in every report) ----
 # Tunables live in gates.yaml; this block binds them to module constants.

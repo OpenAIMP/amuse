@@ -50,7 +50,7 @@ jobs:
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
           PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
-          PUBLIC_ACCOUNT_ID: ${{ vars.PUBLIC_ACCOUNT_ID }}
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID || '5OI32712' }}
         run: |
           STAMP=$(date -u +%F-%H%M)
           echo "STAMP=$STAMP" >> $GITHUB_ENV
