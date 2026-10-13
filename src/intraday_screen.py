@@ -328,6 +328,7 @@ def main():
     cands, rej = [], {}
     rej_notes = {}
     near = []
+    screened = []
 
     quote_map = None
     try:
@@ -356,7 +357,21 @@ def main():
             key = err.split(":")[0]
             rej[key] = rej.get(key, 0) + 1
             rej_notes.setdefault(key, []).append(f"{sym}: {err}"[:90])
+            screened.append({"symbol": sym, "qualification_status": "error",
+                             "qualification_reasons": [err], "error": err})
             continue
+        # Keep the full evaluation for auditability, including names that fail
+        # one or more gates. Data-availability failures are distinct from a
+        # valid technical rejection so downstream decision models can filter.
+        data_prefixes = ("daily bars failed", "insufficient daily history",
+                         "atr uncomputable", "quote failed", "no quote",
+                         "intraday bars failed", "no intraday bars",
+                         "opening range not yet formed")
+        incomplete = any(str(r).startswith(data_prefixes) for r in reasons)
+        status = ("qualified" if not reasons else
+                  "incomplete_data" if incomplete else "rejected")
+        screened.append({**res, "qualification_status": status,
+                         "qualification_reasons": list(reasons)})
         if reasons:
             for r in reasons:
                 key = r.split(":")[0]
@@ -432,6 +447,11 @@ def main():
                                     "atr_pct_min": ATR_PCT_MIN,
                                     "atr_pct_max": ATR_PCT_MAX},
                        "candidates": top,
+                       "screened": screened,
+                       "qualification_counts": {
+                           status: sum(1 for row in screened
+                                       if row.get("qualification_status") == status)
+                           for status in ("qualified", "rejected", "incomplete_data", "error")},
                        "near_misses": near_sorted,
                        "rejections": rej}, f, indent=1)
         print(f"\nwrote {args.json_out}")

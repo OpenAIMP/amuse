@@ -1042,37 +1042,79 @@ def intraday_section(data, report_mode=False):
             return ""
         return section("Intraday momentum screen",
                        '<p class="empty">No data yet — run the intraday screener.</p>')
-    cands = sorted(data.get("candidates") or [],
-                   key=lambda c: -((c.get("conviction") or 0)
-                                   if isinstance(c.get("conviction"), (int, float)) else -1))
+    all_rows = data.get("screened")
+    has_full_universe = isinstance(all_rows, list)
+    if has_full_universe:
+        status_order = {"qualified": 0, "rejected": 1,
+                        "incomplete_data": 2, "error": 3}
+        cands = sorted(all_rows, key=lambda c: (
+            status_order.get(c.get("qualification_status"), 4),
+            -((c.get("conviction") or 0)
+              if isinstance(c.get("conviction"), (int, float)) else -1),
+            str(c.get("symbol") or "")))
+    else:
+        # Backward compatibility for reports generated before per-symbol
+        # evaluations were persisted.
+        cands = sorted(data.get("candidates") or [],
+                       key=lambda c: -((c.get("conviction") or 0)
+                                       if isinstance(c.get("conviction"), (int, float)) else -1))
     rows = []
     for c in cands:
         sig = c.get("orb_signal") or c.get("vwap_signal") or "—"
+        status = c.get("qualification_status", "qualified")
+        status_label = {"qualified": "QUALIFIED", "rejected": "REJECTED",
+                        "incomplete_data": "INCOMPLETE DATA", "error": "ERROR"}.get(status, str(status).upper())
+        status_class = "good" if status == "qualified" else ("warn" if status in ("incomplete_data", "error") else "bad")
+        reasons = c.get("qualification_reasons") or c.get("missed") or []
+        reason_text = "; ".join(str(reason) for reason in reasons) or "Passed all configured gates"
         rows.append(
             "<tr>"
             f"{sym_cell(c.get('symbol'))}"
+            f"<td><span class='badge {status_class}'>{esc(status_label)}</span></td>"
             f"<td class='num'>{num(c.get('price'), 2)}</td>"
+            f"<td class='num'>{num(c.get('orb_high'), 2)} / {num(c.get('orb_low'), 2)}</td>"
             f"<td>{esc(sig)}</td>"
             f"<td class='num'>{num(c.get('rel_vol_tp'), 2)}×</td>"
+            f"<td class='num'>{num(c.get('vwap'), 2)}</td>"
             f"<td class='num'>{num(c.get('vwap_dist_pct'), 2, '%')}</td>"
+            f"<td>{esc(c.get('vwap_signal') or '—')}</td>"
+            f"<td class='num'>{num(c.get('vwap_above_pct'), 1, '%')}</td>"
             f"<td class='num'>{num(c.get('atr_pct'), 2, '%')}</td>"
             f"<td class='num'>{num(c.get('conviction'), 1)}</td>"
             f"<td>{bias_badge(c.get('bias'))}</td>"
+            f"<td>{esc(reason_text)}</td>"
             "</tr>"
         )
+    counts = data.get("qualification_counts") or {}
+    if has_full_universe:
+        counts = {key: sum(1 for row in all_rows
+                           if row.get("qualification_status") == key)
+                  for key in ("qualified", "rejected", "incomplete_data", "error")}
+        summary = (f"{len(all_rows)} symbols evaluated · {counts['qualified']} qualified · "
+                   f"{counts['rejected']} rejected · {counts['incomplete_data']} incomplete data · "
+                   f"{counts['error']} errors")
+        summary_html = f'<p class="fine">{esc(summary)}</p>'
+    else:
+        summary_html = ('<p class="fine">Per-symbol evaluations were not saved for this legacy run; '
+                        f"{len(cands)} candidate rows are available out of {esc(data.get('universe', 'unknown'))} screened.</p>")
     table = (
         '<div class="tbl-wrap"><table><thead><tr>'
         "<th title='Underlying symbol. Click for quote pages.'>Symbol</th>"
+        "<th>Qualification</th>"
         "<th title='Last price at screen time.'>Price</th>"
+        "<th>OR high / low</th>"
         "<th title='Fired signal: breakout_up / breakdown_down (15-min opening range), reclaim_up / loss_down (session VWAP cross).'>Signal</th>"
         "<th title='Today\u2019s volume so far vs 20-day average prorated by elapsed session time. Gate: at least 1.5\u00d7.'>RelVol TP</th>"
+        "<th>VWAP</th>"
         "<th title='Distance from the session VWAP (%).'>VWAP dist</th>"
+        "<th>VWAP signal</th><th>VWAP hold</th>"
         "<th title='Average True Range as % of price. Gate: 1\u20138%.'>ATR%</th>"
         "<th title='Conviction score: (|breakout distance| + 0.5) \u00d7 time-prorated rel vol.'>Conviction</th>"
         "<th title='Bullish / bearish momentum from the fired signals. Not a prediction.'>Bias</th>"
+        "<th>Qualification details</th>"
         "</tr></thead><tbody>"
         + ("".join(rows) if rows else
-           '<tr><td colspan="8" class="empty">No intraday momentum candidates.</td></tr>')
+           f'<tr><td colspan="14" class="empty">No symbols were evaluated (universe size: {esc(data.get("universe", 0))}).</td></tr>')
         + "</tbody></table></div>"
     )
     near = data.get("near_misses") or []
@@ -1107,7 +1149,7 @@ def intraday_section(data, report_mode=False):
         "Technical-only — check headlines before trading any candidate. "
         "Bias is not a prediction.</p>"
     )
-    return section("Intraday momentum screen", table + near_html + fine)
+    return section("Intraday momentum screen", summary_html + table + near_html + fine)
 
 
 def wing_str(wing, suffix):
@@ -1326,7 +1368,12 @@ def build_stats(rtype, stock, spreads, pmcc, premarket, intraday=None,
                 "screened": (premarket or {}).get("universe")}
     if rtype == "intraday":
         cands = (intraday or {}).get("candidates") or []
+        counts = (intraday or {}).get("qualification_counts") or {}
         return {"candidates": len(cands),
+                "qualified": counts.get("qualified", len(cands)),
+                "rejected": counts.get("rejected", 0),
+                "incomplete_data": counts.get("incomplete_data", 0),
+                "errors": counts.get("error", 0),
                 "screened": (intraday or {}).get("universe")}
     if rtype == "pmcc":
         return {"pairs": len((pmcc or {}).get("pairs") or {})}
