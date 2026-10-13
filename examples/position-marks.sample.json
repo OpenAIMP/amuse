@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "source": "replace with the quote source and method",
+  "asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP",
+  "positions": {
+    "replace-with-ledger-position-id": {
+      "close_cost": 0.50,
+      "dte": 30,
+      "short_itm": false,
+      "asof": "REPLACE_WITH_CURRENT_UTC_TIMESTAMP"
+    }
+  }
+}

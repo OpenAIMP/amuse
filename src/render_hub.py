@@ -219,6 +219,18 @@ def build_page(title, subtitle, sections, backlink=""):
 </header>
 <section class="card"><h2>How a trade gets made</h2>{workflow_strip()}</section>
 {sections}
+<section class="card"><h2>Open-position review</h2>
+<p>The bull-put exit policy can be applied to a local ledger using fresh,
+timestamped buy-to-close marks. The review reports take-profit, stop-loss,
+time-exit, and assignment-risk actions; missing or stale marks are marked
+unavailable. It never places orders.</p>
+<p>Run <code>bash bin/manage-positions.sh LEDGER.json MARKS.json</code> from a local
+checkout. Position-level results stay in the ignored <code>reports/</code>
+folder and should not be published with this public dashboard. See the
+<a href="comprehensive-options-market-analysis-framework.html">framework assessment</a> for the mark-file format, coverage
+measures, and limits. This adds auditable rule coverage; it does not establish
+that the exit policy improves returns.</p>
+</section>
 <section class="card"><h2>Reading the screens — notes &amp; lessons</h2>
 <h3>Pre-market gap vs intraday momentum</h3>
 <p>The <b>pre-market gap screen</b> (9:00am ET) looks for overnight gaps ≥ 2% with
@@ -349,7 +361,7 @@ def main():
     )
     out = os.path.join(docs_dir, "index.html")
     os.makedirs(docs_dir, exist_ok=True)
-    with open(out, "w") as f:
+    with open(out, "w", encoding="utf-8") as f:
         f.write(hub)
 
     arch = build_page(
@@ -359,7 +371,7 @@ def main():
         backlink='<p class="backlink"><a href="index.html">← Latest reports</a></p>',
     )
     aout = os.path.join(docs_dir, "archive.html")
-    with open(aout, "w") as f:
+    with open(aout, "w", encoding="utf-8") as f:
         f.write(arch)
 
     print(f"wrote {out} ({os.path.getsize(out)} bytes) "

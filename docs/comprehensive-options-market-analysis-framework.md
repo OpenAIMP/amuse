@@ -1,7 +1,7 @@
 # Comprehensive Options & Market Analysis Framework
 
 **Implementation review:** 2026-10-13
-**Code reviewed:** `main` at merge commit `c268d8d` (PR #40)
+**Code reviewed:** `main` at merge commit `2dd5fd1` (PR #49); issue #50 is in progress on its linked PR branch.
 
 This document begins with the framework blueprint reconstructed from the
 nine-part description supplied in chat, then assesses how much of each part
@@ -81,7 +81,7 @@ is implemented, proposed, or unvalidated.
 
 ## Implementation status assessment
 
-**Overall estimate: about 50% implemented after PR #40 merged.** This is a
+**Overall estimate: about 50% implemented after PR #49 merged.** This is a
 qualitative estimate of breadth and integration, not a count of checklist
 items or an estimate of trading performance.
 Amuse remains strongest at technical screening and defined-risk structures.
@@ -89,6 +89,9 @@ It now has reusable option math, optional book-level risk analysis, and a
 joined advisory decision report. The daily pipeline still lacks a canonical
 account/position feed, book-risk calculations need supplied market context,
 and no out-of-sample result establishes that these changes increase returns.
+PRs #46–#49 improved risk freshness reporting, dashboard visibility, and
+workflow reliability/confidentiality without materially changing this breadth
+estimate. Issue #50 adds a local exit-review path; this has not yet merged.
 
 ## Status key
 
@@ -152,6 +155,27 @@ false-green runs or missed monitoring. These are security/operational benefits;
 they do not establish a trading-performance improvement. After merge, track
 workflow failures accurately detected and PMCC runs completed after upstream
 failures.
+
+### Local bull-put position review (issue #50)
+
+`src/position_manager.py` applies the existing configured bull-put exit rules
+to open ledger entries only when a supplied mark snapshot and each position's
+buy-to-close ask are fresh (30-minute default). It reports policy action,
+reason, source/time, coverage, and missing/stale/unsupported positions in a
+local JSON/Markdown report. `bin/manage-positions.sh` keeps these files under
+the ignored root `reports/` folder; the public dashboard explains the workflow
+without rendering account positions. No broker order is sent.
+
+The incremental benefit is auditable rule coverage: an operator can see which
+open bull-put positions were evaluated and which trigger or data gap applies.
+Measure supported open positions, fresh-mark coverage, unavailable marks,
+action counts, human follow-through, realized P&L after fees, and estimated vs
+realized slippage. Initial implementation creates no trading-outcome evidence;
+it does not prove that taking any exit improves returns. It also depends on
+manually supplied executable complete-spread asks, and other structures remain
+unsupported. Issue [#9](https://github.com/OpenAIMP/amuse/issues/9) still owns
+complete entry-to-exit policy validation, and [#11](https://github.com/OpenAIMP/amuse/issues/11)
+owns out-of-sample comparison.
 
 ### Gradual improvement path
 
@@ -422,10 +446,13 @@ live use
    controlled workflow and add explicit freshness/completeness checks; bring
    preflight and exit plans into the review record while retaining human
    order confirmation.
-6. **Strategy-specific exits:** define and validate management rules for
-   condors, asymmetric condors, PMCCs, and any new strategy. Decide explicitly
-   whether the bull-put time exit remains 7 DTE or changes to 21 DTE; document
-   the rationale and validate either value.
+6. **Strategy-specific exits:** issue #50 applies the existing bull-put rules
+   to fresh, locally supplied position marks, without executing orders. The
+   marks are not yet sourced automatically and outcome evidence is absent.
+   Complete entry-to-exit validation in #9, then define and validate management
+   rules for condors, asymmetric condors, PMCCs, and new strategies. Decide
+   explicitly whether the bull-put time exit remains configured at 7 DTE or
+   changes to the framework's proposed 21 DTE; document and validate the choice.
 7. **Journal and attribution:** analyze net results by regime, strategy,
    candidate rank, sizing method, and rule; compare with the former
    screener-only/manual process.
