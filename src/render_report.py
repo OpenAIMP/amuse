@@ -835,6 +835,97 @@ def section(title, body):
     return f'<section class="card"><h2>{esc(title)}</h2>{body}</section>'
 
 
+def decision_section(data, show_missing=False):
+    """Expose the advisory six-step result and sizing limits in report HTML."""
+    if not data:
+        return (section("Unified decision", '<p class="empty">Decision output not supplied this run.</p>')
+                if show_missing else "")
+    summary = f'<p><strong>{esc(data.get("summary") or "No decision summary")}</strong></p>'
+    candidates = data.get("candidates") or []
+    if not isinstance(candidates, list):
+        candidates = []
+    rows = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        steps = candidate.get("steps") or []
+        status = " · ".join(
+            f"{esc(step.get('name') or step.get('step'))}: {esc(step.get('status') or '—')}"
+            for step in steps if isinstance(step, dict)
+        ) or "No gate details supplied"
+        sizing = candidate.get("kelly_sizing") or {}
+        move = candidate.get("expected_move_1sd")
+        rows.append(
+            "<tr>"
+            f"{sym_cell(candidate.get('symbol'))}"
+            f"<td>{esc(candidate.get('strategy') or '—')}</td>"
+            f"<td><span class='badge'>{esc(candidate.get('recommendation') or '—')}</span></td>"
+            f"<td class='num'>{num(move, 2) if move is not None else '—'}</td>"
+            f"<td class='wrap-cell'>{esc(sizing.get('status') or 'UNSIZED')}; contracts="
+            f"{esc(sizing.get('contracts', '—'))}; capped risk="
+            f"{num(float(sizing.get('capped_fraction')) * 100, 2, '%') if isinstance(sizing.get('capped_fraction'), (int, float)) else '—'}; "
+            f"{esc(sizing.get('reason') or '')}</td>"
+            f"<td class='wrap-cell'>{status}</td>"
+            "</tr>"
+        )
+    table = ('<div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Structure</th>'
+             '<th>Recommendation</th><th>1σ expected move ($)</th><th>Kelly sizing</th>'
+             '<th>Six decision gates</th></tr></thead><tbody>'
+             + ("".join(rows) if rows else '<tr><td colspan="6" class="empty">No spread candidates were supplied.</td></tr>')
+             + '</tbody></table></div>')
+    policy = f'<p class="fine">{esc(data.get("decision_policy") or "Advisory output; no orders are placed.")}</p>'
+    return section("Unified six-step decision", summary + table + policy)
+
+
+def portfolio_risk_section(data, show_missing=False):
+    """Render risk coverage and model outputs without implying missing=zero."""
+    if not data:
+        return (section("Portfolio risk", '<p class="empty">Not supplied this run. No portfolio Greeks or stress results are available.</p>')
+                if show_missing else "")
+    complete = bool(data.get("complete"))
+    status = "Analyzer marked complete" if complete else "INCOMPLETE — review data gaps"
+    coverage = data.get("leg_coverage")
+    pct_coverage = f"{float(coverage) * 100:.1f}%" if isinstance(coverage, (int, float)) else "—"
+    legs_text = (f'{esc(data.get("legs_priced"))}/{esc(data.get("open_legs"))} ({pct_coverage})'
+                 if data.get("open_legs") is not None else
+                 f'{esc(data.get("legs_priced", "—"))} priced; total/coverage unavailable')
+    body = (f'<p><strong>{status}</strong> · Priced legs: {legs_text} · Ledger timestamp: '
+            f'{esc(data.get("ledger_timestamp_status") or "not reported")}</p>')
+    base_value = data.get("model_base_value")
+    body += (f'<p><strong>Black–Scholes aggregate base mark:</strong> '
+             f'{num(base_value, 2, "$") if base_value is not None else "Unavailable"}</p>')
+    checks = (data.get("market_snapshot") or {}).get("checks") or {}
+    if isinstance(checks, dict) and checks:
+        freshness = " · ".join(f"{esc(name)}: {esc((value or {}).get('status') or 'UNKNOWN')}"
+                                for name, value in checks.items() if isinstance(value, dict))
+        body += f'<p><strong>Input freshness:</strong> {freshness or "No freshness checks returned"}</p>'
+    else:
+        body += '<p class="empty">Input freshness was not reported by this risk output.</p>'
+    greeks = data.get("greeks")
+    if isinstance(greeks, dict):
+        body += '<p><strong>Portfolio Greeks (signed, model based):</strong> ' + " · ".join(
+            f"{esc(key)} {num(value, 4)}" for key, value in greeks.items()) + '</p>'
+    else:
+        body += '<p class="empty">Portfolio Greeks unavailable; no legs had usable fresh market inputs.</p>'
+    scenarios = data.get("scenarios") or {}
+    if isinstance(scenarios, dict):
+        scenario_rows = []
+        for name, values in scenarios.items():
+            if not isinstance(values, dict):
+                continue
+            pnl = values.get("pnl_vs_base")
+            scenario_rows.append(f"<tr><td>{esc(name)}</td><td class='num'>{num(pnl, 2, '$') if pnl is not None else 'Unavailable'}</td></tr>")
+        if scenario_rows:
+            body += ('<h3>Modeled scenario P&amp;L vs. base</h3><div class="tbl-wrap"><table>'
+                     '<thead><tr><th>Scenario</th><th>P&amp;L</th></tr></thead><tbody>'
+                     + "".join(scenario_rows) + '</tbody></table></div>')
+    gaps = data.get("data_gaps") or []
+    if gaps:
+        body += '<p><strong>Data gaps:</strong> ' + esc("; ".join(map(str, gaps))) + '</p>'
+    body += f'<p class="fine">{esc(data.get("method_note") or "Black–Scholes model estimates; not executable marks or guaranteed losses.")}</p>'
+    return section("Portfolio Greeks & stress scenarios", body)
+
+
 def bias_badge(bias):
     b = (bias or "").lower()
     if "gap-and-go" in b:
@@ -1255,6 +1346,7 @@ thead th{background:#0d1117;color:var(--dim);text-align:left;font-weight:600;
 padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;
 position:sticky;top:0}
 tbody td{padding:9px 12px;border-bottom:1px solid #21262d;white-space:nowrap}
+tbody td.wrap-cell{white-space:normal;min-width:220px}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#1c2128}
 .num{font-variant-numeric:tabular-nums;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -1312,6 +1404,8 @@ PAGE = """<!DOCTYPE html>
 </header>
 <section class="card"><h2>How a trade gets made</h2>{flow}</section>
 {method}
+{decision}
+{portfolio_risk}
 {stock}
 {spreads}
 {premarket}
@@ -1333,6 +1427,10 @@ def main():
     ap.add_argument("--pmcc", default=None)
     ap.add_argument("--premarket", default=None)
     ap.add_argument("--intraday", default=None)
+    ap.add_argument("--decision", default=None,
+                    help="path to decision_engine.py JSON output")
+    ap.add_argument("--portfolio-risk", default=None,
+                    help="path to portfolio_risk.py JSON output")
     ap.add_argument("--report-id", default=None,
                     help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
     ap.add_argument("--source", default=None,
@@ -1356,6 +1454,8 @@ def main():
     premarket = load_json(args.premarket)
     intraday = load_json(args.intraday)
     news = load_json(args.news)
+    decision = load_json(args.decision)
+    portfolio_risk = load_json(args.portfolio_risk)
 
     if report_mode:
         rid = args.report_id
@@ -1404,6 +1504,9 @@ def main():
         provline=provline,
         flow=workflow_strip(),
         method=method_section(args.config),
+        decision=decision_section(decision, show_missing=report_mode and bool(args.stock or args.spreads)),
+        portfolio_risk=portfolio_risk_section(portfolio_risk,
+                                              show_missing=report_mode and bool(args.stock or args.spreads)),
         stock=stock_html,
         spreads=spreads_html,
         premarket=premarket_html,

@@ -462,6 +462,11 @@ python3 src/portfolio_risk.py --ledger ledger.json --market market.json --max-ag
 
 Marks and stress results are Black–Scholes model estimates, not executable
 quotes. Missing market inputs are reported and the result is marked incomplete.
+The daily HTML report displays the six-step recommendation and expected move.
+When an optional portfolio-risk report is supplied, it also displays Greeks,
+scenario P&L, freshness and priced-leg coverage; when it is not supplied, the
+dashboard says so explicitly. In Actions, no account ledger or live snapshot
+is fabricated, so portfolio risk remains unavailable there by default.
 
 `src/decision_engine.py` consumes the daily stock and spread-screen JSON and
 outputs a six-step advisory decision (regime, horizon/catalysts, timing,
@@ -474,6 +479,10 @@ ledger outcomes and is capped at 2% account risk. Without sufficient history,
 the engine can still identify a `WATCH` candidate but does not fabricate a
 position size. Current screener win probability/EV remains delta-derived and
 is explicitly labeled as a proxy; the engine does not place orders.
+The daily report is archived under `docs/reports/` and linked from
+`docs/index.html`, so the recommendation, per-candidate expected move, Kelly
+availability, and all six gate statuses are visible alongside the existing
+screen results.
 The [comprehensive framework assessment](docs/comprehensive-options-market-analysis-framework.md)
 tracks the rationale, expected mechanism, impact measures, current evidence,
 and remaining implementation steps for these additions. Benefits are not
@@ -566,7 +575,7 @@ on the GitHub Pages site, configured by the repo's `CNAME` file (Pages serves
 | Workflow | Schedule | Scripts it runs, in order | Publishes |
 |---|---|---|---|
 | `master.yml` | Weekdays 9:45am ET | Calls `daily-watch` → `monthly-sch` → `monthly-screen` (on the 3rd) | (via the called workflows) |
-| `daily-watch.yml` | Called by `master.yml`; manual via Actions tab | `stock_screener` → `spread_screener` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` |
+| `daily-watch.yml` | Called by `master.yml`; manual via Actions tab | `stock_screener` → `spread_screener` → `decision_engine` → `pmcc_watch` → `render_report` → `render_hub` | `docs/reports/daily-<source>-<date>.html` with decision and risk-input availability |
 | `premarket-screen.yml` | Own cron (9:00am ET weekdays); manual via Actions tab | `premarket_screen` → `render_report` → `render_hub` | `docs/reports/premarket-<source>-<date>.html` |
 | `intraday-screen.yml` | Own crons (11am + 2pm ET weekdays); manual via Actions tab | `intraday_screen` → `render_report` → `render_hub` | `docs/reports/intraday-<source>-<date>.html` |
 | `monthly-screen.yml` | Called by `master.yml` on the 3rd; manual via Actions tab | `pmcc_quality` → `render_report` → `render_hub` | `docs/reports/pmcc-<source>-<yyyy-mm>.html` |

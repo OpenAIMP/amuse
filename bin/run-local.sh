@@ -40,9 +40,19 @@ run_daily() {
     --spreads "reports/spread-screen-$STAMP.json" \
     --json-out "reports/decision-$STAMP.json" \
     --markdown-out "reports/decision-$STAMP.md"
+  RISK_ARGS=()
+  if [ -n "${PORTFOLIO_RISK_LEDGER:-}" ] && [ -n "${PORTFOLIO_RISK_MARKET:-}" ]; then
+    python3 src/portfolio_risk.py \
+      --ledger "$PORTFOLIO_RISK_LEDGER" \
+      --market "$PORTFOLIO_RISK_MARKET" \
+      --out "reports/portfolio-risk-$STAMP.json"
+    RISK_ARGS+=(--portfolio-risk "reports/portfolio-risk-$STAMP.json")
+  fi
   python3 src/render_report.py \
     --stock "reports/stock-screen-$STAMP.json" \
     --spreads "reports/spread-screen-$STAMP.json" \
+    --decision "reports/decision-$STAMP.json" \
+    "${RISK_ARGS[@]}" \
     --report-id "daily-watchlist-$STAMP" --source watchlist \
     --out "docs/reports/daily-watchlist-$STAMP.html"
 }
