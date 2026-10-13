@@ -1,7 +1,7 @@
 # Comprehensive Options & Market Analysis Framework
 
 **Implementation review:** 2026-10-13
-**Code reviewed:** `origin/main` at `ea9685f` plus pending PR #40 (`873b58b`)
+**Code reviewed:** `main` at merge commit `c268d8d` (PR #40)
 
 This document begins with the framework blueprint reconstructed from the
 nine-part description supplied in chat, then assesses how much of each part
@@ -81,9 +81,9 @@ is implemented, proposed, or unvalidated.
 
 ## Implementation status assessment
 
-**Overall estimate: about 50% implemented with PR #40 included.** This is a
+**Overall estimate: about 50% implemented after PR #40 merged.** This is a
 qualitative estimate of breadth and integration, not a count of checklist
-items. It describes the proposed post-PR state; PR #40 is pending merge.
+items or an estimate of trading performance.
 Amuse remains strongest at technical screening and defined-risk structures.
 It now has reusable option math, optional book-level risk analysis, and a
 joined advisory decision report. The daily pipeline still lacks a canonical
