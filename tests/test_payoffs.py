@@ -19,7 +19,7 @@ from spread_screener import evaluate_asym_condor
 
 
 def make_wing(short_strike, long_strike, credit_per_share, expiration="2026-11-20",
-              width=5, dte=40, leg_spread_sum=0.02):
+              width=5, dte=40, leg_spread_sum=0.02, short_delta=0.15):
     return {
         "expiration": expiration,
         "short_strike": short_strike,
@@ -29,6 +29,7 @@ def make_wing(short_strike, long_strike, credit_per_share, expiration="2026-11-2
         "credit_total": credit_per_share * 100,
         "leg_spread_sum": leg_spread_sum,
         "net_delta": 0.0,
+        "short_delta": short_delta,
         "dte": dte,
     }
 
@@ -53,7 +54,7 @@ CREDIT = 1.80
 
 class TestAsymCondorPayoff(unittest.TestCase):
     def setUp(self):
-        self.put = make_wing(95, 90, 1.00)
+        self.put = make_wing(95, 90, 1.00, short_delta=-0.15)
         self.call = make_wing(110, 115, 0.80)
         self.res = evaluate_asym_condor(100, self.put, self.call, 5)
         self.assertTrue(self.res["accepted"], self.res.get("reasons"))
