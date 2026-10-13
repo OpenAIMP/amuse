@@ -7,6 +7,10 @@ versions preserve both behaviors:
 - parse_osi: strike rounded to 3 decimals (spread_screener's version)
 - greeks: `signed` flag selects delta validation range
   (signed=True → [-1, 1] for put spreads; signed=False → [0, 1] for PMCC calls)
+
+Issue #74 adds `greeks_full`, which retains gamma, theta, vega, and rho when
+the MCP provides them, plus `aggregate_greeks` for portfolio-level exposure.
+The legacy `greeks` function continues to return `(delta, iv)` tuples.
 """
 import math
 import re
@@ -126,12 +130,34 @@ def parse_chain(sym, exp, account_id, min_liquidity, max_spread_pct,
     return out, diag, rejected
 
 
-def greeks(symbols, account_id, signed=True, batch_size=50):
-    """Return ({symbol: (delta, iv)}, errors).
+def _finite_nonnegative(value):
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return None
+    return x if math.isfinite(x) and x >= 0 else None
 
-    Per-contract failures are logged, not raised. Delta validated on
-    [-1, 1] when signed=True (put deltas may be negative) or [0, 1] when
-    signed=False. Symbols are deduplicated and fetched in batches.
+
+def _finite(value):
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return None
+    return x if math.isfinite(x) else None
+
+
+def greeks_full(symbols, account_id, signed=True, batch_size=50):
+    """Return ({symbol: greeks_dict}, errors).
+
+    Retains delta, implied volatility, gamma, theta, vega, and rho when the
+    MCP provides them. Missing optional Greeks are represented as None rather
+    than causing a contract to be rejected.
+
+    Delta is validated on [-1, 1] when signed=True (put deltas may be
+    negative) or [0, 1] when signed=False. IV must be positive. Gamma, vega,
+    and rho must be nonnegative; theta may be either sign.
+
+    Symbols are deduplicated and fetched in batches.
     """
     out, errors = {}, []
     symbols = list(dict.fromkeys(symbols))
@@ -148,13 +174,74 @@ def greeks(symbols, account_id, signed=True, batch_size=50):
             errors.append("greeks batch returned non-object payload")
             continue
         for x in g.get("greeks", []):
+            sym = x.get("symbol")
+            raw = x.get("greeks") if isinstance(x.get("greeks"), dict) else {}
             try:
-                delta = float(x["greeks"]["delta"])
-                iv = float(x["greeks"]["impliedVolatility"])
-                if not (math.isfinite(delta) and math.isfinite(iv)
-                        and lo <= delta <= hi and iv > 0):
-                    raise ValueError(f"delta={delta} iv={iv} out of range")
-                out[x["symbol"]] = (delta, iv)
+                delta = _finite(raw.get("delta"))
+                iv = _finite_nonnegative(raw.get("impliedVolatility"))
+                if delta is None or iv is None or not (lo <= delta <= hi) or iv <= 0:
+                    raise ValueError(f"delta={raw.get('delta')} iv={raw.get('impliedVolatility')} out of range")
+                gamma = _finite_nonnegative(raw.get("gamma"))
+                theta = _finite(raw.get("theta"))
+                vega = _finite_nonnegative(raw.get("vega"))
+                rho = _finite_nonnegative(raw.get("rho"))
+                out[sym] = {
+                    "delta": delta,
+                    "iv": iv,
+                    "gamma": gamma,
+                    "theta": theta,
+                    "vega": vega,
+                    "rho": rho,
+                    "available": {
+                        "gamma": gamma is not None,
+                        "theta": theta is not None,
+                        "vega": vega is not None,
+                        "rho": rho is not None,
+                    },
+                }
             except (KeyError, TypeError, ValueError) as exc:
-                errors.append(f"invalid greeks for {x.get('symbol', '?')}: {exc}")
+                errors.append(f"invalid greeks for {sym if sym else '?'}: {exc}")
     return out, errors
+
+
+def greeks(symbols, account_id, signed=True, batch_size=50):
+    """Return ({symbol: (delta, iv)}, errors).
+
+    Compatibility wrapper around greeks_full for existing callers.
+    """
+    full, errors = greeks_full(symbols, account_id, signed=signed,
+                               batch_size=batch_size)
+    return ({sym: (g["delta"], g["iv"]) for sym, g in full.items()}, errors)
+
+
+def aggregate_greeks(positions):
+    """Aggregate signed option positions into portfolio-level Greeks.
+
+    positions is an iterable of dictionaries, each with:
+      quantity: signed contract quantity (positive long, negative short)
+      delta, gamma, theta, vega, rho: per-share Greeks, or None
+
+    Returns a dictionary with net exposure for each Greek. A metric is None
+    when no contributing position provides it.
+    """
+    keys = ("delta", "gamma", "theta", "vega", "rho")
+    totals = {k: None for k in keys}
+    counts = {k: 0 for k in keys}
+    for pos in positions:
+        try:
+            q = float(pos.get("quantity", 0))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(q):
+            continue
+        for k in keys:
+            value = _finite(pos.get(k))
+            if value is None:
+                continue
+            totals[k] = (totals[k] or 0.0) + q * value
+            counts[k] += 1
+    return {
+        **totals,
+        "available": {k: counts[k] > 0 for k in keys},
+        "positions_with_greeks": max(counts.values()) if counts else 0,
+    }
