@@ -153,13 +153,16 @@ def greeks_full(symbols, account_id, signed=True, batch_size=50):
     MCP provides them. Missing optional Greeks are represented as None rather
     than causing a contract to be rejected.
 
-    Delta is validated on [-1, 1] when signed=True (put deltas may be
-    negative) or [0, 1] when signed=False. IV must be positive. Gamma, vega,
-    and rho must be nonnegative; theta may be either sign.
+    Only contracts explicitly requested are returned; extra records in the
+    MCP response are ignored. Delta is validated on [-1, 1] when signed=True
+    (put deltas may be negative) or [0, 1] when signed=False. IV must be
+    positive. Gamma and vega must be nonnegative; theta and rho may be either
+    sign (put rho is commonly negative).
 
     Symbols are deduplicated and fetched in batches.
     """
     out, errors = {}, []
+    requested = set(symbols)
     symbols = list(dict.fromkeys(symbols))
     lo, hi = (-1.0, 1.0) if signed else (0.0, 1.0)
     for i in range(0, len(symbols), batch_size):
@@ -175,6 +178,8 @@ def greeks_full(symbols, account_id, signed=True, batch_size=50):
             continue
         for x in g.get("greeks", []):
             sym = x.get("symbol")
+            if sym not in requested:
+                continue
             raw = x.get("greeks") if isinstance(x.get("greeks"), dict) else {}
             try:
                 delta = _finite(raw.get("delta"))
@@ -184,7 +189,7 @@ def greeks_full(symbols, account_id, signed=True, batch_size=50):
                 gamma = _finite_nonnegative(raw.get("gamma"))
                 theta = _finite(raw.get("theta"))
                 vega = _finite_nonnegative(raw.get("vega"))
-                rho = _finite_nonnegative(raw.get("rho"))
+                rho = _finite(raw.get("rho"))
                 out[sym] = {
                     "delta": delta,
                     "iv": iv,
