@@ -449,7 +449,7 @@ class TestTapeReadouts(unittest.TestCase):
         import stock_screener as st
         # Mock session_vwap to avoid MCP call in CI
         real_svwap = st.session_vwap
-        st.session_vwap = lambda sym: {"vwap": None, "dist_pct": None}
+        st.session_vwap = lambda sym: {"vwap": None, "dist_pct": None, "session": None}
         try:
             bars = [{"close": 100 + i * 0.1, "high": 101 + i * 0.1,
                      "low": 99 + i * 0.1, "volume": 1_000_000,
