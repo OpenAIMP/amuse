@@ -191,6 +191,17 @@ def spread_events(sym, exp, events):
     return flags, reasons
 
 
+def _friction_cost(leg_spread_sum):
+    """Dollar cost of crossing half of each leg's bid/ask spread (per contract)."""
+    return leg_spread_sum / 2 * 100
+
+
+def _ev(p_win, credit_dollars, max_loss, leg_spread_sum):
+    """Expected value net of execution friction."""
+    return round(p_win * credit_dollars - (1 - p_win) * max_loss
+                 - _friction_cost(leg_spread_sum), 0)
+
+
 def evaluate_vertical(spot, short_c, long_c, width, kind):
     """Evaluate one vertical spread. kind in {"bull_put", "bear_call"}.
 
@@ -235,9 +246,10 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     # probability estimates: P(short expires OTM) ≈ 1 - |delta|
     _pwin = max(0.0, min(1.0, 1 - abs(short_c["delta"])))
     _cd = credit * 100
+    _ev_val = _ev(_pwin, _cd, max_loss, short_c["spread"] + long_c["spread"])
     # bull put: best = above breakeven; worst = below long strike
     # bear call: best = below breakeven; worst = above long strike
-    _is_put = kind == "bull_put_spread"
+    _is_put = kind == "bull_put"
     return {
         "accepted": True,
         "kind": kind,
@@ -256,10 +268,10 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
         "net_delta": net_delta,
         "leg_spread_sum": short_c["spread"] + long_c["spread"],
         "win_prob_est": round(_pwin, 3),
-        "expected_value": round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
+        "expected_value": _ev_val,
         "loss_multiple": round(max_loss / _cd, 2) if _cd > 0 else None,
         "lucrative": lucrative_label(round(_pwin, 3),
-                                     round(_pwin * _cd - (1 - _pwin) * max_loss, 0),
+                                     _ev_val,
                                      round(max_loss / _cd, 2) if _cd > 0 else None),
         "best_case_range": ([round(breakeven, 2), "and up"] if _is_put
                             else ["and down", round(breakeven, 2)]),
@@ -307,13 +319,15 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         return {"accepted": False, "reasons": reasons,
                 "diagnostics": {"max_loss": round(max_loss, 0)}}
     # win probability and expected value from the short-leg deltas
-    # P(short leg expires OTM) ≈ 1 - |delta|; joint assumes independence.
+    # Only one short leg can finish ITM, so P(win) ≈ 1 - |put delta| - |call delta|.
     # These are ESTIMATES, not market facts -- see the hub guide.
     # --- probability estimates (#28): delta-based, labeled as estimates ---
     pd = abs(put_wing["short_delta"])
     cd = abs(call_wing["short_delta"])
-    p_win = max(0.0, min(1.0, (1 - pd) * (1 - cd)))
+    p_win = max(0.0, min(1.0, 1 - pd - cd))
     credit_dollars = total_credit * 100
+    leg_sum = put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"]
+    ev_val = _ev(p_win, credit_dollars, max_loss, leg_sum)
     result = {
         "accepted": True,
         "kind": "iron_condor",
@@ -336,10 +350,10 @@ def evaluate_condor(spot, put_wing, call_wing, width):
         "put_short_delta": put_wing["short_delta"],
         "call_short_delta": call_wing["short_delta"],
         "win_prob_est": round(p_win, 3),
-        "expected_value": round(p_win * credit_dollars - (1 - p_win) * max_loss, 0),
+        "expected_value": ev_val,
         "loss_multiple": round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None,
         "lucrative": lucrative_label(round(p_win, 3),
-                                     round(p_win * credit_dollars - (1 - p_win) * max_loss, 0),
+                                     ev_val,
                                      round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None),
         # price ranges for the explainer
         "best_case_range": [round(put_wing["short_strike"] - total_credit, 2),
@@ -396,6 +410,10 @@ def evaluate_asym_condor(spot, put_wing, call_wing, width):
                 "diagnostics": {"max_loss": round(max_loss, 0)}}
     breakeven_put = put_wing["short_strike"] - total_credit
     breakeven_call = call_wing["short_strike"] + total_credit
+    _p_win = max(0.0, min(1.0, 1 - abs(put_wing["short_delta"])
+                          - abs(call_wing["short_delta"])))
+    _ev_val = _ev(_p_win, total_credit * 100, max_loss,
+                  put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"])
     return {
         "accepted": True,
         "kind": "asym_condor",
@@ -418,12 +436,11 @@ def evaluate_asym_condor(spot, put_wing, call_wing, width):
         "width": width,
         "put_short_delta": put_wing["short_delta"],
         "call_short_delta": call_wing["short_delta"],
-        "win_prob_est": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))), 3),
-        "expected_value": round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))) * total_credit * 100 - (1 - max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"]))))) * max_loss, 0),
+        "win_prob_est": round(_p_win, 3),
+        "expected_value": _ev_val,
         "loss_multiple": round(max_loss / (total_credit * 100), 2) if total_credit > 0 else None,
         "lucrative": lucrative_label(
-            round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))), 3),
-            round(max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"])))) * total_credit * 100 - (1 - max(0.0, min(1.0, (1 - abs(put_wing["short_delta"])) * (1 - abs(call_wing["short_delta"]))))) * max_loss, 0),
+            round(_p_win, 3), _ev_val,
             round(max_loss / (total_credit * 100), 2) if total_credit > 0 else None),
         "best_case_range": [round(breakeven_put, 2), round(breakeven_call, 2)],
         "worst_case_put": round(put_wing["long_strike"], 2),
