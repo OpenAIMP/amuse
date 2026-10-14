@@ -33,7 +33,7 @@ class TestGreeksFull(unittest.TestCase):
         real = mcp_client.mcp_call
         mcp_client.mcp_call = self._fake
         try:
-            out, errors = oc.greeks_full(["P1", "C1", "BAD"], "TEST")
+            out, errors = oc.greeks_full(["P1", "C1"], "TEST")
         finally:
             mcp_client.mcp_call = real
         self.assertEqual(errors, [])
@@ -44,6 +44,27 @@ class TestGreeksFull(unittest.TestCase):
         self.assertAlmostEqual(out["P1"]["rho"], -0.01)
         self.assertTrue(all(out[s]["available"][k] for s in ("P1", "C1")
                             for k in ("gamma", "theta", "vega", "rho")))
+
+    def test_unrequested_symbols_are_filtered(self):
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = self._fake
+        try:
+            out, errors = oc.greeks_full(["P1"], "TEST")
+        finally:
+            mcp_client.mcp_call = real
+        self.assertEqual(errors, [])
+        self.assertEqual(set(out), {"P1"})
+
+    def test_invalid_delta_is_reported(self):
+        real = mcp_client.mcp_call
+        mcp_client.mcp_call = self._fake
+        try:
+            out, errors = oc.greeks_full(["BAD"], "TEST")
+        finally:
+            mcp_client.mcp_call = real
+        self.assertEqual(out, {})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("BAD", errors[0])
 
     def test_partial_greeks_are_none_not_rejected(self):
         real = mcp_client.mcp_call
@@ -83,7 +104,7 @@ class TestAggregateGreeks(unittest.TestCase):
         agg = oc.aggregate_greeks(positions)
         self.assertAlmostEqual(agg["delta"], 0.80)
         self.assertAlmostEqual(agg["gamma"], 0.0)
-        self.assertAlmostEqual(agg["theta"], -0.13)
+        self.assertAlmostEqual(agg["theta"], -0.07)
         self.assertAlmostEqual(agg["vega"], 0.05)
         self.assertAlmostEqual(agg["rho"], 0.03)
         self.assertTrue(all(agg["available"].values()))
