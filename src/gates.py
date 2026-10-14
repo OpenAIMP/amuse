@@ -25,6 +25,7 @@ DEFAULTS = {
         "max_spread_pct": 0.25, "min_liquidity": 10,
         "max_loss": 1000, "max_friction": 3.0,
         "call_distance_min": 0.08,
+        "debit_long_delta_min": 0.40, "debit_long_delta_max": 0.70,
     },
     "stock": {
         "price_min": 10.0, "price_max": 500.0,
