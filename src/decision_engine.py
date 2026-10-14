@@ -107,8 +107,11 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
             steps.append({"step": 5, "name": "Structure & economics", "status": "PASS" if structure_ok else "BLOCK",
                           "detail": f"reported EV=${ev}; max loss=${max_loss}; credit=${credit}; win probability is the screener's delta proxy"})
             # 6. Kelly / portfolio sizing (requires actual, adequately sampled ledger history)
+            # Issue #102: when Kelly history is unavailable, mark SKIPPED (not UNSIZED)
+            # and do NOT block the trade — missing sizing is informational, not a rejection.
             history, ntrades = _history(ledger, strategy)
-            sizing = {"status": "UNSIZED", "reason": f"need {MIN_KELLY_TRADES} closed {strategy} ledger trades; found {ntrades}"}
+            sizing = {"status": "SKIPPED",
+                      "reason": f"Kelly sizing unavailable ({ntrades}/{MIN_KELLY_TRADES} closed {strategy} trades) — no size recommendation; use manual judgment"}
             if history and account and max_loss:
                 probability, avg_win, avg_loss = history
                 k = fractional_kelly(probability, avg_win, avg_loss, kelly_fraction, 0.02)
@@ -126,14 +129,23 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
                     sizing.update({"status": "HEAT_BLOCKED", "contracts": 0,
                                    "reason": heat_reason})
             elif history and not account:
-                sizing = {"status": "UNSIZED", "historical_trades": ntrades,
-                          "reason": "account value required to convert Kelly fraction into contracts"}
-            if sizing["status"] != "SIZED":
+                sizing = {"status": "SKIPPED", "historical_trades": ntrades,
+                          "reason": "Kelly sizing unavailable — account value required to convert Kelly fraction into contracts; use manual judgment"}
+            # Issue #102: SKIPPED sizing is informational only — do not block the trade.
+            # Only ZERO_CONTRACTS and HEAT_BLOCKED are true sizing rejections.
+            if sizing["status"] not in ("SIZED", "SKIPPED"):
                 reasons.append(sizing.get("reason", "Kelly sizing returned zero contracts"))
             steps.append({"step": 6, "name": "Risk & sizing", "status": sizing["status"],
                           "detail": sizing.get("reason", f"contracts={sizing.get('contracts')}")})
             approved = all(s["status"] == "PASS" for s in steps[:5])
-            recommendation = "CONSIDER" if approved and sizing["status"] == "SIZED" and sizing["contracts"] > 0 else ("WATCH" if approved else "NO TRADE")
+            # Issue #102: CONSIDER when economics pass, even if sizing was skipped
+            # (user sizes manually). Only require SIZED for auto-sized recommendations.
+            if approved and sizing["status"] == "SIZED" and sizing["contracts"] > 0:
+                recommendation = "CONSIDER"
+            elif approved:
+                recommendation = "CONSIDER (size manually — Kelly unavailable)"
+            else:
+                recommendation = "NO TRADE"
             # Candidate ranking uses existing EV/RoR plus timing; it is not a calibrated probability.
             rank = (float(ev or 0) + 100 * float(raw.get("return_on_risk") or 0)
                     + 2 * float(score or 0))
