@@ -369,7 +369,7 @@ def stock_section(data):
             f"<td>{val_cell}</td>"
             f"<td>{bias_cell}</td>"
             f"<td class='num'><b>{num(p.get('score'))}</b><span class='dim'>/40</span></td>"
-            f"<td title='{esc(p.get("verdict_reason") or "")}'>{verdict_badge(p.get('verdict'))}</td>"
+            "<td title='" + esc(p.get("verdict_reason") or "") + "'>" + verdict_badge(p.get("verdict")) + "</td>"
             "</tr>"
         )
     summary = evaluation_summary(screened) if isinstance(screened, list) else ""
