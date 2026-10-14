@@ -447,10 +447,16 @@ class TestTapeReadouts(unittest.TestCase):
 
     def test_evaluate_carries_tape(self):
         import stock_screener as st
-        bars = [{"close": 100 + i * 0.1, "high": 101 + i * 0.1,
-                 "low": 99 + i * 0.1, "volume": 1_000_000,
-                 "open": 100 + i * 0.1} for i in range(210)]
-        ok, m, _ = st.evaluate("T", bars)
+        # Mock session_vwap to avoid MCP call in CI
+        real_svwap = st.session_vwap
+        st.session_vwap = lambda sym: None
+        try:
+            bars = [{"close": 100 + i * 0.1, "high": 101 + i * 0.1,
+                     "low": 99 + i * 0.1, "volume": 1_000_000,
+                     "open": 100 + i * 0.1} for i in range(210)]
+            ok, m, _ = st.evaluate("T", bars)
+        finally:
+            st.session_vwap = real_svwap
         tape = m["indicators"]["tape"]
         for k in ("gap_pct", "gap", "momentum", "value_pct", "value",
                   "bias_votes", "bias"):
