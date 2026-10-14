@@ -832,6 +832,9 @@ def main():
                         help="path to gates.yaml (default: gates.yaml next to the script)")
     ap.add_argument("--workers", type=int, default=8,
                     help="concurrent MCP workers (default 8; 1 = sequential)")
+    ap.add_argument("--portfolio-config", default=None,
+                    help="JSON with buying_power, limits, sectors, correlations; "
+                         "adds portfolio-level selection to --json-out")
     ap.add_argument("--no-vol", action="store_true",
                     help="skip the cheap-vs-expensive vol assessment")
     ap.add_argument("--iv-history", default=None,
@@ -1064,8 +1067,21 @@ def main():
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
+        portfolio = None
+        if args.portfolio_config:
+            import portfolio_selection as _ps
+            cfg = _ps.load_config(args.portfolio_config)
+            pairs = ([("bull_put", r) for r in bull_puts]
+                     + [("iron_condor", r) for r in condors]
+                     + [("asym_condor", r) for r in asym_condors])
+            corr = {tuple(k.split("|")): v
+                    for k, v in (cfg.get("correlations") or {}).items()}
+            portfolio = _ps.select_portfolio(
+                _ps.candidates_from_spreads(pairs, cfg.get("sectors")),
+                cfg["buying_power"], cfg.get("limits"), cfg.get("baseline"), corr)
         with open(args.json_out, "w") as f:
             json.dump({"asof": RUN_DATE.isoformat(), "results": best,
+                       "portfolio": portfolio,
                        "diagnostics": diagnostics,
                        "screened": screened,
                        "qualification_counts": qualification_counts(screened),
