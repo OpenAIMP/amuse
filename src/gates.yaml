@@ -112,6 +112,16 @@ ledger:
   heat_cap_pct: 0.35   # total open max loss <= 35% of account
   fee_per_contract: 0.65  # all-in per-contract fee assumption, each side
 
+cross_stock:
+  min_correlation: 0.60       # pairs/rotation: |corr| of daily returns must reach this
+  min_observations: 30        # minimum aligned return observations
+  max_net_delta_pct: 0.10     # |net $delta| / gross $delta
+  max_beta_exposure_pct: 0.25 # |net beta-weighted $delta| / gross $delta
+  max_concentration_pct: 0.60 # largest single-underlying share of gross $delta
+  max_spread_pct: 0.25        # option leg (ask-bid)/mid
+  min_liquidity: 10           # option leg open interest
+  contract_multiplier: 100
+
 vol:
   hv_short: 20        # short HV window (trading days)
   hv_long: 60         # long HV window (trading days)
