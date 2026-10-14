@@ -358,7 +358,7 @@ def stock_section(data):
             f"<td class='num'>{num(p.get('vol_ratio'), 2)}</td>"
             f"<td class='num'>{num(bb.get('pct_b'), 2)}</td>"
             f"<td class='num'>{num(bb.get('bandwidth_pct'))}</td>"
-            f"<td class='sqz'>{'<span class=\"warn\">●</span>' if sqz else ''}</td>"
+            f"<td class='sqz'>{'<span class=warn>●</span>' if sqz else ''}</td>"
             f"<td class='num'>{pct(vw.get('anchored_dist_pct'))}</td>"
             f"<td>{trend_badge(st.get('trend'))}</td>"
             f"<td>{cross_cell}</td>"
