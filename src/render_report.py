@@ -37,6 +37,12 @@ import re
 import sys
 from screening_common import qualification_counts, sort_evaluations
 
+# Issue #100: chain data lazy-loading. Full contract list is stashed here by
+# chain_table() and written to a <report-id>.chain.json sidecar by main().
+# Only CHAIN_INLINE_LIMIT rows render inline in the HTML.
+CHAIN_INLINE_LIMIT = 200
+_PENDING_CHAIN = []
+
 # ---------------------------------------------------------------- helpers
 
 def load_json(path):
@@ -547,7 +553,14 @@ def considered_table(res, asof):
 def chain_table(res, asof):
     """Issue #38: raw option chain data. Every contract retrieved, with its
     quote and which gate it hit (or 'passed' for contracts that survived to
-    evaluation). Data is never excluded from the report."""
+    evaluation). Data is never excluded from the report.
+
+    Issue #100: the full chain (40k+ contracts) is written to a separate
+    <report-id>.chain.json sidecar by main(); only the first CHAIN_INLINE_LIMIT
+    rows render inline, with a button to lazy-load the rest via fetch().
+    """
+    global _PENDING_CHAIN
+    contracts = []  # full data for the JSON sidecar
     rows = []
     for sym in sorted(res):
         r = res[sym] or {}
@@ -564,6 +577,18 @@ def chain_table(res, asof):
                     spread_pct = (c["ask"] - c["bid"]) / mid if mid else None
                 except (TypeError, ZeroDivisionError):
                     pass
+            contracts.append({
+                "sym": sym,
+                "type": c.get("type") or "",
+                "expiration": c.get("expiration") or "",
+                "strike": c.get("strike"),
+                "bid": c.get("bid"),
+                "ask": c.get("ask"),
+                "spread_pct": round(spread_pct * 100, 2) if spread_pct is not None else None,
+                "open_interest": c.get("open_interest"),
+                "volume": c.get("volume"),
+                "gate": c.get("gate") or "",
+            })
             rows.append(
                 "<tr>"
                 f"{sym_cell(sym)}"
@@ -580,10 +605,14 @@ def chain_table(res, asof):
             )
     if not rows:
         return ""
-    return (
+    _PENDING_CHAIN = contracts
+    total = len(rows)
+    inline = rows[:CHAIN_INLINE_LIMIT]
+    table_id = "chain-tbl"
+    html = (
         "<h3>Option chain data "
-        f"<span class='dim'>({len(rows)} contracts retrieved)</span></h3>"
-        '<div class="tbl-wrap"><table><thead><tr>'
+        f"<span class='dim'>({total} contracts retrieved)</span></h3>"
+        f'<div class="tbl-wrap"><table id="{table_id}"><thead><tr>'
         "<th title='Underlying symbol.'>Sym</th>"
         "<th title='Put or call.'>Type</th>"
         "<th title='Option expiration date.'>Exp</th>"
@@ -595,9 +624,53 @@ def chain_table(res, asof):
         "<th title='Volume.'>Vol</th>"
         "<th title='Which gate rejected this contract, if any.'>Gate</th>"
         "</tr></thead><tbody>"
-        + "".join(rows)
+        + "".join(inline)
         + "</tbody></table></div>"
     )
+    if total > CHAIN_INLINE_LIMIT:
+        html += (
+            f"<p><button id='chain-load-btn' onclick='loadChainData()'>"
+            f"Load all {total} contracts</button> "
+            f"<span class='dim'>Showing {len(inline)} of {total} — full data loads on demand.</span></p>"
+            "<script>\n"
+            "function loadChainData() {\n"
+            "  var btn = document.getElementById('chain-load-btn');\n"
+            "  btn.disabled = true; btn.textContent = 'Loading…';\n"
+            "  var base = window.location.pathname.split('/').pop().replace(/\\.html$/, '');\n"
+            "  fetch(base + '.chain.json').then(function(r) {\n"
+            "    if (!r.ok) throw new Error('HTTP ' + r.status);\n"
+            "    return r.json();\n"
+            "  }).then(function(data) {\n"
+            "    var contracts = data.contracts || [];\n"
+            "    var tbody = document.querySelector('#chain-tbl tbody');\n"
+            "    var html = '';\n"
+            "    for (var i = 0; i < contracts.length; i++) {\n"
+            "      var c = contracts[i];\n"
+            "      var gateCls = (c.gate || '').indexOf('passed') === 0 ? 'good' : 'bad';\n"
+            "      html += '<tr><td class=\"sym\">' + escHtml(c.sym) + '</td>'\n"
+            "        + '<td>' + escHtml(c.type) + '</td>'\n"
+            "        + '<td class=\"num\">' + escHtml(c.expiration) + '</td>'\n"
+            "        + '<td class=\"num\">' + fmtNum(c.strike) + '</td>'\n"
+            "        + '<td class=\"num\">' + fmtNum(c.bid) + '</td>'\n"
+            "        + '<td class=\"num\">' + fmtNum(c.ask) + '</td>'\n"
+            "        + '<td class=\"num\">' + (c.spread_pct != null ? c.spread_pct.toFixed(1) + '%' : '—') + '</td>'\n"
+            "        + '<td class=\"num\">' + (c.open_interest != null ? c.open_interest : '—') + '</td>'\n"
+            "        + '<td class=\"num\">' + (c.volume != null ? c.volume : '—') + '</td>'\n"
+            "        + '<td class=\"' + gateCls + '\">' + escHtml(c.gate) + '</td></tr>';\n"
+            "    }\n"
+            "    tbody.innerHTML = html;\n"
+            "    btn.textContent = 'All ' + contracts.length + ' contracts loaded';\n"
+            "  }).catch(function(e) {\n"
+            "    btn.disabled = false; btn.textContent = 'Load failed — retry';\n"
+            "  });\n"
+            "}\n"
+            "function escHtml(s) {\n"
+            "  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
+            "}\n"
+            "function fmtNum(v) { return v == null ? '—' : Number(v).toFixed(2); }\n"
+            "</script>\n"
+        )
+    return html
 
 
 def spread_tables(data):
@@ -1800,6 +1873,17 @@ def main():
     with open(out, "w") as f:
         f.write(page)
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
+
+    # Issue #100: write the full chain data as a JSON sidecar for lazy-loading.
+    global _PENDING_CHAIN
+    if report_mode and _PENDING_CHAIN:
+        chain_path = os.path.join(outdir, rid + ".chain.json")
+        with open(chain_path, "w") as f:
+            json.dump({"report_id": rid, "asof": asof,
+                       "count": len(_PENDING_CHAIN),
+                       "contracts": _PENDING_CHAIN}, f)
+        print(f"wrote {chain_path} ({os.path.getsize(chain_path)} bytes)")
+        _PENDING_CHAIN = []
 
     if report_mode:
         blurb = build_blurb(rtype, stock, spreads, pmcc, premarket, intraday,
