@@ -1,5 +1,7 @@
 # Options Lab
 
+**Live dashboard:** https://amuse.openaimp.com
+
 Stock and options screeners that pull live market data through Public.com's
 hosted MCP server — built around one idea: **no indicator places a trade.**
 Every signal answers exactly one question, and a trade only happens when they
