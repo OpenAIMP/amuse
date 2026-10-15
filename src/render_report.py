@@ -1138,8 +1138,33 @@ def decision_section(data, show_missing=False):
              '<th>Six decision gates</th></tr></thead><tbody>'
              + ("".join(rows) if rows else '<tr><td colspan="6" class="empty">No spread candidates were supplied.</td></tr>')
              + '</tbody></table></div>')
+    # Best strategy per name (issue #106): which strategy has the highest EV
+    # for each symbol, answering "what's the best strategy for each name?"
+    best_by_symbol = data.get("best_by_symbol") or {}
+    if best_by_symbol:
+        best_rows = []
+        for sym in sorted(best_by_symbol.keys()):
+            b = best_by_symbol[sym]
+            best_rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td>{esc(b.get('strategy') or '—')}</td>"
+                f"<td><span class='badge'>{esc(b.get('recommendation') or '—')}</span></td>"
+                f"<td class='num'>{money(b.get('expected_value'))}</td>"
+                f"<td class='num'>{num(b.get('rank_score'), 1)}</td>"
+                f"<td class='num'>{b.get('alternatives', 0)} other(s)</td>"
+                "</tr>"
+            )
+        best_table = ('<h4>Best strategy per name <span class="dim">(highest EV per symbol)</span></h4>'
+                      '<div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>Best strategy</th>'
+                      '<th>Recommendation</th><th>EV$</th><th>Rank</th><th>Alternatives</th>'
+                      '</tr></thead><tbody>'
+                      + "".join(best_rows)
+                      + '</tbody></table></div>')
+    else:
+        best_table = ""
     policy = f'<p class="fine">{esc(data.get("decision_policy") or "Advisory output; no orders are placed.")}</p>'
-    return section("Unified six-step decision", summary + table + policy)
+    return section("Unified six-step decision", summary + table + best_table + policy)
 
 
 def portfolio_risk_section(data, show_missing=False):
