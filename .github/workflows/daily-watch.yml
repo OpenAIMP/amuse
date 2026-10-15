@@ -112,6 +112,29 @@ jobs:
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           fi
 
+      - name: Lev-ETF stock screener
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
+          python3 src/stock_screener.py --universe lev_etf \
+            --json-out reports/stock-levetf.json | tee reports/stock-levetf.txt
+      
+      - name: Lev-ETF spread screener
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
+          python3 src/spread_screener.py --universe lev_etf \
+            --iv-history state/iv_history.jsonl \
+            --json-out reports/spread-levetf.json | tee reports/spread-levetf.txt
+
       - name: Unified six-step decision report
         if: always()
         run: |
