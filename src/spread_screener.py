@@ -279,6 +279,76 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     }
 
 
+def evaluate_debit_vertical(spot, long_c, short_c, width, kind):
+    """Evaluate one debit vertical spread. kind in {"bull_call", "bear_put"}.
+
+    Conservative debit = long ask - short bid. Max loss = debit paid.
+    Max profit = width - debit. Stable reason categories.
+    """
+    reasons, diag = [], {}
+    lk, sk = long_c["strike"], short_c["strike"]
+    if kind == "bull_call":
+        if not (lk < spot):
+            reasons.append("long call not ITM/ATM")
+        if round(sk, 3) != round(lk + width, 3):
+            reasons.append("short leg not at width")
+    else:  # bear_put
+        if not (lk > spot):
+            reasons.append("long put not ITM/ATM")
+        if round(sk, 3) != round(lk - width, 3):
+            reasons.append("short leg not at width")
+    ld = abs(long_c["delta"])
+    if not (SHORT_DELTA_MIN <= ld <= SHORT_DELTA_MAX):
+        reasons.append("long delta outside range")
+        diag["long_delta"] = round(ld, 3)
+    debit = long_c["ask"] - short_c["bid"]
+    if debit <= 0:
+        reasons.append("nonpositive net debit")
+    max_loss = debit * 100 if debit > 0 else float("inf")
+    max_profit = (width - debit) * 100 if debit > 0 else 0
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("max loss over limit")
+        diag["max_loss"] = round(max_loss, 0)
+    friction = ((long_c["spread"] + short_c["spread"]) / debit
+                if debit > 0 else float("inf"))
+    if friction > MAX_FRICTION:
+        reasons.append("execution friction over limit")
+        diag["friction"] = round(friction, 2)
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    if kind == "bull_call":
+        breakeven = lk + debit
+    else:
+        breakeven = lk - debit
+    # Debit spread win prob: P(long expires ITM) ≈ |long delta|
+    _pwin = max(0.0, min(1.0, abs(long_c["delta"])))
+    _ev_val = _ev(_pwin, max_profit, max_loss,
+                  long_c["spread"] + short_c["spread"])
+    return {
+        "accepted": True,
+        "kind": kind,
+        "long_sym": long_c["sym"], "short_sym": short_c["sym"],
+        "long_strike": lk, "short_strike": sk,
+        "expiration": long_c["expiration"],
+        "dte": dte(long_c["expiration"]),
+        "width": width,
+        "long_delta": long_c["delta"],
+        "debit_per_share": debit,
+        "debit_total": debit * 100,
+        "credit_total": -debit * 100,  # negative credit for consistency
+        "max_loss_total": max_loss,
+        "max_profit_total": max_profit,
+        "breakeven": breakeven,
+        "return_on_risk": max_profit / max_loss if max_loss > 0 else 0,
+        "friction": friction,
+        "win_prob_est": round(_pwin, 3),
+        "expected_value": _ev_val,
+        "loss_multiple": round(max_loss / max_profit, 2) if max_profit > 0 else None,
+        "lucrative": lucrative_label(round(_pwin, 3), _ev_val,
+                                     round(max_loss / max_profit, 2) if max_profit > 0 else None),
+    }
+
+
 def lucrative_label(win_prob, ev, loss_mult):
     """Classify a spread as lucrative or not (#28).
 
@@ -413,6 +483,295 @@ def evaluate_butterfly(spot, put_wing, call_wing, width):
         "loss_multiple": round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None,
         "lucrative": lucrative_label(round(p_win, 3), ev_val,
                                      round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None),
+    }
+
+
+def evaluate_calendar(spot, short_c, long_c, kind):
+    """Evaluate a calendar spread: sell near-term, buy far-term.
+    kind in {"calendar_call", "calendar_put"}.
+    Same strike (pure calendar); diagonals use different strikes.
+    """
+    reasons, diag = [], {}
+    if short_c["expiration"] >= long_c["expiration"]:
+        reasons.append("short expiration not before long")
+    if short_c["strike"] != long_c["strike"]:
+        reasons.append("strikes do not match (not a calendar)")
+    # Calendar is a debit trade: pay for far-term, collect near-term
+    debit = long_c["ask"] - short_c["bid"]
+    if debit <= 0:
+        reasons.append("nonpositive net debit")
+    # Max loss = debit paid (if both expire worthless, lose the debit)
+    # Max profit is complex (depends on vol); use conservative estimate
+    max_loss = debit * 100 if debit > 0 else float("inf")
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("max loss over limit")
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    return {
+        "accepted": True,
+        "kind": kind,
+        "short_sym": short_c["sym"], "long_sym": long_c["sym"],
+        "strike": short_c["strike"],
+        "short_expiration": short_c["expiration"],
+        "long_expiration": long_c["expiration"],
+        "dte_short": dte(short_c["expiration"]),
+        "dte_long": dte(long_c["expiration"]),
+        "debit_total": debit * 100,
+        "max_loss_total": max_loss,
+        "breakeven_note": "profit zone depends on IV expansion",
+    }
+
+
+def evaluate_long_butterfly(spot, wing1, wing2, wing3, kind):
+    """Evaluate a long butterfly: buy 1 wing1, sell 2 wing2, buy 1 wing3.
+    kind in {"long_call_butterfly", "long_put_butterfly"}.
+    All same expiration. Debit trade, defined risk.
+    """
+    reasons, diag = [], {}
+    exps = {wing1["expiration"], wing2["expiration"], wing3["expiration"]}
+    if len(exps) > 1:
+        reasons.append("wings on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    s1, s2, s3 = wing1["strike"], wing2["strike"], wing3["strike"]
+    # Strikes should be equidistant: s2 - s1 == s3 - s2
+    w1, w2 = round(s2 - s1, 2), round(s3 - s2, 2)
+    if abs(w1 - w2) > 0.01:
+        reasons.append("wings not equidistant")
+    if w1 <= 0:
+        reasons.append("strikes not ascending")
+    # Debit = (wing1 ask + wing3 ask) - 2 * wing2 bid
+    debit = (wing1["ask"] + wing3["ask"]) - 2 * wing2["bid"]
+    if debit <= 0:
+        reasons.append("nonpositive net debit")
+    max_loss = debit * 100 if debit > 0 else float("inf")
+    max_profit = (w1 - debit) * 100 if debit > 0 else 0
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("max loss over limit")
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": diag}
+    return {
+        "accepted": True,
+        "kind": kind,
+        "expiration": wing1["expiration"],
+        "dte": dte(wing1["expiration"]),
+        "strikes": [s1, s2, s3],
+        "width": w1,
+        "debit_total": debit * 100,
+        "max_loss_total": max_loss,
+        "max_profit_total": max_profit,
+        "breakeven_low": round(s1 + debit, 2),
+        "breakeven_high": round(s3 - debit, 2),
+        "return_on_risk": max_profit / max_loss if max_loss > 0 else 0,
+    }
+
+
+def evaluate_covered_call(spot, call_c, stock_price):
+    """Covered call: own stock, sell OTM call. Income from premium.
+    Max profit = (strike - stock_price) + premium. Max loss = stock to zero minus premium.
+    """
+    reasons = []
+    if call_c["strike"] <= spot:
+        reasons.append("call not OTM")
+    premium = call_c["bid"] * 100
+    max_profit = (call_c["strike"] - stock_price) * 100 + premium
+    # Max loss: stock goes to zero, keep premium
+    max_loss = stock_price * 100 - premium
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    return {
+        "accepted": True,
+        "kind": "covered_call",
+        "expiration": call_c["expiration"],
+        "dte": dte(call_c["expiration"]),
+        "strike": call_c["strike"],
+        "premium_total": premium,
+        "max_profit_total": max_profit,
+        "max_loss_total": max_loss,
+        "breakeven": round(stock_price - call_c["bid"], 2),
+    }
+
+
+def evaluate_cash_secured_put(spot, put_c):
+    """Cash-secured put: sell OTM put, cash backs assignment. Income from premium.
+    Max profit = premium. Max loss = strike - premium (if assigned at zero).
+    """
+    reasons = []
+    if put_c["strike"] >= spot:
+        reasons.append("put not OTM")
+    premium = put_c["bid"] * 100
+    max_loss = put_c["strike"] * 100 - premium
+    if max_loss > MAX_SPREAD_LOSS * 10:  # CSPs have larger notional
+        reasons.append("max loss over limit")
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    return {
+        "accepted": True,
+        "kind": "cash_secured_put",
+        "expiration": put_c["expiration"],
+        "dte": dte(put_c["expiration"]),
+        "strike": put_c["strike"],
+        "premium_total": premium,
+        "max_profit_total": premium,
+        "max_loss_total": max_loss,
+        "breakeven": round(put_c["strike"] - put_c["bid"], 2),
+    }
+
+
+def evaluate_straddle(spot, call_c, put_c, kind):
+    """Evaluate a straddle: call + put at same strike, same expiration.
+    kind in {"long_straddle", "short_straddle"}.
+    Long = buy both (debit, defined risk). Short = sell both (credit, UNDEFINED risk).
+    """
+    reasons = []
+    if call_c["expiration"] != put_c["expiration"]:
+        reasons.append("legs on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    if abs(call_c["strike"] - put_c["strike"]) > 0.01:
+        reasons.append("strikes do not match (not a straddle)")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    strike = call_c["strike"]
+    if kind == "long_straddle":
+        debit = call_c["ask"] + put_c["ask"]
+        max_loss = debit * 100
+        # Max profit undefined (unlimited upside/downside), breakevens at strike +/- debit
+        if max_loss > MAX_SPREAD_LOSS:
+            reasons.append("max loss over limit")
+        if reasons:
+            return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+        return {
+            "accepted": True, "kind": kind,
+            "expiration": call_c["expiration"], "dte": dte(call_c["expiration"]),
+            "strike": strike,
+            "debit_total": debit * 100,
+            "max_loss_total": max_loss,
+            "breakeven_up": round(strike + debit, 2),
+            "breakeven_down": round(strike - debit, 2),
+            "risk_note": "defined risk (debit paid)",
+        }
+    else:  # short_straddle - UNDEFINED RISK
+        credit = call_c["bid"] + put_c["bid"]
+        if credit <= 0:
+            reasons.append("nonpositive net credit")
+            return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+        return {
+            "accepted": True, "kind": kind,
+            "expiration": call_c["expiration"], "dte": dte(call_c["expiration"]),
+            "strike": strike,
+            "credit_total": credit * 100,
+            "max_loss_total": float("inf"),  # undefined
+            "breakeven_up": round(strike + credit, 2),
+            "breakeven_down": round(strike - credit, 2),
+            "risk_note": "UNDEFINED RISK - losses can exceed credit received",
+            "risk_warning": True,
+        }
+
+
+def evaluate_strangle(spot, call_c, put_c, kind):
+    """Evaluate a strangle: OTM call + OTM put, different strikes, same expiration.
+    kind in {"long_strangle", "short_strangle"}.
+    """
+    reasons = []
+    if call_c["expiration"] != put_c["expiration"]:
+        reasons.append("legs on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    if not (put_c["strike"] < spot < call_c["strike"]):
+        reasons.append("legs not OTM strangle")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    if kind == "long_strangle":
+        debit = call_c["ask"] + put_c["ask"]
+        max_loss = debit * 100
+        if max_loss > MAX_SPREAD_LOSS:
+            reasons.append("max loss over limit")
+        if reasons:
+            return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+        return {
+            "accepted": True, "kind": kind,
+            "expiration": call_c["expiration"], "dte": dte(call_c["expiration"]),
+            "call_strike": call_c["strike"], "put_strike": put_c["strike"],
+            "debit_total": debit * 100,
+            "max_loss_total": max_loss,
+            "breakeven_up": round(call_c["strike"] + debit, 2),
+            "breakeven_down": round(put_c["strike"] - debit, 2),
+            "risk_note": "defined risk (debit paid)",
+        }
+    else:  # short_strangle - UNDEFINED RISK
+        credit = call_c["bid"] + put_c["bid"]
+        if credit <= 0:
+            reasons.append("nonpositive net credit")
+            return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+        return {
+            "accepted": True, "kind": kind,
+            "expiration": call_c["expiration"], "dte": dte(call_c["expiration"]),
+            "call_strike": call_c["strike"], "put_strike": put_c["strike"],
+            "credit_total": credit * 100,
+            "max_loss_total": float("inf"),
+            "breakeven_up": round(call_c["strike"] + credit, 2),
+            "breakeven_down": round(put_c["strike"] - credit, 2),
+            "risk_note": "UNDEFINED RISK - losses can exceed credit received",
+            "risk_warning": True,
+        }
+
+
+def evaluate_naked(spot, opt_c, kind):
+    """Evaluate a naked option sale: short put or short call.
+    kind in {"short_put", "short_call"}.
+    UNDEFINED RISK - must be flagged prominently.
+    """
+    reasons = []
+    if kind == "short_put" and opt_c["strike"] >= spot:
+        reasons.append("put not OTM")
+    if kind == "short_call" and opt_c["strike"] <= spot:
+        reasons.append("call not OTM")
+    credit = opt_c["bid"] * 100
+    if credit <= 0:
+        reasons.append("nonpositive premium")
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    # Win prob: P(expires OTM) ≈ 1 - |delta|
+    p_win = max(0.0, min(1.0, 1 - abs(opt_c.get("delta", 0.2))))
+    return {
+        "accepted": True,
+        "kind": kind,
+        "expiration": opt_c["expiration"],
+        "dte": dte(opt_c["expiration"]),
+        "strike": opt_c["strike"],
+        "credit_total": credit,
+        "max_loss_total": float("inf"),  # undefined
+        "breakeven": round(opt_c["strike"] - opt_c["bid"], 2) if kind == "short_put"
+                     else round(opt_c["strike"] + opt_c["bid"], 2),
+        "win_prob_est": round(p_win, 3),
+        "risk_note": "UNDEFINED RISK - naked option sale",
+        "risk_warning": True,
+    }
+
+
+def evaluate_ratio_spread(spot, short_c, long_c, ratio, kind):
+    """Evaluate a ratio spread: sell 1, buy ratio (typically 2).
+    kind in {"call_ratio_spread", "put_ratio_spread"}.
+    UNDEFINED RISK on the extra long leg side.
+    """
+    reasons = []
+    if short_c["expiration"] != long_c["expiration"]:
+        reasons.append("legs on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    # Net credit (ratio spreads are typically done for a credit)
+    credit = short_c["bid"] - ratio * long_c["ask"]
+    # Max loss undefined on the naked side
+    if reasons:
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    return {
+        "accepted": True,
+        "kind": kind,
+        "expiration": short_c["expiration"],
+        "dte": dte(short_c["expiration"]),
+        "short_strike": short_c["strike"],
+        "long_strike": long_c["strike"],
+        "ratio": ratio,
+        "credit_total": credit * 100 if credit > 0 else 0,
+        "debit_total": -credit * 100 if credit < 0 else 0,
+        "max_loss_total": float("inf"),
+        "risk_note": "UNDEFINED RISK - ratio leaves naked exposure",
+        "risk_warning": True,
     }
 
 
@@ -583,8 +942,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
     considered (issue #38: every evaluated structure with qualification),
     chain (issue #38: every retrieved contract with its gate status).
     """
-    out = {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
-           "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {}, "iron_butterfly": {},
+    out = {"bp": [], "bc": [], "bcall": [], "bput": [], "cal_call": [], "cal_put": [], "lpb": [], "lcb": [], "cc": [], "csp": [], "ls": [], "ss": [], "lsg": [], "ssg": [], "naked_put": [], "naked_call": [], "ratio_call": [], "ratio_put": [], "ic": [], "ib": [], "ac": [], "notes": [],
+           "rejs": {"bull_put": {}, "bear_call": {}, "bull_call": {}, "bear_put": {}, "iron_condor": {}, "iron_butterfly": {},
                     "asym_condor": {}},
            "vol_veto": 0, "error": None}
     spot = spot_map.get(sym)
@@ -753,6 +1112,215 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
             _record("bear_call", r["expiration"], r["short_strike"],
                     r["long_strike"], "accepted", [])
 
+        # Debit verticals: bull call spreads (buy low call, sell high call)
+        # and bear put spreads (buy high put, sell low put).
+        bcall_accepted, bput_accepted = [], []
+        bcall_rej, bput_rej = {}, {}
+        bcall_n_rej = bput_n_rej = 0
+        # Bull calls: long = lower strike, short = higher strike
+        for lc in calls_by_exp.values():
+            for l in lc.values():
+                if "delta" not in l:
+                    continue
+                # Long call should be ITM/ATM (delta 0.3-0.7 typical)
+                if not (0.30 <= abs(l["delta"]) <= 0.70):
+                    continue
+                if not (l["strike"] < spot + width):
+                    continue
+                target = round(l["strike"] + width, 3)
+                s = calls_by_strike.get((l["expiration"], target))
+                if s is None:
+                    continue
+                flags, event_reasons = spread_events(sym, l["expiration"], events)
+                r = evaluate_debit_vertical(spot, l, s, width, "bull_call")
+                reasons = r.get("reasons", []) + event_reasons
+                if reasons:
+                    bcall_n_rej += 1
+                    for reason in reasons:
+                        bcall_rej[reason] = bcall_rej.get(reason, 0) + 1
+                    continue
+                r.update({"stock": sym, "spot": spot, "events": flags})
+                bcall_accepted.append(r)
+        # Bear puts: long = higher strike, short = lower strike
+        for lp in puts_by_exp.values():
+            for l in lp.values():
+                if "delta" not in l:
+                    continue
+                if not (0.30 <= abs(l["delta"]) <= 0.70):
+                    continue
+                if not (l["strike"] > spot - width):
+                    continue
+                target = round(l["strike"] - width, 3)
+                s = puts_by_strike.get((l["expiration"], target))
+                if s is None:
+                    continue
+                flags, event_reasons = spread_events(sym, l["expiration"], events)
+                r = evaluate_debit_vertical(spot, l, s, width, "bear_put")
+                reasons = r.get("reasons", []) + event_reasons
+                if reasons:
+                    bput_n_rej += 1
+                    for reason in reasons:
+                        bput_rej[reason] = bput_rej.get(reason, 0) + 1
+                    continue
+                r.update({"stock": sym, "spot": spot, "events": flags})
+                bput_accepted.append(r)
+
+        # Calendar spreads: sell near-term, buy far-term (same strike).
+        # Simplified: only ATM strikes, 30+ days between expirations.
+        cal_call_accepted, cal_put_accepted = [], []
+        expirations = sorted(set(c["expiration"] for cc in calls_by_exp.values()
+                                 for c in cc.values()))
+        if len(expirations) >= 2:
+            near_exp, far_exp = expirations[0], expirations[1]
+            # ATM strike (closest to spot)
+            atm_strike = min((c["strike"] for cc in calls_by_exp.values()
+                              for c in cc.values()),
+                             key=lambda k: abs(k - spot), default=None)
+            if atm_strike:
+                # Calendar call
+                near_c = calls_by_strike.get((near_exp, atm_strike))
+                far_c = calls_by_strike.get((far_exp, atm_strike))
+                if near_c and far_c:
+                    r = evaluate_calendar(spot, near_c, far_c, "calendar_call")
+                    if r.get("accepted"):
+                        r.update({"stock": sym, "spot": spot, "events": []})
+                        cal_call_accepted.append(r)
+                # Calendar put
+                near_p = puts_by_strike.get((near_exp, atm_strike))
+                far_p = puts_by_strike.get((far_exp, atm_strike))
+                if near_p and far_p:
+                    r = evaluate_calendar(spot, near_p, far_p, "calendar_put")
+                    if r.get("accepted"):
+                        r.update({"stock": sym, "spot": spot, "events": []})
+                        cal_put_accepted.append(r)
+
+        # Long butterflies: buy 1 / sell 2 / buy 1 (same expiration).
+        # Simplified: use ATM-centered strikes with standard width.
+        lpb_accepted, lcb_accepted = [], []
+        for exp, strikes in puts_by_exp.items():
+            sorted_strikes = sorted(strikes.keys())
+            for i in range(len(sorted_strikes) - 2):
+                s1, s2, s3 = sorted_strikes[i:i+3]
+                if abs((s2 - s1) - (s3 - s2)) > 0.01:
+                    continue
+                if abs((s2 - s1) - width) > 0.01:
+                    continue
+                w1, w2, w3 = strikes[s1], strikes[s2], strikes[s3]
+                r = evaluate_long_butterfly(spot, w1, w2, w3, "long_put_butterfly")
+                if r.get("accepted"):
+                    r.update({"stock": sym, "spot": spot, "events": []})
+                    lpb_accepted.append(r)
+                    break  # one per expiration is enough
+        for exp, strikes in calls_by_exp.items():
+            sorted_strikes = sorted(strikes.keys())
+            for i in range(len(sorted_strikes) - 2):
+                s1, s2, s3 = sorted_strikes[i:i+3]
+                if abs((s2 - s1) - (s3 - s2)) > 0.01:
+                    continue
+                if abs((s2 - s1) - width) > 0.01:
+                    continue
+                w1, w2, w3 = strikes[s1], strikes[s2], strikes[s3]
+                r = evaluate_long_butterfly(spot, w1, w2, w3, "long_call_butterfly")
+                if r.get("accepted"):
+                    r.update({"stock": sym, "spot": spot, "events": []})
+                    lcb_accepted.append(r)
+                    break
+
+        # Income strategies: covered calls and cash-secured puts.
+        # Simplified: best OTM call/put by premium.
+        cc_accepted, csp_accepted = [], []
+        best_call = max(
+            (c for cc in calls_by_exp.values() for c in cc.values()
+             if c["strike"] > spot and "bid" in c),
+            key=lambda c: c["bid"], default=None)
+        if best_call:
+            r = evaluate_covered_call(spot, best_call, spot)
+            if r.get("accepted"):
+                r.update({"stock": sym, "spot": spot, "events": []})
+                cc_accepted.append(r)
+        best_put = max(
+            (c for pc in puts_by_exp.values() for c in pc.values()
+             if c["strike"] < spot and "bid" in c),
+            key=lambda c: c["bid"], default=None)
+        if best_put:
+            r = evaluate_cash_secured_put(spot, best_put)
+            if r.get("accepted"):
+                r.update({"stock": sym, "spot": spot, "events": []})
+                csp_accepted.append(r)
+
+        # Volatility: straddles and strangles (long and short).
+        # Simplified: ATM straddle, 5% OTM strangle, first expiration only.
+        ls_accepted, ss_accepted, lsg_accepted, ssg_accepted = [], [], [], []
+        exps = sorted(set(c["expiration"] for cc in calls_by_exp.values()
+                          for c in cc.values()))
+        if exps:
+            exp = exps[0]
+            atm = min((c["strike"] for cc in calls_by_exp.values()
+                       for c in cc.values() if c["expiration"] == exp),
+                      key=lambda k: abs(k - spot), default=None)
+            if atm:
+                call_atm = calls_by_strike.get((exp, atm))
+                put_atm = puts_by_strike.get((exp, atm))
+                if call_atm and put_atm:
+                    for kind, lst in (("long_straddle", ls_accepted),
+                                      ("short_straddle", ss_accepted)):
+                        r = evaluate_straddle(spot, call_atm, put_atm, kind)
+                        if r.get("accepted"):
+                            r.update({"stock": sym, "spot": spot, "events": []})
+                            lst.append(r)
+                # Strangle: 5% OTM
+                call_otm = min((c for cc in calls_by_exp.values()
+                                for c in cc.values()
+                                if c["expiration"] == exp and c["strike"] > spot * 1.05),
+                               key=lambda c: c["strike"], default=None)
+                put_otm = max((c for pc in puts_by_exp.values()
+                               for c in pc.values()
+                               if c["expiration"] == exp and c["strike"] < spot * 0.95),
+                              key=lambda c: c["strike"], default=None)
+                if call_otm and put_otm:
+                    for kind, lst in (("long_strangle", lsg_accepted),
+                                      ("short_strangle", ssg_accepted)):
+                        r = evaluate_strangle(spot, call_otm, put_otm, kind)
+                        if r.get("accepted"):
+                            r.update({"stock": sym, "spot": spot, "events": []})
+                            lst.append(r)
+
+        # Naked options: short put / short call (UNDEFINED RISK).
+        # Simplified: best premium OTM put/call.
+        naked_put_accepted, naked_call_accepted = [], []
+        if best_put:
+            r = evaluate_naked(spot, best_put, "short_put")
+            if r.get("accepted"):
+                r.update({"stock": sym, "spot": spot, "events": []})
+                naked_put_accepted.append(r)
+        if best_call:
+            r = evaluate_naked(spot, best_call, "short_call")
+            if r.get("accepted"):
+                r.update({"stock": sym, "spot": spot, "events": []})
+                naked_call_accepted.append(r)
+
+        # Ratio spreads: sell 1, buy 2 (UNDEFINED RISK).
+        # Simplified: 1x2 call and put ratios using ATM strikes.
+        ratio_call_accepted, ratio_put_accepted = [], []
+        if exps:
+            exp = exps[0]
+            # Call ratio: sell ATM call, buy 2 OTM calls
+            atm_c = calls_by_strike.get((exp, atm)) if atm else None
+            otm_c = call_otm if 'call_otm' in dir() else None
+            if atm_c and otm_c:
+                r = evaluate_ratio_spread(spot, atm_c, otm_c, 2, "call_ratio_spread")
+                if r.get("accepted"):
+                    r.update({"stock": sym, "spot": spot, "events": []})
+                    ratio_call_accepted.append(r)
+            # Put ratio: sell ATM put, buy 2 OTM puts
+            atm_p = puts_by_strike.get((exp, atm)) if atm else None
+            otm_p = put_otm if 'put_otm' in dir() else None
+            if atm_p and otm_p:
+                r = evaluate_ratio_spread(spot, atm_p, otm_p, 2, "put_ratio_spread")
+                if r.get("accepted"):
+                    r.update({"stock": sym, "spot": spot, "events": []})
+                    ratio_put_accepted.append(r)
+
         # Iron condors: cross accepted wings on the same expiration.
         ic_accepted = []
         for pw in bp_accepted:
@@ -875,6 +1443,22 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         out["ic"] = ic_accepted[:3]
         out["ib"] = ib_accepted[:3]
         out["ac"] = ac_accepted[:3]
+        out["bcall"] = bcall_accepted[:3]
+        out["bput"] = bput_accepted[:3]
+        out["cal_call"] = cal_call_accepted[:3]
+        out["cal_put"] = cal_put_accepted[:3]
+        out["lpb"] = lpb_accepted[:3]
+        out["lcb"] = lcb_accepted[:3]
+        out["cc"] = cc_accepted[:3]
+        out["csp"] = csp_accepted[:3]
+        out["ls"] = ls_accepted[:3]
+        out["ss"] = ss_accepted[:3]
+        out["lsg"] = lsg_accepted[:3]
+        out["ssg"] = ssg_accepted[:3]
+        out["naked_put"] = naked_put_accepted[:3]
+        out["naked_call"] = naked_call_accepted[:3]
+        out["ratio_call"] = ratio_call_accepted[:3]
+        out["ratio_put"] = ratio_put_accepted[:3]
         out["considered"] = considered
         out["chain"] = chain_rejected
 
@@ -985,7 +1569,7 @@ def main():
         quote_error = f"MCP error: batch underlying quotes failed: {e}"
         print(quote_error, file=sys.stderr)
 
-    bull_puts, bear_calls, condors, butterflies, asym_condors = [], [], [], [], []
+    bull_puts, bear_calls, bull_calls, bear_puts, cal_calls, cal_puts, lpb_list, lcb_list, cc_list, csp_list, ls_list, ss_list, lsg_list, ssg_list, naked_puts, naked_calls, ratio_calls, ratio_puts, condors, butterflies, asym_condors, ratio_calls, ratio_puts = [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     stock_notes, diagnostics = {}, {}
     screened = []
     vol_veto_total = 0
@@ -994,7 +1578,7 @@ def main():
 
     def safe(sym):
         if quote_error:
-            return (sym, {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
+            return (sym, {"bp": [], "bc": [], "bcall": [], "bput": [], "cal_call": [], "cal_put": [], "lpb": [], "lcb": [], "cc": [], "csp": [], "ls": [], "ss": [], "lsg": [], "ssg": [], "naked_put": [], "naked_call": [], "ratio_call": [], "ratio_put": [], "ic": [], "ib": [], "ac": [], "notes": [],
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0, "error": quote_error})
@@ -1003,7 +1587,7 @@ def main():
                                             events, iv_hist_path,
                                             args.no_vol))
         except Exception as e:  # one bad name never kills the run
-            return (sym, {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
+            return (sym, {"bp": [], "bc": [], "bcall": [], "bput": [], "cal_call": [], "cal_put": [], "lpb": [], "lcb": [], "cc": [], "csp": [], "ls": [], "ss": [], "lsg": [], "ssg": [], "naked_put": [], "naked_call": [], "ratio_call": [], "ratio_put": [], "ic": [], "ib": [], "ac": [], "notes": [],
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0,
@@ -1032,6 +1616,22 @@ def main():
                 rej_all[key][k] = rej_all[key].get(k, 0) + v
         bull_puts.extend(r["bp"])
         bear_calls.extend(r["bc"])
+        bull_calls.extend(r.get("bcall", []))
+        bear_puts.extend(r.get("bput", []))
+        cal_calls.extend(r.get("cal_call", []))
+        cal_puts.extend(r.get("cal_put", []))
+        lpb_list.extend(r.get("lpb", []))
+        lcb_list.extend(r.get("lcb", []))
+        cc_list.extend(r.get("cc", []))
+        csp_list.extend(r.get("csp", []))
+        ls_list.extend(r.get("ls", []))
+        ss_list.extend(r.get("ss", []))
+        lsg_list.extend(r.get("lsg", []))
+        ssg_list.extend(r.get("ssg", []))
+        naked_puts.extend(r.get("naked_put", []))
+        naked_calls.extend(r.get("naked_call", []))
+        ratio_calls.extend(r.get("ratio_call", []))
+        ratio_puts.extend(r.get("ratio_put", []))
         condors.extend(r["ic"])
         butterflies.extend(r["ib"])
         asym_condors.extend(r["ac"])
@@ -1039,6 +1639,8 @@ def main():
 
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     bear_calls.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    bull_calls.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    bear_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     butterflies.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     asym_condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
@@ -1104,7 +1706,7 @@ def main():
         print("readout unavailable")
 
     if args.json_out:
-        best = {"bull_puts": {}, "bear_calls": {}, "iron_condors": {}, "iron_butterflies": {}, "asym_condors": {}}
+        best = {"bull_puts": {}, "bear_calls": {}, "bull_calls": {}, "bear_puts": {}, "cal_calls": {}, "cal_puts": {}, "long_put_butterflies": {}, "long_call_butterflies": {}, "covered_calls": {}, "cash_secured_puts": {}, "long_straddles": {}, "short_straddles": {}, "long_strangles": {}, "short_strangles": {}, "naked_puts": {}, "naked_calls": {}, "call_ratio_spreads": {}, "put_ratio_spreads": {}, "iron_condors": {}, "iron_butterflies": {}, "asym_condors": {}}
         for r in bull_puts:
             if r["stock"] not in best["bull_puts"]:
                 best["bull_puts"][r["stock"]] = {
@@ -1138,6 +1740,140 @@ def main():
                     "lucrative": r.get("lucrative"),
                     "events": r["events"],
                     "vol": r.get("vol"),
+                }
+        for r in bull_calls:
+            if r["stock"] not in best["bull_calls"]:
+                best["bull_calls"][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "long_strike": r["long_strike"],
+                    "short_strike": r["short_strike"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "max_profit_total": round(r.get("max_profit_total", 0), 0),
+                    "breakeven": round(r["breakeven"], 2),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "events": r["events"],
+                    "vol": r.get("vol"),
+                }
+        for r in bear_puts:
+            if r["stock"] not in best["bear_puts"]:
+                best["bear_puts"][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "long_strike": r["long_strike"],
+                    "short_strike": r["short_strike"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "max_profit_total": round(r.get("max_profit_total", 0), 0),
+                    "breakeven": round(r["breakeven"], 2),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "events": r["events"],
+                    "vol": r.get("vol"),
+                }
+        for r in cal_calls:
+            if r["stock"] not in best["cal_calls"]:
+                best["cal_calls"][r["stock"]] = {
+                    "strike": r["strike"],
+                    "short_expiration": r["short_expiration"],
+                    "long_expiration": r["long_expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "events": r["events"],
+                }
+        for r in cal_puts:
+            if r["stock"] not in best["cal_puts"]:
+                best["cal_puts"][r["stock"]] = {
+                    "strike": r["strike"],
+                    "short_expiration": r["short_expiration"],
+                    "long_expiration": r["long_expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "events": r["events"],
+                }
+        for r in lpb_list:
+            if r["stock"] not in best["long_put_butterflies"]:
+                best["long_put_butterflies"][r["stock"]] = {
+                    "strikes": r["strikes"],
+                    "expiration": r["expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "max_profit_total": round(r.get("max_profit_total", 0), 0),
+                    "events": r["events"],
+                }
+        for r in lcb_list:
+            if r["stock"] not in best["long_call_butterflies"]:
+                best["long_call_butterflies"][r["stock"]] = {
+                    "strikes": r["strikes"],
+                    "expiration": r["expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "max_profit_total": round(r.get("max_profit_total", 0), 0),
+                    "events": r["events"],
+                }
+        for r in cc_list:
+            if r["stock"] not in best["covered_calls"]:
+                best["covered_calls"][r["stock"]] = {
+                    "strike": r["strike"],
+                    "expiration": r["expiration"],
+                    "premium_total": round(r["premium_total"], 0),
+                    "max_profit_total": round(r["max_profit_total"], 0),
+                    "events": r["events"],
+                }
+        for r in csp_list:
+            if r["stock"] not in best["cash_secured_puts"]:
+                best["cash_secured_puts"][r["stock"]] = {
+                    "strike": r["strike"],
+                    "expiration": r["expiration"],
+                    "premium_total": round(r["premium_total"], 0),
+                    "max_profit_total": round(r["max_profit_total"], 0),
+                    "events": r["events"],
+                }
+        for r in ls_list:
+            if r["stock"] not in best["long_straddles"]:
+                best["long_straddles"][r["stock"]] = {
+                    "strike": r["strike"], "expiration": r["expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "events": r["events"],
+                }
+        for r in ss_list:
+            if r["stock"] not in best["short_straddles"]:
+                best["short_straddles"][r["stock"]] = {
+                    "strike": r["strike"], "expiration": r["expiration"],
+                    "credit_total": round(r["credit_total"], 0),
+                    "risk_warning": True, "events": r["events"],
+                }
+        for r in lsg_list:
+            if r["stock"] not in best["long_strangles"]:
+                best["long_strangles"][r["stock"]] = {
+                    "call_strike": r["call_strike"], "put_strike": r["put_strike"],
+                    "expiration": r["expiration"],
+                    "debit_total": round(r["debit_total"], 0),
+                    "events": r["events"],
+                }
+        for r in ssg_list:
+            if r["stock"] not in best["short_strangles"]:
+                best["short_strangles"][r["stock"]] = {
+                    "call_strike": r["call_strike"], "put_strike": r["put_strike"],
+                    "expiration": r["expiration"],
+                    "credit_total": round(r["credit_total"], 0),
+                    "risk_warning": True, "events": r["events"],
+                }
+        for r in naked_puts:
+            if r["stock"] not in best["naked_puts"]:
+                best["naked_puts"][r["stock"]] = {
+                    "strike": r["strike"], "expiration": r["expiration"],
+                    "credit_total": round(r["credit_total"], 0),
+                    "risk_warning": True, "events": r["events"],
+                }
+        for r in naked_calls:
+            if r["stock"] not in best["naked_calls"]:
+                best["naked_calls"][r["stock"]] = {
+                    "strike": r["strike"], "expiration": r["expiration"],
+                    "credit_total": round(r["credit_total"], 0),
+                    "risk_warning": True, "events": r["events"],
                 }
         for r in condors:
             if r["stock"] not in best["iron_condors"]:
