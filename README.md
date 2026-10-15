@@ -1,7 +1,5 @@
 # Options Lab
 
-**Live dashboard:** https://amuse.openaimp.com
-
 Stock and options screeners that pull live market data through Public.com's
 hosted MCP server — built around one idea: **no indicator places a trade.**
 Every signal answers exactly one question, and a trade only happens when they
@@ -847,6 +845,27 @@ more candidates, not more edge — see the honest limitations below.
 - A full S&P 500 stock screen is ~1,000 API calls and takes ~20 minutes; the
   spread screener on 500 names takes an hour-plus — these are scheduled jobs,
   not interactive ones.
+
+### Statistical claims (issue #2)
+
+- **Delta is not a calibrated probability.** Win% estimates use
+  `1 - |delta|` as a heuristic for strike selection and directional
+  sensitivity, not as a calibrated probability of profit. All probability
+  estimates are labeled by model (delta-based), measure (heuristic), and
+  horizon (to expiration). They are not backtested calibration.
+- **Expectancy is net P&L under exit rules**, not opening credit. A $150
+  credit is not a $150 profit — realized P&L depends on the exit policy
+  (50% profit target, 2x stop, 7 DTE time exit) and is tracked in the
+  ledger, not assumed at entry.
+- **Quotes are estimates, not guaranteed fills.** The screener uses
+  conservative fills (short bid minus long ask), but these are estimates.
+  Actual fills depend on market conditions, liquidity, and timing.
+- **Defined risk does not enforce position sizing.** A $400 max-loss
+  structure does not automatically size to 1-2% of account — sizing is
+  enforced separately via the Kelly/heat controls in the decision engine.
+- **Testable hypotheses, not proven edges.** Claims like "safe to sell
+  premium" or "the edge compounds" are hypotheses awaiting validation
+  via issue #11 backtesting, not established facts.
 
 ## Roadmap
 
