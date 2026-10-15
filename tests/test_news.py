@@ -5,6 +5,10 @@ _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
                                   "..", "src"))
 
 import unittest
+import json
+import tempfile
+from unittest import mock
+from urllib.error import HTTPError
 
 import fetch_news as fn
 
@@ -54,6 +58,41 @@ class TestParseRss(unittest.TestCase):
         h2 = {"title": "same title", "link": "y", "published": "", "source": ""}
         h3 = {"title": "Different", "link": "z", "published": "", "source": ""}
         self.assertEqual(len(fn.dedupe([h, h2, h3])), 2)
+
+
+class TestNewsFetching(unittest.TestCase):
+    def test_symbols_from_reports_collects_only_screened_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stock = _os.path.join(tmp, "stock.json")
+            spreads = _os.path.join(tmp, "spreads.json")
+            with open(stock, "w", encoding="utf-8") as f:
+                json.dump({"passing": [{"symbol": "NVDA"}, {"symbol": " msft "}]}, f)
+            with open(spreads, "w", encoding="utf-8") as f:
+                json.dump({"results": {"bull_puts": {"NVDA": {}, "AMD": {}}}}, f)
+
+            self.assertEqual(fn.symbols_from_reports([stock, spreads, "missing.json"]),
+                             ["NVDA", "MSFT", "AMD"])
+
+    def test_fetch_retries_temporary_service_unavailable(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = SAMPLE_RSS.encode()
+        temporary = HTTPError("https://news.google.com", 503,
+                              "Service Unavailable", {}, None)
+        with mock.patch.object(fn.urllib.request, "urlopen",
+                               side_effect=[temporary, response]), \
+                mock.patch.object(fn.time, "sleep") as sleep:
+            headlines = fn.fetch("NVDA stock", retries=1)
+
+        self.assertEqual(len(headlines), 2)
+        sleep.assert_called_once_with(1)
+
+    def test_fetch_returns_empty_after_retryable_failures(self):
+        temporary = HTTPError("https://news.google.com", 503,
+                              "Service Unavailable", {}, None)
+        with mock.patch.object(fn.urllib.request, "urlopen",
+                               side_effect=temporary), \
+                mock.patch.object(fn.time, "sleep"):
+            self.assertEqual(fn.fetch("NVDA stock", retries=1), [])
 
 
 if __name__ == "__main__":

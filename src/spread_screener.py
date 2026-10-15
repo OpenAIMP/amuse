@@ -27,6 +27,7 @@ import os
 import math
 import re
 import sys
+import traceback
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -1646,11 +1647,14 @@ def main():
                                             events, iv_hist_path,
                                             args.no_vol))
         except Exception as e:  # one bad name never kills the run
+            frames = traceback.extract_tb(e.__traceback__)
+            where = (f"{os.path.basename(frames[-1].filename)}:{frames[-1].lineno}"
+                     if frames else "unknown location")
             return (sym, {"bp": [], "bc": [], "bcall": [], "bput": [], "cal_call": [], "cal_put": [], "lpb": [], "lcb": [], "cc": [], "csp": [], "ls": [], "ss": [], "lsg": [], "ssg": [], "naked_put": [], "naked_call": [], "ratio_call": [], "ratio_put": [], "ic": [], "ib": [], "ac": [], "notes": [],
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0,
-                          "error": f"unexpected error: {type(e).__name__}: {e}"})
+                          "error": f"unexpected error at {where}: {type(e).__name__}: {e}"})
 
     # Thread pool over names (issue #14). Merge in submission order in the
     # main thread: no shared-state locks, deterministic output.
