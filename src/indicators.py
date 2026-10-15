@@ -317,17 +317,34 @@ def anchored_vwap(bars, lookback=252):
     return vw, (close / vw - 1) * 100.0
 
 
-def find_pivots(highs, lows, n=5):
+def find_pivots(highs, lows, n=5, timestamps=None):
     """Fractal pivots: index i is a swing high if highs[i] strictly exceeds
     the n bars on each side (swing low analogously). Returns two lists of
-    (index, price), oldest first."""
+    (index, price), oldest first.
+
+    Issue #5: if timestamps are provided (list of bar timestamps), each pivot
+    includes pivot_bar_timestamp (when the pivot bar occurred) and
+    confirmed_at_timestamp (when the pivot was confirmed, n bars later).
+    Returns (index, price, pivot_ts, confirmed_ts) tuples when timestamps
+    are given, else (index, price).
+    """
     ph, pl = [], []
     for i in range(n, len(highs) - n):
         h, l = highs[i], lows[i]
         if all(h > highs[j] for j in range(i - n, i + n + 1) if j != i):
-            ph.append((i, h))
+            if timestamps:
+                pivot_ts = timestamps[i] if i < len(timestamps) else None
+                confirmed_ts = timestamps[i + n] if i + n < len(timestamps) else None
+                ph.append((i, h, pivot_ts, confirmed_ts))
+            else:
+                ph.append((i, h))
         if all(l < lows[j] for j in range(i - n, i + n + 1) if j != i):
-            pl.append((i, l))
+            if timestamps:
+                pivot_ts = timestamps[i] if i < len(timestamps) else None
+                confirmed_ts = timestamps[i + n] if i + n < len(timestamps) else None
+                pl.append((i, l, pivot_ts, confirmed_ts))
+            else:
+                pl.append((i, l))
     return ph, pl
 
 
