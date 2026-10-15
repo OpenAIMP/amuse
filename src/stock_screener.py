@@ -91,6 +91,9 @@ INTRADAY_AGG = "FIFTEEN_MINUTES"
 FIB_LEVELS = (0.382, 0.50, 0.618)
 
 RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
+# Issue #4: immutable run ID
+import uuid as _uuid
+RUN_ID = f"{RUN_DATE.isoformat()}-{_uuid.uuid4().hex[:8]}"
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
 
 
@@ -772,7 +775,7 @@ def main():
 
     if args.json_out:
         with open(args.json_out, "w") as f:
-            json.dump({"asof": RUN_DATE.isoformat(),
+            json.dump({"asof": RUN_DATE.isoformat(), "run_id": RUN_ID,
                        "settings": {
                            "price_range": [PRICE_MIN, PRICE_MAX],
                            "rsi_range": [RSI_MIN, RSI_MAX],
