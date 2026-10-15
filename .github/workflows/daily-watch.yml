@@ -135,6 +135,26 @@ jobs:
             --iv-history state/iv_history.jsonl \
             --json-out reports/spread-levetf.json | tee reports/spread-levetf.txt
 
+      - name: Render lev-ETF report
+        if: always()
+        run: |
+          STAMP=$(date -u +%F-%H%M)
+          REPORT_ARGS=()
+          if [ -s reports/decision.json ]; then
+            REPORT_ARGS+=(--decision reports/decision.json)
+          fi
+          if [ -s reports/portfolio-risk.json ]; then
+            REPORT_ARGS+=(--portfolio-risk reports/portfolio-risk.json)
+          fi
+          if [ -s reports/stock-levetf.json ] && [ -s reports/spread-levetf.json ]; then
+            python3 src/render_report.py --stock reports/stock-levetf.json \
+              --spreads reports/spread-levetf.json \
+              --news reports/news.json \
+              "${REPORT_ARGS[@]}" \
+              --report-id daily-lev_etf-$STAMP --source "lev_etf" --source-detail "29 names"
+          fi
+          python3 src/render_hub.py
+            
       - name: Unified six-step decision report
         if: always()
         run: |
