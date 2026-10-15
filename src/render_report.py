@@ -725,6 +725,42 @@ def spread_tables(data):
         + "</tbody></table></div>"
     )
 
+    # Bear call spreads (issue #106)
+    bcs = sorted((res.get("bear_calls") or {}).items(),
+                 key=lambda kv: -(kv[1].get("return_on_risk") or -1))
+    rows = []
+    for sym, r in bcs:
+        dte = dte_between(asof, r.get("expiration"))
+        why = why_for(sym, readout)
+        rows.append(
+            "<tr>"
+            f"{sym_cell(sym)}"
+            f"<td class='num'>{esc(r.get('expiration'))}</td>"
+            f"<td class='num'>{num(r.get('short_strike'), 0)}/{num(r.get('long_strike'), 0)}C</td>"
+            f"<td class='num'>{dte if dte is not None else '—'}</td>"
+            f"<td class='num'>{money(r.get('credit_total'))}</td>"
+            f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+            f"<td class='num'>{num(r.get('breakeven'), 2)}</td>"
+            f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+            f"<td class='num'>{money(r.get('expected_value'))}</td>"
+            f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
+            f"<td class='{'good' if (r.get('lucrative') in ('Lucrative','Solid')) else 'bad' if (r.get('lucrative') in ('Negative EV','High risk')) else ''}'>{esc(r.get('lucrative') or '—')}</td>"
+            f"<td>{events_cell(r.get('events'))}</td>"
+            "</tr>"
+            + (f"<tr class='whyrow'><td colspan='12'>{esc(why)}</td></tr>" if why else "")
+        )
+    out.append("<h3>Bear call spreads <span class='dim'>(ranked by return on risk)</span></h3>")
+    out.append(
+        '<div class="tbl-wrap"><table><thead><tr>'
+        "<th>Sym</th><th>Exp</th><th>Strikes</th><th>DTE</th>"
+        "<th>Credit</th><th>Max loss</th><th>Breakeven</th><th>RoR</th>"
+        "<th>Win%</th><th>EV$</th><th>Loss×</th><th>Lucrative</th><th>Events</th>"
+        "</tr></thead><tbody>"
+        + ("".join(rows) if rows else '<tr><td colspan="13" class="empty">No qualifying bear calls.</td></tr>')
+        + "</tbody></table></div>"
+    )
+
     ics = sorted((res.get("iron_condors") or {}).items(),
                  key=lambda kv: -(kv[1].get("return_on_risk") or -1))
     rows = []
@@ -772,6 +808,41 @@ def spread_tables(data):
         + ("".join(rows) if rows else '<tr><td colspan="13" class="empty">No qualifying condors.</td></tr>')
         + "</tbody></table></div>"
     )
+    # Iron butterflies (issue #106)
+    ibs = sorted((res.get("iron_butterflies") or {}).items(),
+                 key=lambda kv: -(kv[1].get("return_on_risk") or -1))
+    rows = []
+    for sym, r in ibs:
+        dte = dte_between(asof, r.get("expiration"))
+        why = why_for(sym, readout)
+        rows.append(
+            "<tr>"
+            f"{sym_cell(sym)}"
+            f"<td class='num'>{esc(r.get('expiration'))}</td>"
+            f"<td class='num'>{num(r.get('put_wing', [0,0])[0], 0)}/{num(r.get('put_wing', [0,0])[1], 0)}P x {num(r.get('call_wing', [0,0])[0], 0)}/{num(r.get('call_wing', [0,0])[1], 0)}C</td>"
+            f"<td class='num'>{dte if dte is not None else '—'}</td>"
+            f"<td class='num'>{money(r.get('credit_total'))}</td>"
+            f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+            f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+            f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+            f"<td class='num'>{money(r.get('expected_value'))}</td>"
+            f"<td class='num'>{num(r.get('loss_multiple'), 1)}×</td>"
+            f"<td>{events_cell(r.get('events'))}</td>"
+            "</tr>"
+            + (f"<tr class='whyrow'><td colspan='11'>{esc(why)}</td></tr>" if why else "")
+        )
+    if ibs:
+        out.append("<h3>Iron butterflies <span class='dim'>(ranked by return on risk)</span></h3>")
+        out.append(
+            '<div class="tbl-wrap"><table><thead><tr>'
+            "<th>Sym</th><th>Exp</th><th>Wings</th><th>DTE</th>"
+            "<th>Credit</th><th>Max loss</th><th>RoR</th>"
+            "<th>Win%</th><th>EV$</th><th>Loss×</th><th>Events</th>"
+            "</tr></thead><tbody>"
+            + "".join(rows)
+            + "</tbody></table></div>"
+        )
+
     # readout lines not tied to a symbol still get shown
     ac_rows, ac_syms = asym_condor_rows(data, asof, readout)
     if ac_rows:
@@ -1781,8 +1852,6 @@ def main():
                     help="path to decision_engine.py JSON output")
     ap.add_argument("--portfolio-risk", default=None,
                     help="path to portfolio_risk.py JSON output")
-    ap.add_argument("--hide-portfolio-risk", action="store_true",
-                    help="omit the portfolio-risk section when no risk input applies to this report")
     ap.add_argument("--report-id", default=None,
                     help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
     ap.add_argument("--source", default=None,
@@ -1860,8 +1929,7 @@ def main():
         method=method_section(args.config),
         decision=decision_section(decision, show_missing=report_mode and bool(args.stock or args.spreads)),
         portfolio_risk=portfolio_risk_section(portfolio_risk,
-                                              show_missing=(report_mode and bool(args.stock or args.spreads)
-                                                            and not args.hide_portfolio_risk)),
+                                              show_missing=report_mode and bool(args.stock or args.spreads)),
         stock=stock_html,
         spreads=spreads_html,
         premarket=premarket_html,
