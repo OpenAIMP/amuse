@@ -19,7 +19,9 @@ _os.environ.setdefault("PUBLIC_ACCOUNT_ID", "TEST")
 import concurrent.futures
 import json
 import unittest
-from datetime import date, timedelta
+from datetime import date, datetime, time as wall_time, timedelta
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import premarket_screen as dt
 import mcp_client
@@ -88,10 +90,26 @@ class TestBatching(unittest.TestCase):
         self.assertEqual(self.fake.count("get_quotes"), 1)
 
     def test_screen_one_uses_quote_map(self):
-        res, reasons = dt.screen_one("AAA", {"AAA": 103.0})
+        et = ZoneInfo("America/New_York")
+        test_date = date.today()
+        now_et = datetime.combine(test_date, wall_time(15, 0), et)
+        prior_close = _daily_bars()[-1]["close"]
+        quote = prior_close * 1.03
+        intraday = [{
+            "ts": now_et - timedelta(minutes=15),
+            "open": quote,
+            "high": quote * 1.01,
+            "low": quote * 0.99,
+            "close": quote,
+            "volume": 60_000,
+        }]
+        with patch.object(dt, "RUN_DT_ET", now_et), \
+                patch.object(dt, "RUN_DATE_ET", test_date), \
+                patch.object(dt, "intraday_bars", return_value=(intraday, None)):
+            res, reasons = dt.screen_one(
+                "AAA", {"AAA": quote}, mode="opening_range")
         self.assertEqual(self.fake.count("get_quotes"), 0)
-        self.assertAlmostEqual(res["price"], 103.0)
-        # gap = 103/100 - 1 = 3% >= 2% min; rel vol = 1.2M/1M = 1.2 < 1.5
+        self.assertAlmostEqual(res["price"], quote)
         self.assertIn("regular-session volume below time-normalized minimum", reasons)
 
     def test_screen_one_falls_back_without_map(self):
