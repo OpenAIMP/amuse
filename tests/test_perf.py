@@ -400,6 +400,31 @@ class TestRenderSmoke(unittest.TestCase):
     def test_imports(self):
         import render_report  # noqa: F401 — must not SyntaxError
 
+    def test_hide_portfolio_risk_flag_omits_missing_panel(self):
+        import os
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            stock = Path(tmp) / "stock.json"
+            spreads = Path(tmp) / "spreads.json"
+            output = Path(tmp) / "report.html"
+            stock.write_text(json.dumps({"passing": [], "rejected": {}}),
+                             encoding="utf-8")
+            spreads.write_text(json.dumps({"results": {}}), encoding="utf-8")
+            env = os.environ.copy()
+            env["PYTHONUTF8"] = "1"
+            subprocess.run([
+                _sys.executable, _os.path.join(_os.path.dirname(__file__), "..",
+                                               "src", "render_report.py"),
+                "--stock", str(stock), "--spreads", str(spreads),
+                "--hide-portfolio-risk", "--report-id", "daily-lev_etf-2099-01-01",
+                "--source", "lev_etf", "--out", str(output),
+            ], check=True, env=env, capture_output=True, text=True)
+            html = output.read_text(encoding="utf-8")
+        self.assertNotIn("No portfolio Greeks or stress results are available", html)
+
     def test_stock_section_renders(self):
         import render_report as rr
         html = rr.stock_section({"passing": [self._record()]})
