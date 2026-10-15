@@ -364,6 +364,58 @@ def evaluate_condor(spot, put_wing, call_wing, width):
     return result
 
 
+def evaluate_butterfly(spot, put_wing, call_wing, width):
+    """Combine two accepted wings into an iron butterfly. Same expiration
+    required, and short strikes must match (at-the-money body)."""
+    reasons = []
+    if put_wing["expiration"] != call_wing["expiration"]:
+        reasons.append("wings on different expirations")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    if abs(put_wing["short_strike"] - call_wing["short_strike"]) > 0.01:
+        reasons.append("short strikes do not match (not a butterfly)")
+        return {"accepted": False, "reasons": reasons, "diagnostics": {}}
+    # Build butterfly economics directly (can't reuse evaluate_condor which
+    # requires put_short < call_short; butterfly has them equal).
+    total_credit = put_wing["credit_per_share"] + call_wing["credit_per_share"]
+    max_loss = (width - total_credit) * 100
+    if max_loss > MAX_SPREAD_LOSS:
+        reasons.append("butterfly max loss over limit")
+    friction = ((put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"])
+                / total_credit) if total_credit > 0 else float("inf")
+    if friction > MAX_FRICTION:
+        reasons.append("butterfly friction over limit")
+    if reasons:
+        return {"accepted": False, "reasons": reasons,
+                "diagnostics": {"max_loss": round(max_loss, 0)}}
+    pd = abs(put_wing["short_delta"])
+    cd = abs(call_wing["short_delta"])
+    p_win = max(0.0, min(1.0, 1 - pd - cd))
+    credit_dollars = total_credit * 100
+    leg_sum = put_wing["leg_spread_sum"] + call_wing["leg_spread_sum"]
+    ev_val = _ev(p_win, credit_dollars, max_loss, leg_sum)
+    return {
+        "accepted": True,
+        "kind": "iron_butterfly",
+        "expiration": put_wing["expiration"],
+        "dte": put_wing["dte"],
+        "put_short_strike": put_wing["short_strike"],
+        "put_long_strike": put_wing["long_strike"],
+        "call_short_strike": call_wing["short_strike"],
+        "call_long_strike": call_wing["long_strike"],
+        "credit_total": credit_dollars,
+        "max_loss_total": max_loss,
+        "breakeven_put": put_wing["short_strike"] - total_credit,
+        "breakeven_call": call_wing["short_strike"] + total_credit,
+        "return_on_risk": total_credit / (width - total_credit) if width > total_credit else 0,
+        "friction": friction,
+        "win_prob_est": round(p_win, 3),
+        "expected_value": ev_val,
+        "loss_multiple": round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None,
+        "lucrative": lucrative_label(round(p_win, 3), ev_val,
+                                     round(max_loss / credit_dollars, 2) if credit_dollars > 0 else None),
+    }
+
+
 def evaluate_asym_condor(spot, put_wing, call_wing, width):
     """Combine an accepted put wing and call wing into an asymmetric iron
     condor. Same expiration required.
@@ -531,8 +583,8 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
     considered (issue #38: every evaluated structure with qualification),
     chain (issue #38: every retrieved contract with its gate status).
     """
-    out = {"bp": [], "ic": [], "ac": [], "notes": [],
-           "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {},
+    out = {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
+           "rejs": {"bull_put": {}, "bear_call": {}, "iron_condor": {}, "iron_butterfly": {},
                     "asym_condor": {}},
            "vol_veto": 0, "error": None}
     spot = spot_map.get(sym)
@@ -728,6 +780,37 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                         r.get("put_long", pw["long_strike"]),
                         "accepted", [], {"wings": wings})
 
+        # Iron butterflies: same as condors but short strikes match (ATM body).
+        ib_accepted = []
+        ib_rej, ib_n_rej = {}, 0
+        for pw in bp_accepted:
+            for cw in bc_accepted:
+                if pw["expiration"] != cw["expiration"]:
+                    continue
+                # Only consider pairs where short strikes match (butterfly)
+                if abs(pw["short_strike"] - cw["short_strike"]) > 0.01:
+                    continue
+                flags, event_reasons = spread_events(
+                    sym, pw["expiration"], events)
+                r = evaluate_butterfly(spot, pw, cw, width)
+                reasons = r.get("reasons", []) + event_reasons
+                wings = (f"{pw['short_strike']}/{pw['long_strike']}P x "
+                         f"{cw['short_strike']}/{cw['long_strike']}C")
+                if reasons:
+                    ib_n_rej += 1
+                    for reason in reasons:
+                        ib_rej[reason] = ib_rej.get(reason, 0) + 1
+                    _record("iron_butterfly", pw["expiration"],
+                            pw["short_strike"], pw["long_strike"],
+                            "rejected", reasons, {"wings": wings})
+                    continue
+                r.update({"stock": sym, "spot": spot, "events": flags})
+                ib_accepted.append(r)
+                _record("iron_butterfly", r["expiration"],
+                        r.get("put_short_strike", pw["short_strike"]),
+                        r.get("put_long_strike", pw["long_strike"]),
+                        "accepted", [], {"wings": wings})
+
         # asymmetric iron condors (defined-risk): accepted put wing + accepted call
         # wing with the call wing skewed far OTM (asym condor character).
         ac_accepted = []
@@ -759,23 +842,24 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         bp_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         bc_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         ic_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+        ib_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
         ac_accepted.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
 
         # Vol assessment (issue #7): sits between Regime and Timing.
         # Cheap premium stands down -- structures are vetoed, not ranked.
-        if not no_vol and (bp_accepted or ic_accepted or ac_accepted):
+        if not no_vol and (bp_accepted or ic_accepted or ib_accepted or ac_accepted):
             vol_read = vol_read_for(sym, spot, puts_by_exp, calls_by_exp,
                                     exps, iv_hist_path)
             slim = {k: vol_read[k] for k in
                     ("iv", "hv", "iv_rank", "iv_vs_hv",
                      "skew_25d", "term_structure", "decision")}
-            for r in bp_accepted + ic_accepted + ac_accepted:
+            for r in bp_accepted + ic_accepted + ib_accepted + ac_accepted:
                 r["vol"] = slim
             notes.append(
                 "vol: " + ", ".join(f"{k}={v}" for k, v in slim.items())
                 + f" ({vol_read['reason']})")
             if vol_read["decision"] == _vol.STAND_DOWN:
-                n_veto = (len(bp_accepted) + len(ic_accepted)
+                n_veto = (len(bp_accepted) + len(ic_accepted) + len(ib_accepted)
                           + len(ac_accepted))
                 out["vol_veto"] += n_veto
                 notes.append(f"vol veto: {n_veto} structures stood down "
@@ -784,10 +868,12 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                     if c["qualification"] == "accepted":
                         c["qualification"] = "rejected"
                         c["reasons"] = ["vol veto: cheap premium"]
-                bp_accepted, ic_accepted, ac_accepted = [], [], []
+                bp_accepted, ic_accepted, ib_accepted, ac_accepted = [], [], [], []
 
         out["bp"] = bp_accepted[:3]
+        out["bc"] = bc_accepted[:3]
         out["ic"] = ic_accepted[:3]
+        out["ib"] = ib_accepted[:3]
         out["ac"] = ac_accepted[:3]
         out["considered"] = considered
         out["chain"] = chain_rejected
@@ -800,6 +886,10 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
                      f"{bc_n_rej} rejected")
         for reason, cnt in sorted(bc_rej.items(), key=lambda kv: (-kv[1], kv[0])):
             notes.append(f"  bear-call rejections: {reason} x{cnt}")
+        notes.append(f"iron butterflies: {len(ib_accepted)} accepted, "
+                     f"{ib_n_rej} rejected")
+        for reason, cnt in sorted(ib_rej.items(), key=lambda kv: (-kv[1], kv[0])):
+            notes.append(f"  butterfly rejections: {reason} x{cnt}")
         notes.append(f"iron condors: {len(ic_accepted)} accepted, "
                      f"{ic_n_rej} rejected")
         for reason, cnt in sorted(ic_rej.items(), key=lambda kv: (-kv[1], kv[0])):
@@ -895,7 +985,7 @@ def main():
         quote_error = f"MCP error: batch underlying quotes failed: {e}"
         print(quote_error, file=sys.stderr)
 
-    bull_puts, condors, asym_condors = [], [], []
+    bull_puts, bear_calls, condors, butterflies, asym_condors = [], [], [], [], []
     stock_notes, diagnostics = {}, {}
     screened = []
     vol_veto_total = 0
@@ -904,7 +994,7 @@ def main():
 
     def safe(sym):
         if quote_error:
-            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
+            return (sym, {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0, "error": quote_error})
@@ -913,7 +1003,7 @@ def main():
                                             events, iv_hist_path,
                                             args.no_vol))
         except Exception as e:  # one bad name never kills the run
-            return (sym, {"bp": [], "ic": [], "ac": [], "notes": [],
+            return (sym, {"bp": [], "bc": [], "ic": [], "ib": [], "ac": [], "notes": [],
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0,
@@ -941,13 +1031,18 @@ def main():
             for k, v in d.items():
                 rej_all[key][k] = rej_all[key].get(k, 0) + v
         bull_puts.extend(r["bp"])
+        bear_calls.extend(r["bc"])
         condors.extend(r["ic"])
+        butterflies.extend(r["ib"])
         asym_condors.extend(r["ac"])
         vol_veto_total += r["vol_veto"]
 
     bull_puts.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    bear_calls.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    butterflies.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     asym_condors.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
+    butterflies.sort(key=lambda r: (-r["return_on_risk"], r["friction"]))
     if vol_veto_total:
         print(f"\nVol vetoes: {vol_veto_total} structures stood down on cheap "
               "premium (issue #7).")
@@ -1009,7 +1104,7 @@ def main():
         print("readout unavailable")
 
     if args.json_out:
-        best = {"bull_puts": {}, "iron_condors": {}, "asym_condors": {}}
+        best = {"bull_puts": {}, "bear_calls": {}, "iron_condors": {}, "iron_butterflies": {}, "asym_condors": {}}
         for r in bull_puts:
             if r["stock"] not in best["bull_puts"]:
                 best["bull_puts"][r["stock"]] = {
@@ -1027,9 +1122,44 @@ def main():
                     "events": r["events"],
                     "vol": r.get("vol"),
                 }
+        for r in bear_calls:
+            if r["stock"] not in best["bear_calls"]:
+                best["bear_calls"][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "short_strike": r["short_strike"],
+                    "long_strike": r["long_strike"],
+                    "credit_total": round(r["credit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "breakeven": round(r["breakeven"], 2),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
+                    "events": r["events"],
+                    "vol": r.get("vol"),
+                }
         for r in condors:
             if r["stock"] not in best["iron_condors"]:
                 best["iron_condors"][r["stock"]] = {
+                    "expiration": r["expiration"],
+                    "put_wing": [r["put_short_strike"], r["put_long_strike"]],
+                    "call_wing": [r["call_short_strike"], r["call_long_strike"]],
+                    "credit_total": round(r["credit_total"], 0),
+                    "max_loss_total": round(r["max_loss_total"], 0),
+                    "breakeven_put": round(r["breakeven_put"], 2),
+                    "breakeven_call": round(r["breakeven_call"], 2),
+                    "return_on_risk": round(r["return_on_risk"], 4),
+                    "win_prob_est": r.get("win_prob_est"),
+                    "expected_value": r.get("expected_value"),
+                    "loss_multiple": r.get("loss_multiple"),
+                    "lucrative": r.get("lucrative"),
+                    "events": r["events"],
+                    "vol": r.get("vol"),
+                }
+        for r in butterflies:
+            if r["stock"] not in best["iron_butterflies"]:
+                best["iron_butterflies"][r["stock"]] = {
                     "expiration": r["expiration"],
                     "put_wing": [r["put_short_strike"], r["put_long_strike"]],
                     "call_wing": [r["call_short_strike"], r["call_long_strike"]],
