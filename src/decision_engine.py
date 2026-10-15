@@ -39,15 +39,35 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
     # regime-appropriate families.
     REGIME_ROUTES = {
         "UP": [("bull_puts", "bull_put_spread"),
+               ("bull_calls", "bull_call_spread"),
+               ("covered_calls", "covered_call"),
+               ("cash_secured_puts", "cash_secured_put"),
+               ("naked_puts", "short_put"),
                ("asym_condors", "asym_condor")],
-        "DN": [("bear_calls", "bear_call_spread")],
+        "DN": [("bear_calls", "bear_call_spread"),
+               ("bear_puts", "bear_put_spread"),
+               ("naked_calls", "short_call")],
         "RNG": [("iron_condors", "iron_condor"),
-                ("iron_butterflies", "iron_butterfly")],
+                ("iron_butterflies", "iron_butterfly"),
+                ("cal_calls", "calendar_call"),
+                ("cal_puts", "calendar_put"),
+                ("long_put_butterflies", "long_put_butterfly"),
+                ("long_call_butterflies", "long_call_butterfly"),
+                ("long_straddles", "long_straddle"),
+                ("short_straddles", "short_straddle"),
+                ("long_strangles", "long_strangle"),
+                ("short_strangles", "short_strangle")],
     }
     # Collect all symbols that have any structures
     all_syms = set()
-    for group in ("bull_puts", "bear_calls", "iron_condors",
-                  "iron_butterflies", "asym_condors"):
+    for group in ("bull_puts", "bear_calls", "bull_calls", "bear_puts",
+                  "cal_calls", "cal_puts",
+                  "long_put_butterflies", "long_call_butterflies",
+                  "covered_calls", "cash_secured_puts",
+                  "long_straddles", "short_straddles",
+                  "long_strangles", "short_strangles",
+                  "naked_puts", "naked_calls",
+                  "iron_condors", "iron_butterflies", "asym_condors"):
         all_syms.update((results.get(group) or {}).keys())
     for sym in sorted(all_syms):
         stock = passing.get(sym)
