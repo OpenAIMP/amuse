@@ -248,7 +248,7 @@ def evaluate_vertical(spot, short_c, long_c, width, kind):
     numeric details go in diagnostics, not reasons.
     """
     reasons, diag = [], {}
-    sk, lk = short_c["strike"], long_c["strike"]
+    sk, lk = float(short_c["strike"]), float(long_c["strike"])
     if kind == "bull_put":
         if not (sk < spot):
             reasons.append("short put not OTM")
@@ -325,7 +325,7 @@ def evaluate_debit_vertical(spot, long_c, short_c, width, kind):
     Max profit = width - debit. Stable reason categories.
     """
     reasons, diag = [], {}
-    lk, sk = long_c["strike"], short_c["strike"]
+    lk, sk = float(long_c["strike"]), float(short_c["strike"])
     if kind == "bull_call":
         if not (lk < spot):
             reasons.append("long call not ITM/ATM")
@@ -668,7 +668,7 @@ def evaluate_straddle(spot, call_c, put_c, kind):
     if abs(call_c["strike"] - put_c["strike"]) > 0.01:
         reasons.append("strikes do not match (not a straddle)")
         return {"accepted": False, "reasons": reasons, "diagnostics": {}}
-    strike = call_c["strike"]
+    strike = float(call_c["strike"])
     if kind == "long_straddle":
         debit = call_c["ask"] + put_c["ask"]
         max_loss = debit * 100
@@ -1212,7 +1212,7 @@ def screen_spreads_sym(sym, spot_map, width_arg, events, iv_hist_path, no_vol):
         if len(expirations) >= 2:
             near_exp, far_exp = expirations[0], expirations[1]
             # ATM strike (closest to spot)
-            atm_strike = min((c["strike"] for cc in calls_by_exp.values()
+            atm_strike = min((float(c["strike"]) for cc in calls_by_exp.values()
                               for c in cc.values()),
                              key=lambda k: abs(k - spot), default=None)
             if atm_strike:
