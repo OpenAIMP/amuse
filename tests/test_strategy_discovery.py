@@ -11,6 +11,8 @@ import unittest
 import sys
 import os
 
+os.environ.setdefault("PUBLIC_ACCOUNT_ID", "test-account")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from spread_screener import evaluate_vertical, evaluate_butterfly
