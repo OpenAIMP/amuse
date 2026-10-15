@@ -263,6 +263,35 @@ class TestSpreadThreading(unittest.TestCase):
         self.assertNotIn("get_price_history",
                            self.fake.call_names[calls_before:])
 
+    def test_spread_screener_main_initializes_every_strategy_bucket(self):
+        import contextlib
+        import io
+        import tempfile
+        from unittest.mock import patch
+        import spread_screener as sp
+
+        empty_result = {
+            "bp": [], "bc": [], "bcall": [], "bput": [],
+            "cal_call": [], "cal_put": [], "lpb": [], "lcb": [],
+            "cc": [], "csp": [], "ls": [], "ss": [],
+            "lsg": [], "ssg": [], "naked_put": [], "naked_call": [],
+            "ratio_call": [], "ratio_put": [], "ic": [], "ib": [],
+            "ac": [], "notes": [], "error": None, "vol_veto": 0,
+            "rejs": {"bull_put": {}, "bear_call": {},
+                     "iron_condor": {}, "asym_condor": {}},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            output = _os.path.join(tmp, "spread-screen.json")
+            with patch.object(_sys, "argv", ["spread_screener.py", "--names", "AAA",
+                                              "--no-vol", "--json-out", output]), \
+                    patch.object(sp, "quotes", return_value={"AAA": 100.0}), \
+                    patch.object(sp, "screen_spreads_sym", return_value=empty_result), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                sp.main()
+            with open(output, encoding="utf-8") as f:
+                result = json.load(f)
+        self.assertEqual([row["symbol"] for row in result["screened"]], ["AAA"])
+
 
 class TestStockRegression(unittest.TestCase):
     """Issue #15: rsi local shadowed rsi() -> UnboundLocalError on every name.
