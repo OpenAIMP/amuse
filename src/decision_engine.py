@@ -34,25 +34,36 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
     rejected = (stock_data or {}).get("rejected", {})
     results = (spread_data or {}).get("results", {})
     candidates, by_symbol = [], {}
-    for group, strategy in (("bull_puts", "bull_put_spread"),
-                            ("iron_condors", "iron_condor"),
-                            ("asym_condors", "asym_condor")):
-        for sym, raw in (results.get(group) or {}).items():
-            stock = passing.get(sym)
-            ind = (stock or {}).get("indicators") or {}
-            trend = (ind.get("structure") or {}).get("trend") or "UNKNOWN"
+    # Regime router (issue #106): map trend regime to compatible strategy families.
+    # Instead of binary pass/fail per strategy, we route each symbol to its
+    # regime-appropriate families.
+    REGIME_ROUTES = {
+        "UP": [("bull_puts", "bull_put_spread"),
+               ("asym_condors", "asym_condor")],
+        "DN": [("bear_calls", "bear_call_spread")],
+        "RNG": [("iron_condors", "iron_condor"),
+                ("iron_butterflies", "iron_butterfly")],
+    }
+    # Collect all symbols that have any structures
+    all_syms = set()
+    for group in ("bull_puts", "bear_calls", "iron_condors",
+                  "iron_butterflies", "asym_condors"):
+        all_syms.update((results.get(group) or {}).keys())
+    for sym in sorted(all_syms):
+        stock = passing.get(sym)
+        ind = (stock or {}).get("indicators") or {}
+        trend = (ind.get("structure") or {}).get("trend") or "UNKNOWN"
+        # Route to regime-appropriate strategies
+        routes = REGIME_ROUTES.get(trend, [])
+        for group, strategy in routes:
+            raw = (results.get(group) or {}).get(sym)
+            if not raw:
+                continue
             vol = raw.get("vol") or {}
             reasons, steps = [], []
-            # 1. Regime / eligibility
-            compatible = ((strategy == "bull_put_spread" and trend == "UP")
-                          or (strategy == "iron_condor" and trend == "RNG")
-                          or (strategy == "asym_condor" and trend == "UP"))
-            if not stock:
-                reasons.append("underlying did not pass the stock screen")
-            if not compatible:
-                reasons.append(f"regime {trend} is not the preferred regime for {strategy}")
-            steps.append({"step": 1, "name": "Regime", "status": "PASS" if stock and compatible else "BLOCK",
-                          "detail": f"stock-qualified={bool(stock)}; trend={trend}; structure={strategy}"})
+            # 1. Regime / router (always PASS here — routing already filtered)
+            steps.append({"step": 1, "name": "Regime", "status": "PASS",
+                          "detail": f"stock-qualified={bool(stock)}; trend={trend}; structure={strategy}; routed by regime"})
             # 2. Horizon / event exposure
             dte = raw.get("dte")
             if dte is None and raw.get("expiration"):
@@ -171,9 +182,26 @@ def build_decisions(stock_data, spread_data, ledger=None, account=None,
         preferred = next((c for c in candidates if c["recommendation"] == "WATCH"), None)
     summary = (f"{preferred['recommendation']}: {preferred['strategy']} on {preferred['symbol']}" if preferred
                else "NO TRADE: no candidate cleared the decision gates")
+    # Phase 4 (issue #106): per-symbol best-strategy recommendation.
+    # For each symbol, rank its candidates by EV and pick the best.
+    best_by_symbol = {}
+    for sym, items in by_symbol.items():
+        # Sort by EV descending, then by rank_score
+        ranked = sorted(items, key=lambda x: (-(x.get("expected_value_delta_proxy") or -999999),
+                                              -x.get("rank_score", 0)))
+        best = ranked[0] if ranked else None
+        if best:
+            best_by_symbol[sym] = {
+                "strategy": best["strategy"],
+                "recommendation": best["recommendation"],
+                "expected_value": best.get("expected_value_delta_proxy"),
+                "rank_score": best.get("rank_score"),
+                "alternatives": len(ranked) - 1,
+            }
     return {"asof": (spread_data or {}).get("asof") or (stock_data or {}).get("asof"),
             "summary": summary, "selected_candidate": preferred,
             "candidate_count": len(candidates), "candidates": candidates,
+            "best_by_symbol": best_by_symbol,
             "decision_policy": "Advisory only. No orders are placed. Existing delta-based probability/EV estimates are proxies; Kelly requires at least 30 realized closed trades per strategy and an account value.",
             "rejected_stock_symbols": list(rejected.keys())}
 
