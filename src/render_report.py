@@ -843,6 +843,196 @@ def spread_tables(data):
             + "</tbody></table></div>"
         )
 
+    # Debit verticals: bull calls and bear puts (issue #106)
+    for key, title, suffix in (("bull_calls", "Bull call spreads", "C"),
+                               ("bear_puts", "Bear put spreads", "P")):
+        items = sorted((res.get(key) or {}).items(),
+                       key=lambda kv: -(kv[1].get("return_on_risk") or -1))
+        rows = []
+        for sym, r in items:
+            dte = dte_between(asof, r.get("expiration"))
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{num(r.get('long_strike'), 0)}/{num(r.get('short_strike'), 0)}{suffix}</td>"
+                f"<td class='num'>{dte if dte is not None else '—'}</td>"
+                f"<td class='num'>{money(r.get('debit_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_profit_total'))}</td>"
+                f"<td class='num'>{num(r.get('breakeven'), 2)}</td>"
+                f"<td class='num good'>{pct((r.get('return_on_risk') or 0) * 100)}</td>"
+                f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+                f"<td class='num'>{money(r.get('expected_value'))}</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='dim'>(debit, ranked by return on risk)</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strikes</th><th>DTE</th>"
+                "<th>Debit</th><th>Max loss</th><th>Max profit</th><th>Breakeven</th>"
+                "<th>RoR</th><th>Win%</th><th>EV$</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Calendars (issue #106)
+    for key, title in (("cal_calls", "Calendar call spreads"),
+                       ("cal_puts", "Calendar put spreads")):
+        items = sorted((res.get(key) or {}).items(),
+                       key=lambda kv: -(kv[1].get("debit_total") or 999999))
+        rows = []
+        for sym, r in items:
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{num(r.get('strike'), 0)}</td>"
+                f"<td class='num'>{esc(r.get('short_expiration'))}</td>"
+                f"<td class='num'>{esc(r.get('long_expiration'))}</td>"
+                f"<td class='num'>{money(r.get('debit_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='dim'>(time spread)</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Strike</th><th>Short exp</th><th>Long exp</th>"
+                "<th>Debit</th><th>Max loss</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Long butterflies (issue #106)
+    for key, title in (("long_put_butterflies", "Long put butterflies"),
+                       ("long_call_butterflies", "Long call butterflies")):
+        items = list((res.get(key) or {}).items())
+        rows = []
+        for sym, r in items:
+            strikes = r.get("strikes") or [0, 0, 0]
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{num(strikes[0], 0)}/{num(strikes[1], 0)}/{num(strikes[2], 0)}</td>"
+                f"<td class='num'>{money(r.get('debit_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_profit_total'))}</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='dim'>(debit)</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strikes</th>"
+                "<th>Debit</th><th>Max loss</th><th>Max profit</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Income: covered calls and cash-secured puts (issue #106)
+    for key, title in (("covered_calls", "Covered calls"),
+                       ("cash_secured_puts", "Cash-secured puts")):
+        items = list((res.get(key) or {}).items())
+        rows = []
+        for sym, r in items:
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{num(r.get('strike'), 0)}</td>"
+                f"<td class='num'>{money(r.get('premium_total'))}</td>"
+                f"<td class='num'>{money(r.get('max_profit_total'))}</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='dim'>(income)</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strike</th>"
+                "<th>Premium</th><th>Max profit</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Volatility: straddles and strangles (issue #106)
+    for key, title, warn in (
+            ("long_straddles", "Long straddles", False),
+            ("short_straddles", "Short straddles", True),
+            ("long_strangles", "Long strangles", False),
+            ("short_strangles", "Short strangles", True)):
+        items = list((res.get(key) or {}).items())
+        rows = []
+        for sym, r in items:
+            strike_info = (f"{num(r.get('strike'), 0)}" if r.get("strike")
+                           else f"{num(r.get('put_strike'), 0)}/{num(r.get('call_strike'), 0)}")
+            amt = r.get("debit_total") or r.get("credit_total")
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{strike_info}</td>"
+                f"<td class='num'>{money(amt)}</td>"
+                f"<td class='num'>{money(r.get('max_loss_total')) if r.get('max_loss_total') != float('inf') else 'UNDEFINED'}</td>"
+                f"<td>{'⚠️ UNDEFINED RISK' if warn else 'defined'}</td>"
+                "</tr>"
+            )
+        if items:
+            warn_tag = " <span class='badge bad'>UNDEFINED RISK</span>" if warn else ""
+            out.append(f"<h3>{title}{warn_tag}</h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strike(s)</th>"
+                "<th>Debit/Credit</th><th>Max loss</th><th>Risk</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Naked options (issue #106) - UNDEFINED RISK
+    for key, title in (("naked_puts", "Naked puts"),
+                       ("naked_calls", "Naked calls")):
+        items = list((res.get(key) or {}).items())
+        rows = []
+        for sym, r in items:
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{num(r.get('strike'), 0)}</td>"
+                f"<td class='num'>{money(r.get('credit_total'))}</td>"
+                f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+                f"<td>⚠️ UNDEFINED RISK</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='badge bad'>UNDEFINED RISK</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strike</th>"
+                "<th>Credit</th><th>Win%</th><th>Risk</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
+    # Ratio spreads (issue #106) - UNDEFINED RISK
+    for key, title in (("call_ratio_spreads", "Call ratio spreads"),
+                       ("put_ratio_spreads", "Put ratio spreads")):
+        items = list((res.get(key) or {}).items())
+        rows = []
+        for sym, r in items:
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{num(r.get('short_strike'), 0)}/{num(r.get('long_strike'), 0)} x{r.get('ratio')}</td>"
+                f"<td class='num'>{money(r.get('credit_total'))}</td>"
+                f"<td>⚠️ UNDEFINED RISK</td>"
+                "</tr>"
+            )
+        if items:
+            out.append(f"<h3>{title} <span class='badge bad'>UNDEFINED RISK</span></h3>")
+            out.append(
+                '<div class="tbl-wrap"><table><thead><tr>'
+                "<th>Sym</th><th>Exp</th><th>Strikes</th>"
+                "<th>Credit</th><th>Risk</th>"
+                "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>"
+            )
+
     # readout lines not tied to a symbol still get shown
     ac_rows, ac_syms = asym_condor_rows(data, asof, readout)
     if ac_rows:
