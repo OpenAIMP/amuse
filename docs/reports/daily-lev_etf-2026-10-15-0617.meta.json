@@ -1,0 +1,22 @@
+{
+ "id": "daily-lev_etf-2026-10-15-0617",
+ "type": "daily",
+ "date": "lev_etf-2026-10-15-0617",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 lev_etf-2026-10-15-0617",
+ "blurb": "2 bull puts, 1 condor, 1 asym condor; Decision unavailable; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 0,
+  "stock_qualified": 0,
+  "stock_rejected": 29,
+  "stock_incomplete_data": 0,
+  "stock_errors": 0,
+  "bull_puts": 2,
+  "iron_condors": 1,
+  "asym_condors": 1,
+  "pmcc_pairs": 0,
+  "decision": "not supplied",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "lev_etf",
+ "source_detail": "29 names"
+}
