@@ -71,11 +71,50 @@ _apply_gates()
 GREEKS_BATCH = 40             # implementation setting, not a verified service limit
 REJECT_EARNINGS = True        # earnings inside the spread window rejects it
 REQUIRE_EARNINGS_DATE = False  # True = unknown earnings date also rejects
+
+# Issue #3: data policy - per-field eligibility states
+# required: must be present and valid for trade-ready designation
+# optional: nice to have, missing = flagged but not blocked
+# unavailable: source doesn't provide it (e.g., historical IV)
+# stale: present but older than freshness threshold
+# invalid: present but fails validation
+DATA_POLICY = {
+    "earnings_date": {
+        "state": "required",
+        "on_missing": "research_only",  # allowed for research, blocked for trade-ready
+        "note": "Missing earnings date -> candidate flagged 'earnings date unknown', "
+                "trade-ready designation blocked unless REQUIRE_EARNINGS_DATE=False "
+                "(then allowed with flag per legacy behavior)",
+    },
+    "option_quote": {
+        "state": "required",
+        "on_missing": "reject",
+        "note": "Missing bid/ask -> structure cannot be priced, rejected",
+    },
+    "delta": {
+        "state": "required",
+        "on_missing": "reject",
+        "note": "Missing delta -> cannot assess probability, rejected",
+    },
+    "iv_rank": {
+        "state": "optional",
+        "on_missing": "flag",
+        "note": "Missing IV rank -> vol decision shows NO_READ, not blocked",
+    },
+    "historical_iv": {
+        "state": "unavailable",
+        "on_missing": "n/a",
+        "note": "MCP has no historical IV; vol regime uses 30-day snapshot accumulation",
+    },
+}
 import os as _os
 _EVENTS_DEFAULT = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "earnings_dates.json")
 EVENTS_FILE = _EVENTS_DEFAULT if _os.path.exists(_EVENTS_DEFAULT) else None  # curated earnings dates (#33)
 
 RUN_DATE = datetime.now(ZoneInfo("America/New_York")).date()
+# Issue #4: immutable run ID for traceability
+import uuid
+RUN_ID = f"{RUN_DATE.isoformat()}-{uuid.uuid4().hex[:8]}"
 RUN_TS = datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds")
 
 
@@ -1569,27 +1608,7 @@ def main():
         quote_error = f"MCP error: batch underlying quotes failed: {e}"
         print(quote_error, file=sys.stderr)
 
-    bull_puts = []
-    bear_calls = []
-    bull_calls = []
-    bear_puts = []
-    cal_calls = []
-    cal_puts = []
-    lpb_list = []
-    lcb_list = []
-    cc_list = []
-    csp_list = []
-    ls_list = []
-    ss_list = []
-    lsg_list = []
-    ssg_list = []
-    naked_puts = []
-    naked_calls = []
-    ratio_calls = []
-    ratio_puts = []
-    condors = []
-    butterflies = []
-    asym_condors = []
+    bull_puts, bear_calls, bull_calls, bear_puts, cal_calls, cal_puts, lpb_list, lcb_list, cc_list, csp_list, ls_list, ss_list, lsg_list, ssg_list, naked_puts, naked_calls, ratio_calls, ratio_puts, condors, butterflies, asym_condors, ratio_calls, ratio_puts = [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     stock_notes, diagnostics = {}, {}
     screened = []
     vol_veto_total = 0
@@ -1951,7 +1970,7 @@ def main():
                     "vol": r.get("vol"),
                 }
         with open(args.json_out, "w") as f:
-            json.dump({"asof": RUN_DATE.isoformat(), "results": best,
+            json.dump({"asof": RUN_DATE.isoformat(), "run_id": RUN_ID, "results": best,
                        "diagnostics": diagnostics,
                        "screened": screened,
                        "qualification_counts": qualification_counts(screened),
