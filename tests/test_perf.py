@@ -233,6 +233,50 @@ class TestSpreadThreading(unittest.TestCase):
         # bear-call wing also qualifies -> iron condor built
         self.assertEqual(len(r["ic"]), 1)
 
+    def test_screen_spreads_sym_uses_numeric_strikes_for_long_butterflies(self):
+        sp = self.sp
+        # The chain maps are keyed by OSI strings. Three strikes per side
+        # exercise the butterfly loops that previously subtracted those keys.
+        self.fake.puts.append((100.0, -0.50, 2.50, 2.60))
+        self.fake.call_contracts.append((100.0, 0.50, 2.50, 2.60))
+
+        r = sp.screen_spreads_sym("XOM", {"XOM": 100.0}, 5.0, {},
+                                  "/tmp/none.jsonl", True)
+
+        self.assertIsNone(r["error"], r)
+        self.assertEqual(r["lpb"][0]["strikes"], [90.0, 95.0, 100.0])
+        self.assertEqual(r["lcb"][0]["strikes"], [100.0, 105.0, 110.0])
+
+    def test_main_fails_and_keeps_traceback_for_unexpected_symbol_error(self):
+        import contextlib
+        import io
+        import tempfile
+        from unittest.mock import patch
+        import spread_screener as sp
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output = _os.path.join(tmp, "spread-screen.json")
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with patch.object(_sys, "argv", ["spread_screener.py", "--names", "AAA",
+                                              "--no-vol", "--json-out", output]), \
+                    patch.object(sp, "quotes", return_value={"AAA": 100.0}), \
+                    patch.object(sp, "screen_spreads_sym",
+                                 side_effect=TypeError("string strike subtraction")), \
+                    contextlib.redirect_stdout(stdout), \
+                    contextlib.redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as raised:
+                    sp.main()
+
+            self.assertEqual(raised.exception.code, 1)
+            self.assertIn("failed for 1 of 1 symbols", stderr.getvalue())
+            self.assertIn("Traceback (most recent call last)", stderr.getvalue())
+            with open(output, encoding="utf-8") as f:
+                result = json.load(f)
+            diagnostic = result["diagnostics"]["AAA"]
+            self.assertIn("TypeError", diagnostic["error"])
+            self.assertIn("Traceback (most recent call last)",
+                          diagnostic["traceback"])
+
     def test_threaded_merge_matches(self):
         import concurrent.futures
         sp = self.sp
