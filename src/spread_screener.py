@@ -27,6 +27,7 @@ import os
 import math
 import re
 import sys
+import traceback
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -1654,7 +1655,8 @@ def main():
                           "rejs": {"bull_put": {}, "bear_call": {},
                                    "iron_condor": {}, "asym_condor": {}},
                           "vol_veto": 0,
-                          "error": f"unexpected error: {type(e).__name__}: {e}"})
+                          "error": f"unexpected error: {type(e).__name__}: {e}",
+                          "traceback": traceback.format_exc()})
 
     # Thread pool over names (issue #14). Merge in submission order in the
     # main thread: no shared-state locks, deterministic output.
@@ -1666,7 +1668,8 @@ def main():
         diagnostics[sym] = {"considered": r.get("considered", []),
                             "chain": r.get("chain", []),
                             "notes": stock_notes[sym],
-                            "error": r.get("error")}
+                            "error": r.get("error"),
+                            "traceback": r.get("traceback")}
         accepted_count = len(r["bp"]) + len(r["ic"]) + len(r["ac"])
         if r["error"]:
             screened.append(evaluation_record({"symbol": sym}, error=r["error"]))
@@ -2000,6 +2003,17 @@ def main():
                        "qualification_counts": qualification_counts(screened),
                        "readout": readout}, f, indent=1)
         print(f"\nwrote {args.json_out}", file=sys.stderr)
+
+    unexpected = [(sym, r.get("error"), r.get("traceback"))
+                  for sym, r in results if r.get("error")]
+    if unexpected:
+        print(f"Spread screening failed for {len(unexpected)} of {len(names)} "
+              "symbols; this run is incomplete.", file=sys.stderr)
+        for sym, error, stack in unexpected:
+            print(f"\n[{sym}] {error}", file=sys.stderr)
+            if stack:
+                print(stack.rstrip(), file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
