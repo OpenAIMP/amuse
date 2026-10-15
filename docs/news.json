@@ -1,41 +1,35 @@
 {
- "fetched_at": "2026-10-15T06:36:30+00:00",
+ "fetched_at": "2026-10-15T10:37:30+00:00",
  "headlines": [
   {
-   "title": "S&P 500 futures fall ahead of more U.S. economic data; South Korea's Kospi slides 7%: Live updates",
-   "link": "https://news.google.com/rss/articles/CBMid0FVX3lxTE9pUGoyb2Q2c1FvdW5RZUNXMGQ4Vk55SWZ1RGlEZ2xocGYwZkRlbGU5WUtNNzB0N1ZUdUxGank2bFFkcUpwVWtYcTNLUUhLUG12SUVpX0txZkdiamtWZXB0SHVQLW83dUM0cFI4YnpScHdmVmE3SjVv0gF8QVVfeXFMTnI4TmlaWHJ3endjbXZvUXlYOHRhV3lyb1lvNjNrYnVDVmYwUmxxQ0M4Vm42WDR2WUxZWE5CRnRhaExSY1prYkNlOUNId3R6akpzcUdlUUxfZmEzdFZCZnc4bjAwZDhYVnpVR1lBMTNHa0JGREd3NUQtaDlUeA?oc=5",
-   "published": "Thu, 15 Oct 2026 06:27:00 GMT",
+   "title": "S&P 500 drops 1%, dragged down by hot inflation data and sell-off in AI-related stocks",
+   "link": "https://news.google.com/rss/articles/CBMieEFVX3lxTFA5LXlOZnZiVWJqSnQ2TzM5RmJkamRlQ0dDeFQ3QjVMOVB6TFFUaENwSGJsOEk5enQwRVRPSUN6cGlDNldmXzdTX3ZLYmpiZFJaWW9WbFF1RUZYRjhuMk5NZ0lWa0JtREEyM2ZXV3R3cU9KWDVwYk9UbNIBfkFVX3lxTFBuUXFxSkctRkxsaWZMQ1ZEUzNLaDlwMHZzMjlfcW5wdmpTbklYcU45bks5WmY0SUJvdWlTWERCd1NHUUwwcjNJQ2V2ZkUxZGtWem16cmU4VXNVdnpqUnR5MzZkQVBsTnlBWmh1bDJ3THRyQVZfd3Y0aHptTER4Zw?oc=5",
+   "published": "Thu, 15 Oct 2026 07:16:10 GMT",
    "source": "CNBC"
   },
   {
-   "title": "Stock market today: Hot inflation report drops tech, drives S&P 500, Dow and Nasdaq down",
-   "link": "https://news.google.com/rss/articles/CBMiygFBVV95cUxNd1dyS0JCRnFXYVM3dS00OUFGc2EzdV9pRm0yR3M3TndxOF84SE5iN3BNcmN1UWpnWVFBVmhTVHhNekczM3FKSVNZUUdXLWZGanM3c09sMDFFa3dPV2VoMUJUekhYaC1FZlAyclBSQVhIV1c3c3dsUUZCV09RWkFUSHJZRVNkOG5kQXV4eTNlTFhnVXhzWElwU0pVYlpKUUNucEplSWNHdzRSbDFSbFJuYi1UWkRiT3U5VUotYUM1cUhKMnVuTndydnR3?oc=5",
-   "published": "Wed, 14 Oct 2026 20:43:14 GMT",
+   "title": "Stock Market Today: Dow seen steady while S&P 500 to fall, Nasdaq to sputter on worries over Anthropic's growth; PPI data on tap",
+   "link": "https://news.google.com/rss/articles/CBMixgFBVV95cUxQem16UFhoRWMtTXFaVlg3emJLd2c3eUJkeFBWZU94dk8yczZCeGRoVEpLNEhRaDV0NmJ0d1N2UnJrWGd2SXhQdkVrNGx0RHVTdTZzUVlRcHdHeFNWVlZXa3RGS2pZOTQ5c2hvSTZwTy1NWnFmdVktb2VQRnBZR2dXRjNWZFJ1TkMtMEtxQWRqSHBxRkZNX0g0Z1NQVG1DakMwZnk0czBMSkUyeGxRMnZXVnRaNW9XMFBsNzRPY1hhclNjQXVUTEE?oc=5",
+   "published": "Thu, 15 Oct 2026 09:05:00 GMT",
+   "source": "MarketWatch"
+  },
+  {
+   "title": "US Stock Market Today: S&P 500 Futures Edge Up On Energy Driven Inflation Focus",
+   "link": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOb0xNMXVUZnFPOUR2ZGxGX2VHS3VPbndReVBBTXNreHZFM0tBcmtJZDhrTFJTSmlvMm1zTkVfQkdEa3RxdVFhUEs3aUY1YjFlRGhVamJzWjlzU2x4blFlWTc1S3Z3cDVtTjNhWEJTaXVjRnZpZmUzaThPdW84S29QUUhhcVRXR2R2b2VtM3hZczZWZw?oc=5",
+   "published": "Thu, 15 Oct 2026 08:12:03 GMT",
    "source": "Yahoo Finance"
   },
   {
-   "title": "The S&P 500 Just Hit a Record High. Here's Why History Says It's Still a Smart Time to Invest.",
-   "link": "https://news.google.com/rss/articles/CBMimAFBVV95cUxOQ2piZ1VlM2pKYVpUOUJGdFZQaDRJUmpLcXM3UDgyN0JsMjRLNVNJbXZLLUUwdUpQay1VU0UydkE0ZDlUcVNxSVV5THE2X0ZBM0VrRTlJUE5nUGNSS3B5c0NheE5JTkZadTRtZWswalUtRWIzN3BKSS15T3ljb2tEZnNPaDFMRDlodlF3NlppdU5aWjBUd2o0dg?oc=5",
-   "published": "Wed, 14 Oct 2026 06:00:00 GMT",
-   "source": "The Motley Fool"
+   "title": "Stock Market: Will S&P 500 Open Up or Down Today? - State Street SPDR S&P 500 ETF Trust (ARCA:SPY)",
+   "link": "https://news.google.com/rss/articles/CBMitwFBVV95cUxQYUhHc0ZXRjBqYWZYMGQteWJQV184RnZXOUU5WWphcHBVaVVoX3RTZS10LUFnNUtFRVp5OEVHd01GbDh2SV9RNHJSc2Z0S28tdDZYWldrZWFSYS1xUXFtWXBNM1JnU21SLWQwNTNSU0cyRTAtdWNvYXVnbFVRY1QzcGxPU2NGZUJ6STZVcFU3WlVCM2UxdEo2NE42ZlV4U0NhdGJoRGVNUVVxSkdmdG14UWxWSFpJQWM?oc=5",
+   "published": "Thu, 15 Oct 2026 06:16:08 GMT",
+   "source": "Benzinga"
   },
   {
-   "title": "No One Owns A Stock That Beat The S&P 500 Every Year",
-   "link": "https://news.google.com/rss/articles/CBMinAFBVV95cUxQVVF4dndERTlvQ19JQVFXUzBYUnJINjNXRVRETkpnMmUxY2VaLTh4elBoZG45R2RQejdNZ29yZWttQ05qTl9SaEwwZnhjdUhaNVpFNm40Z0FXSXRSLWdodGFScC0wbmlFSnotd1cyejZZMzk2Xzh5SE0wV0lfMThFMUZwN3Z6cVVKeEpYN0dDOGduTkpnYVVCSVUzNmw?oc=5",
-   "published": "Wed, 14 Oct 2026 12:00:00 GMT",
-   "source": "Investor's Business Daily"
-  },
-  {
-   "title": "Three Weeks Before The Midterms, Donald Trump Has A Stock Market Problem Hiding In Plain Sight. The Stealth Bear Market Is Already Here",
-   "link": "https://news.google.com/rss/articles/CBMiiAJBVV95cUxQdXR1RmJLRXd6TDJGQWNMYngydWE0c2NNVDRiVWdWd1BTWmtrcHBFRElmamVSSnFNU3JSZy1lUU1qX3hKWTJrbktGbHh1djdjUlI0bG5LLVdlVll2U1dyZTFvR0RCM3VrbVRzb0xRZ1k0WmxBVkFDZXBHQzFjVzhNOWprajZBMUlHZHFaNk5DYWFtSzFxT1gxMkRWMEV3aUNoOWNsMUtXQTJKQ2Z4SGdTeWhPYmh5WUgwaDhrZ2tWVEhCczFfdlFfQS1sbjQ5aVg1QW43TkliRUFlTVZFbEgyVzc2WGZabTlWT2NEYXZQU0hiaURWUGVRWVFQY21GaHBFcTlCN3ZhUUg?oc=5",
-   "published": "Wed, 14 Oct 2026 08:38:00 GMT",
-   "source": "24/7 Wall St."
-  },
-  {
-   "title": "Fed minutes: Another rate hike likely coming this year to combat persistent inflation",
-   "link": "https://news.google.com/rss/articles/CBMipAFBVV95cUxNMVBLVEgwejNoSlowajFhT0ZuSTN4UVk5Ui1Ea3dZWUZjR0lWbVNaY3IzTkU5Q2VfQUpOZHRVajNPYUJ6OTBva0E2VzJCVFZTWjgwUEJBMTN5YmE5SGhxeTlRTEVoM3RIak1MVEN5cVNwUVJ6LXpfQnlMNDhsMUh4YjlBTzhMNnM0WjktaGxmVGtEUkpObEVDdGpMUTdYb3VnaWNNMg?oc=5",
-   "published": "Sun, 11 Oct 2026 17:27:05 GMT",
-   "source": "ABC7 Los Angeles"
+   "title": "US Stock Market Today: S&P 500 Futures Edge Up On Energy Driven Inflation Test",
+   "link": "https://news.google.com/rss/articles/CBMixwFBVV95cUxNSDI5UXpCWnZQLWd2Nl9HalAzQzNFZVpseTEzeDc0S2NEN3dacGQ3a0dXdDN1MHdtRW9EUlJqWWlnaS02WTg2c3RlbnpHS2IxcmZiemh4cXRRamxQT1FSUlpKWVhCLURHWThnejVNLWhjSHhjQWdrbDkxN1dqRzhQQTF5el9yNWtGOGpydmRNY09tZ0JjRGM4WEZlTXY3bkNrUWJyMGpSWHdsUERCam52X2t6OUUwT2JQU1hzQjJsa0FKM05WYVo40gHMAUFVX3lxTFBzNG42VzB4WG05MTFBSS1LanlSVTVwX09uSFM3Rm0zblBrUllBdVg4dk9aMzY0S3JMX3AydnFlOTRjeldKQkFVYW9yM3lQbUp5YzhPd25scUdnT3VCa2I5cnlMa3ljekl3V0Z6VmpJWWNJQWN2MGV5d2NhOEVlNkxPRmRFQVE1cFowTTJzOVFJc2xFMmcwMW1ZaGVoVmdNU1QzbFlkNUFwM1VpckJqVmdqTkJjNjZtbElQem5WUnFiY1hvRy1yNnJKbjQxeA?oc=5",
+   "published": "Thu, 15 Oct 2026 08:37:39 GMT",
+   "source": "Simply Wall Street"
   },
   {
    "title": "EXCLUSIVE: Fed's Daly says rate hikes likely needed, but not urgently",
@@ -50,16 +44,22 @@
    "source": "Yahoo Finance"
   },
   {
+   "title": "One More U.S. Interest-Rate Increase May Be Appropriate, Fed\u2019s Williams Says",
+   "link": "https://news.google.com/rss/articles/CBMixAFBVV95cUxPSW1RS05MdnMwMjY4RW1VR0dhSkw0dUpSdkp6NFBFcllqMTdmcVpqZkZhbEx3ZWZSMnR3UVYzbTZVUEZkUVFOUWxMWFpzZDZ0SkxZOTBnYVVJNWFMTGZkd3IxaFBobG1JV2tmSm8yQTVqNm5rSDhwMEpPbVBQejFWM0VzR2ZOMmJ6YU5RR0RyeHF4LUZBb3ZfQkJpczVKd01yRFBpcXV1UWh3ZC11ajM4VjdjdHZxaFlfMFpTRmxEOTV0RWNG?oc=5",
+   "published": "Tue, 13 Oct 2026 20:07:00 GMT",
+   "source": "WSJ"
+  },
+  {
    "title": "What to expect at the next Fed meeting now that rate-hike odds are rising",
    "link": "https://news.google.com/rss/articles/CBMixwFBVV95cUxNSjlTcGhWTmRxZXNLdlJwRENqLXZkLVlBWDRad1dUQkRHaWZEa3VhZDFPZEprRFdNT2l5TFJJVl9YbFlBUXpZVElfemsxc0diREhzZnBTTmdrYms2WHBCa0dIRG9QRngxZEFyUm11UTNyQmhyMWRhQmljTzNMaDM4Ykd4OTE5TnJoVVJHb3IzMUFtbHZuV21ycHpYZDhTQ0hCTlEweDk4bnQzWUViVnpwM2JJNUlrNzE1VmxiNXp6VnB4UlNXeDRB?oc=5",
    "published": "Wed, 14 Oct 2026 19:04:00 GMT",
    "source": "MarketWatch"
   },
   {
-   "title": "One More U.S. Interest-Rate Increase May Be Appropriate, Fed\u2019s Williams Says",
-   "link": "https://news.google.com/rss/articles/CBMixAFBVV95cUxPSW1RS05MdnMwMjY4RW1VR0dhSkw0dUpSdkp6NFBFcllqMTdmcVpqZkZhbEx3ZWZSMnR3UVYzbTZVUEZkUVFOUWxMWFpzZDZ0SkxZOTBnYVVJNWFMTGZkd3IxaFBobG1JV2tmSm8yQTVqNm5rSDhwMEpPbVBQejFWM0VzR2ZOMmJ6YU5RR0RyeHF4LUZBb3ZfQkJpczVKd01yRFBpcXV1UWh3ZC11ajM4VjdjdHZxaFlfMFpTRmxEOTV0RWNG?oc=5",
-   "published": "Tue, 13 Oct 2026 20:07:00 GMT",
-   "source": "WSJ"
+   "title": "Fed rate hike call seen tight as inflation heats up",
+   "link": "https://news.google.com/rss/articles/CBMinwFBVV95cUxPMjl1ZWZGd2lIRXg1US1hUjNacTVDN2o5S2lIcXpCdnZ1VHBXcEpqOHV5SzJJZHJrT3RxYjdrRjRrRU03eHNGTTFRMnVCVEdZa0VfLU9BeFdSeTE1aFRrc3ZRampyOFVTczZRbWk0azFBakVndUJ1X0NjVmJmV1JmeXNXSlFkNzF0NUZKTUUyUnlHWi1sOXFpVHV5NnVvcDA?oc=5",
+   "published": "Wed, 14 Oct 2026 14:22:26 GMT",
+   "source": "Reuters"
   }
  ]
 }
