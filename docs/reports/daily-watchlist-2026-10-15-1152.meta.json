@@ -1,0 +1,24 @@
+{
+ "id": "daily-watchlist-2026-10-15-1152",
+ "type": "daily",
+ "date": "2026-10-15-1152",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-15-1152",
+ "blurb": "AMGN 30.9 leads; Decision: NO TRADE: no candidate cleared the decision gates; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 10,
+  "stock_qualified": 10,
+  "stock_rejected": 87,
+  "stock_incomplete_data": 4,
+  "stock_errors": 0,
+  "bull_puts": 0,
+  "iron_condors": 0,
+  "asym_condors": 0,
+  "pmcc_pairs": 0,
+  "decision_candidates": 0,
+  "recommendation": "NO TRADE",
+  "Kelly": "UNSIZED",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "watchlist",
+ "source_detail": "101 names"
+}
