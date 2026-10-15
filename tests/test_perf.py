@@ -19,9 +19,7 @@ _os.environ.setdefault("PUBLIC_ACCOUNT_ID", "TEST")
 import concurrent.futures
 import json
 import unittest
-from datetime import date, datetime, time as wall_time, timedelta
-from unittest.mock import patch
-from zoneinfo import ZoneInfo
+from datetime import date, timedelta
 
 import premarket_screen as dt
 import mcp_client
@@ -90,26 +88,27 @@ class TestBatching(unittest.TestCase):
         self.assertEqual(self.fake.count("get_quotes"), 1)
 
     def test_screen_one_uses_quote_map(self):
-        et = ZoneInfo("America/New_York")
-        test_date = date.today()
-        now_et = datetime.combine(test_date, wall_time(15, 0), et)
-        prior_close = _daily_bars()[-1]["close"]
-        quote = prior_close * 1.03
-        intraday = [{
-            "ts": now_et - timedelta(minutes=15),
-            "open": quote,
-            "high": quote * 1.01,
-            "low": quote * 0.99,
-            "close": quote,
-            "volume": 60_000,
-        }]
-        with patch.object(dt, "RUN_DT_ET", now_et), \
-                patch.object(dt, "RUN_DATE_ET", test_date), \
-                patch.object(dt, "intraday_bars", return_value=(intraday, None)):
-            res, reasons = dt.screen_one(
-                "AAA", {"AAA": quote}, mode="opening_range")
+        # Pin run time to mid-session so the time-normalized volume check
+        # is deterministic (CI runs at 1am ET, before the open).
+        # Use mode="opening_range" to exercise the regular-session volume gate.
+        # The quote price is set to 3% above the actual prior close (which
+        # includes the sine-wave oscillation from _daily_bars).
+        import datetime as _dt
+        _orig = dt.RUN_DT_ET
+        try:
+            dt.RUN_DT_ET = _dt.datetime.now(_dt.timezone.utc).astimezone(
+                _dt.timezone(_dt.timedelta(hours=-4))).replace(
+                hour=11, minute=0, second=0, microsecond=0)
+            # Get actual prior close from the fake bars
+            bars = _daily_bars()
+            prior_close = bars[-1]["close"]
+            quote_price = prior_close * 1.03  # 3% gap, passes 2% minimum
+            res, reasons = dt.screen_one("AAA", {"AAA": quote_price}, mode="opening_range")
+        finally:
+            dt.RUN_DT_ET = _orig
         self.assertEqual(self.fake.count("get_quotes"), 0)
-        self.assertAlmostEqual(res["price"], quote)
+        self.assertAlmostEqual(res["price"], quote_price)
+        # gap = 3% >= 2% min; rel vol = 1.2M/1M = 1.2 < 1.5
         self.assertIn("regular-session volume below time-normalized minimum", reasons)
 
     def test_screen_one_falls_back_without_map(self):
