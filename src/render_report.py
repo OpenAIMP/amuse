@@ -1781,6 +1781,8 @@ def main():
                     help="path to decision_engine.py JSON output")
     ap.add_argument("--portfolio-risk", default=None,
                     help="path to portfolio_risk.py JSON output")
+    ap.add_argument("--hide-portfolio-risk", action="store_true",
+                    help="omit the portfolio-risk section when no risk input applies to this report")
     ap.add_argument("--report-id", default=None,
                     help="e.g. daily-nasdaq100-2026-10-13: write to docs/reports/<id>.html + .meta.json sidecar")
     ap.add_argument("--source", default=None,
@@ -1858,7 +1860,8 @@ def main():
         method=method_section(args.config),
         decision=decision_section(decision, show_missing=report_mode and bool(args.stock or args.spreads)),
         portfolio_risk=portfolio_risk_section(portfolio_risk,
-                                              show_missing=report_mode and bool(args.stock or args.spreads)),
+                                              show_missing=(report_mode and bool(args.stock or args.spreads)
+                                                            and not args.hide_portfolio_risk)),
         stock=stock_html,
         spreads=spreads_html,
         premarket=premarket_html,
