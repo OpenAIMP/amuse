@@ -174,8 +174,9 @@ jobs:
 
       - name: Fetch market news
         run: |
-          LEV_ETF_NAMES="$(PYTHONPATH=src python3 -c "import universes; print(','.join(universes.UNIVERSES['lev_etf']))")"
-          python3 src/fetch_news.py --names "${WATCHLIST:+$WATCHLIST,}$LEV_ETF_NAMES" \
+          python3 src/fetch_news.py \
+            --reports reports/stock-screen.json reports/spread-screen.json \
+              reports/stock-levetf.json reports/spread-levetf.json \
             --out reports/news.json --market-out docs/news.json || true
 
       - name: Render lev-ETF report

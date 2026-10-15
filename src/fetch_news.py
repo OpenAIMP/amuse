@@ -20,12 +20,14 @@ import datetime
 import json
 import os
 import sys
+import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
 UA = {"User-Agent": "Mozilla/5.0 (compatible; amuse-news/1.0)"}
 TIMEOUT = 25
+MAX_RETRIES = 2
 
 MARKET_QUERIES = [
     "S&P 500 stock market",
@@ -64,14 +66,24 @@ def parse_rss(xml_text):
     return out
 
 
-def fetch(query):
+def fetch(query, retries=MAX_RETRIES):
     req = urllib.request.Request(rss_url(query), headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return parse_rss(r.read().decode("utf-8", "replace"))
-    except Exception as e:
-        print(f"news: query {query!r} failed: {e}", file=sys.stderr)
-        return []
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return parse_rss(r.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as e:
+            retryable = e.code in (429, 500, 502, 503, 504)
+            if not retryable or attempt == retries:
+                print(f"news: query {query!r} failed: {e}", file=sys.stderr)
+                return []
+        except (urllib.error.URLError, TimeoutError) as e:
+            if attempt == retries:
+                print(f"news: query {query!r} failed: {e}", file=sys.stderr)
+                return []
+        # Exponential backoff, capped to keep the whole workflow bounded.
+        time.sleep(min(2 ** attempt, 4))
+    return []
 
 
 def dedupe(headlines):
@@ -84,10 +96,39 @@ def dedupe(headlines):
     return out
 
 
+def symbols_from_reports(paths):
+    """Collect symbols that actually passed stock or spread screening."""
+    symbols = []
+
+    def add(symbol):
+        symbol = str(symbol or "").strip().upper()
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        for row in data.get("passing", []) or []:
+            if isinstance(row, dict):
+                add(row.get("symbol"))
+        results = data.get("results") or {}
+        if isinstance(results, dict):
+            for strategy_rows in results.values():
+                if isinstance(strategy_rows, dict):
+                    for symbol in strategy_rows:
+                        add(symbol)
+    return symbols
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", default="",
                     help="comma-separated tickers for per-ticker news")
+    ap.add_argument("--reports", nargs="*", default=[],
+                    help="screen JSON files; fetch ticker news only for passing candidates")
     ap.add_argument("--out", default="reports/news.json")
     ap.add_argument("--market-out", default="docs/news.json")
     a = ap.parse_args()
@@ -101,7 +142,11 @@ def main():
     market = dedupe(market)[: PER_QUERY * len(MARKET_QUERIES)]
 
     tickers = {}
-    for sym in [s.strip().upper() for s in a.names.split(",") if s.strip()]:
+    names = [s.strip().upper() for s in a.names.split(",") if s.strip()]
+    for sym in symbols_from_reports(a.reports):
+        if sym not in names:
+            names.append(sym)
+    for sym in names:
         heads = fetch(f"{sym} stock")[:PER_TICKER]
         if heads:
             tickers[sym] = heads
