@@ -278,7 +278,7 @@ jobs:
           python3 src/render_hub.py
           ls docs/index.html
 
-      - name: Publish dashboard to GitHub Pages
+      - name: Publish
         if: always()
         run: |
           git config user.name "github-actions[bot]"
@@ -287,6 +287,9 @@ jobs:
           # tracked file (API pushes land as 100644). Discard the flip so it
           # never blocks the rebase below.
           git checkout -- bin/public-mcp 2>/dev/null || true
+          git stash push -m "workflow working tree" || true
+          git pull --rebase --strategy-option=theirs
+          git stash pop || true          
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: update daily screen"
           # Fold in concurrent pushes (doc edits, other jobs). If the hub
