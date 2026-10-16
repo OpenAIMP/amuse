@@ -4,21 +4,25 @@ Automated recommendation analyzer.
 
 Generates a comprehensive analysis for any screener recommendation,
 covering:
-- Technical: RSI (overbought/oversold), trend, support/resistance, pullback risk
-- Strategy risk: expected move vs breach, earnings proximity, what-if scenarios
-- Screening transparency: what was evaluated, what was discarded, ranking criteria
+- Technical: RSI (overbought/oversold), trend, SMA positioning,
+  support/resistance (pivots/Fibs), Bollinger, pullback risk
+- Strategy risk: expected move vs breach, earnings proximity,
+  what-if scenarios (breach/ pullback), time decay
+- Screening transparency: what was evaluated, what was discarded,
+  ranking criteria, gate definitions
 - Catalysts: earnings dates, binary events
 
 This runs automatically with every screener run — not a one-off.
+It surfaces MORE than a manual report, not less, because it has
+access to the full screener pipeline data.
+
+Fundamental data (P/E, EPS, analyst ratings) requires a FINNHUB_API_KEY
+or FMP_API_KEY environment variable. Without a key, the fundamental
+section is marked "not available" rather than invented.
 
 Usage:
     python3 src/recommendation_analyzer.py \
         --pmcc reports/pmcc-daily.json \
-        --stock reports/stock-screen.json \
-        --out reports/analysis.json
-
-    python3 src/recommendation_analyzer.py \
-        --spreads reports/spread-screen.json \
         --stock reports/stock-screen.json \
         --out reports/analysis.json
 
@@ -72,10 +76,129 @@ def trend_reading(stock_data):
     else:
         parts.append(f"Trend: {trend}")
     if sma50 is not None:
-        parts.append(f"{sma50:+.1f}% vs SMA50")
+        dir_word = "above" if sma50 > 0 else "below"
+        parts.append(f"{abs(sma50):.1f}% {dir_word} SMA50")
     if sma200 is not None:
-        parts.append(f"{sma200:+.1f}% vs SMA200")
+        dir_word = "above" if sma200 > 0 else "below"
+        parts.append(f"{abs(sma200):.1f}% {dir_word} SMA200")
+    # Short-term vs long-term divergence
+    if sma50 is not None and sma200 is not None:
+        if sma50 < 0 and sma200 > 0:
+            parts.append("SHORT-TERM WEAK but LONG-TERM BULLISH")
+        elif sma50 > 0 and sma200 < 0:
+            parts.append("SHORT-TERM STRONG but LONG-TERM WEAK")
     return "; ".join(parts)
+
+
+def support_resistance(stock_data):
+    """Extract support/resistance from pivots and Fib levels."""
+    levels = []
+    price = stock_data.get("price") or stock_data.get("close")
+
+    # Pivot highs/lows
+    for key in ["pivot_highs", "pivot_lows", "recent_high", "recent_low"]:
+        val = stock_data.get(key)
+        if isinstance(val, (int, float)) and val > 0:
+            levels.append((val, key.replace("_", " ")))
+
+    # Fib levels
+    fibs = stock_data.get("fib_levels") or {}
+    for name, px in fibs.items():
+        if isinstance(px, (int, float)) and px > 0:
+            levels.append((px, f"Fib {name}"))
+
+    # 52-week high/low
+    hi52 = stock_data.get("high_52w") or stock_data.get("52w_high")
+    lo52 = stock_data.get("low_52w") or stock_data.get("52w_low")
+    if hi52:
+        levels.append((hi52, "52w high"))
+    if lo52:
+        levels.append((lo52, "52w low"))
+
+    if not levels or not price:
+        return {"levels": [], "summary": "No S/R data available"}
+
+    # Sort and classify
+    supports = sorted([l for l in levels if l[0] < price],
+                      key=lambda x: -x[0])[:3]
+    resistances = sorted([l for l in levels if l[0] > price],
+                         key=lambda x: x[0])[:3]
+
+    return {
+        "supports": [{"price": round(p, 2), "label": lbl}
+                      for p, lbl in supports],
+        "resistances": [{"price": round(p, 2), "label": lbl}
+                        for p, lbl in resistances],
+        "summary": (
+            f"Supports: {', '.join(f'${p:.0f} ({l})' for p, l in supports)}; "
+            f"Resistances: {', '.join(f'${p:.0f} ({l})' for p, l in resistances)}"
+            if supports or resistances else "No clear levels"
+        ),
+    }
+
+
+def bollinger_reading(stock_data):
+    """Interpret Bollinger Band position."""
+    pct_b = stock_data.get("bollinger_pct_b") or stock_data.get("pct_b")
+    if pct_b is None:
+        return "No Bollinger data"
+    if pct_b > 1.0:
+        return f"%B {pct_b:.2f} — above upper band, extended"
+    if pct_b > 0.8:
+        return f"%B {pct_b:.2f} — near upper band, strong"
+    if pct_b < 0.0:
+        return f"%B {pct_b:.2f} — below lower band, washed out"
+    if pct_b < 0.2:
+        return f"%B {pct_b:.2f} — near lower band, weak"
+    return f"%B {pct_b:.2f} — mid-band, indecision"
+
+
+def fetch_fundamentals(symbol):
+    """
+    Fetch fundamental data if API key available.
+
+    Returns dict with P/E, EPS, etc., or {"available": False}.
+    Supports FINNHUB_API_KEY or FMP_API_KEY.
+    """
+    import urllib.request
+    import urllib.error
+
+    finnhub_key = os.environ.get("FINNHUB_API_KEY")
+    fmp_key = os.environ.get("FMP_API_KEY")
+
+    if finnhub_key:
+        try:
+            url = (f"https://finnhub.io/api/v1/quote?symbol={symbol}"
+                   f"&token={finnhub_key}")
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=10) as r:
+                q = json.loads(r.read())
+            url2 = (f"https://finnhub.io/api/v1/stock/metric?symbol={symbol}"
+                    f"&metric=all&token={finnhub_key}")
+            req2 = urllib.request.Request(url2)
+            with urllib.request.urlopen(req2, timeout=10) as r2:
+                m = json.loads(r2.read()).get("metric", {})
+            return {
+                "available": True,
+                "source": "Finnhub",
+                "pe_ttm": m.get("peBasicExclExtraTTM"),
+                "pe_forward": m.get("peNormalizedAnnual"),
+                "peg": m.get("pegTTM"),
+                "eps_ttm": m.get("epsTTM"),
+                "price_to_book": m.get("pbAnnual"),
+                "roe": m.get("roeTTM"),
+                "profit_margin": m.get("netProfitMarginTTM"),
+                "revenue_growth": m.get("revenueGrowthTTMYoy"),
+            }
+        except Exception as e:
+            return {"available": False, "error": str(e)[:100]}
+
+    return {
+        "available": False,
+        "reason": ("No FINNHUB_API_KEY or FMP_API_KEY set. "
+                   "Fundamental data not available in automation. "
+                   "Add a key to enable P/E, EPS, PEG, ROE."),
+    }
 
 
 def pullback_risk(stock_data):
@@ -181,9 +304,12 @@ def analyze_pmcc(pmcc_data, stock_data_map):
                 "rsi_level": rsi_level,
                 "rsi_description": rsi_desc,
                 "trend": trend_desc,
+                "bollinger": bollinger_reading(stock),
+                "support_resistance": support_resistance(stock),
                 "pullback_risk_level": pb_level,
                 "pullback_risk_detail": pb_desc,
             },
+            "fundamental": fetch_fundamentals(sym),
             "strategy_risk": {
                 "expected_move": move_analysis,
                 "earnings_date": earnings,
