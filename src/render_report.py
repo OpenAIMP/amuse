@@ -1119,7 +1119,57 @@ def spread_tables(data):
     return section("Spread opportunities", "".join(out))
 
 
-def pmcc_section(data):
+def _pmcc_analysis_html(pmcc_data, stock_data):
+    """Generate automated comprehensive analysis for PMCC recommendations."""
+    if not pmcc_data or not pmcc_data.get("pairs"):
+        return ""
+    try:
+        import recommendation_analyzer as ra
+        stock_map = ra.build_stock_map(stock_data or {})
+        analysis = ra.analyze_pmcc(pmcc_data, stock_map)
+    except Exception:
+        return ""
+
+    parts = ['<h3>Recommendation Analysis (automated)</h3>']
+    parts.append(
+        f'<p class="sub">{analysis["summary"]["total_combinations_evaluated"]} '
+        f'combinations evaluated, {analysis["summary"]["qualifying_pairs"]} '
+        f'qualified. Analysis generated automatically with every run.</p>'
+    )
+    for rec in analysis["recommendations"][:5]:  # Top 5
+        t = rec["technical"]
+        sr = rec["strategy_risk"]
+        sc = rec["screening"]
+        parts.append(
+            f'<div class="card" style="margin:12px 0;padding:12px">'
+            f'<h4>{rec["symbol"]} {rec["long_strike"]}C / {rec["short_strike"]}C '
+            f'— P/D {rec["premium_to_debit_30d"]}%</h4>'
+            f'<p><strong>Technical:</strong> {t["rsi_description"]}; {t["trend"]}</p>'
+            f'<p><strong>Pullback risk:</strong> {t["pullback_risk_level"]} — '
+            f'{t["pullback_risk_detail"]}</p>'
+        )
+        exp = sr["expected_move"]
+        if "expected_30d_pct" in exp:
+            parts.append(
+                f'<p><strong>Expected move:</strong> ~{exp["expected_30d_pct"]}% '
+                f'(30d) vs {exp["breach_pct"]}% breach — {exp["risk"]}</p>'
+            )
+        if sr["earnings_date"]:
+            parts.append(
+                f'<p><strong>⚠️ Earnings:</strong> {sr["earnings_date"]} — '
+                f'in window, binary risk</p>'
+            )
+        parts.append(
+            f'<p class="sub"><strong>Screening:</strong> '
+            f'{sc["combinations_evaluated"]} combos evaluated, '
+            f'{sc["combinations_rejected"]} rejected. '
+            f'Ranked by {sc["ranking_criterion"]}.</p>'
+            f'</div>'
+        )
+    return "".join(parts)
+
+
+def pmcc_section(data, stock_data=None):
     if not data:
         return section("PMCC watch", '<p class="empty">No data yet — run the PMCC screen.</p>')
     pairs = data.get("pairs") or {}
@@ -1178,6 +1228,7 @@ def pmcc_section(data):
         + ("".join(rows) if rows else
            '<tr><td colspan="6" class="empty">No qualifiers — baseline set or nothing meeting entry gates.</td></tr>')
         + "</tbody></table></div>"
+        + _pmcc_analysis_html(data, stock_data)
     )
     return section("PMCC watch", body)
 
@@ -2156,7 +2207,7 @@ def main():
 
     stock_html = stock_section(stock) if (stock or not report_mode) else ""
     spreads_html = spread_tables(spreads) if (spreads or not report_mode) else ""
-    pmcc_html = pmcc_section(pmcc) if (pmcc or not report_mode) else ""
+    pmcc_html = pmcc_section(pmcc, stock) if (pmcc or not report_mode) else ""
     premarket_html = premarket_section(premarket, report_mode) if premarket else ""
     intraday_html = intraday_section(intraday, report_mode) if intraday else ""
     passing_syms = [p.get("symbol") for p in (stock or {}).get("passing", [])
