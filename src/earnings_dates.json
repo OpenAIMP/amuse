@@ -1,1 +1,6594 @@
-{"BAC":{"earnings":"2026-10-14"},"JNJ":{"earnings":"2026-10-13"},"JPM":{"earnings":"2026-10-13"},"TSM":{"earnings":"2026-10-15"},"_note":"Curated earnings dates for the screener's earnings-in-window reject rule (#33). Format: {\"SYM\": {\"earnings\": \"YYYY-MM-DD\"}}. Only add dates verified against company IR or major calendars. Unknown symbols keep the 'earnings date unknown' flag."}
+{
+  "AADX": {
+    "earnings": "2026-11-11"
+  },
+  "AAMI": {
+    "earnings": "2026-10-29"
+  },
+  "AAP": {
+    "earnings": "2026-10-29"
+  },
+  "AAPL": {
+    "earnings": "2026-11-02"
+  },
+  "AAT": {
+    "earnings": "2026-10-27"
+  },
+  "ABAT": {
+    "earnings": "2026-11-05"
+  },
+  "ABBV": {
+    "earnings": "2026-10-30"
+  },
+  "ABCB": {
+    "earnings": "2026-10-22"
+  },
+  "ABEO": {
+    "earnings": "2026-11-11"
+  },
+  "ABG": {
+    "earnings": "2026-10-27"
+  },
+  "ABNB": {
+    "earnings": "2026-11-05"
+  },
+  "ABOS": {
+    "earnings": "2026-11-11"
+  },
+  "ABR": {
+    "earnings": "2026-10-30"
+  },
+  "ABSI": {
+    "earnings": "2026-11-12"
+  },
+  "ABT": {
+    "earnings": "2026-10-21"
+  },
+  "ABUS": {
+    "earnings": "2026-11-12"
+  },
+  "ABX": {
+    "earnings": "2026-11-05"
+  },
+  "ACA": {
+    "earnings": "2026-10-29"
+  },
+  "ACAD": {
+    "earnings": "2026-11-04"
+  },
+  "ACCO": {
+    "earnings": "2026-10-29"
+  },
+  "ACDC": {
+    "earnings": "2026-11-09"
+  },
+  "ACEL": {
+    "earnings": "2026-11-03"
+  },
+  "ACGL": {
+    "earnings": "2026-10-27"
+  },
+  "ACH": {
+    "earnings": "2026-10-29"
+  },
+  "ACHC": {
+    "earnings": "2026-11-04"
+  },
+  "ACHR": {
+    "earnings": "2026-11-05"
+  },
+  "ACHV": {
+    "earnings": "2026-11-05"
+  },
+  "ACIC": {
+    "earnings": "2026-11-04"
+  },
+  "ACIW": {
+    "earnings": "2026-11-05"
+  },
+  "ACLS": {
+    "earnings": "2026-11-03"
+  },
+  "ACMR": {
+    "earnings": "2026-11-04"
+  },
+  "ACNB": {
+    "earnings": "2026-10-22"
+  },
+  "ACR": {
+    "earnings": "2026-11-04"
+  },
+  "ACRE": {
+    "earnings": "2026-11-06"
+  },
+  "ACRS": {
+    "earnings": "2026-11-05"
+  },
+  "ACT": {
+    "earnings": "2026-11-04"
+  },
+  "ACTG": {
+    "earnings": "2026-11-04"
+  },
+  "ACU": {
+    "earnings": "2026-10-20"
+  },
+  "ACVA": {
+    "earnings": "2026-11-04"
+  },
+  "ADAM": {
+    "earnings": "2026-11-04"
+  },
+  "ADCT": {
+    "earnings": "2026-11-09"
+  },
+  "ADEA": {
+    "earnings": "2026-11-02"
+  },
+  "ADM": {
+    "earnings": "2026-11-03"
+  },
+  "ADMA": {
+    "earnings": "2026-11-04"
+  },
+  "ADNT": {
+    "earnings": "2026-11-04"
+  },
+  "ADP": {
+    "earnings": "2026-10-28"
+  },
+  "ADPT": {
+    "earnings": "2026-11-04"
+  },
+  "ADTN": {
+    "earnings": "2026-11-02"
+  },
+  "ADUS": {
+    "earnings": "2026-11-03"
+  },
+  "ADV": {
+    "earnings": "2026-11-05"
+  },
+  "AEBI": {
+    "earnings": "2026-11-12"
+  },
+  "AEE": {
+    "earnings": "2026-11-04"
+  },
+  "AEHR": {
+    "earnings": "2026-11-02"
+  },
+  "AEP": {
+    "earnings": "2026-10-28"
+  },
+  "AES": {
+    "earnings": "2026-11-03"
+  },
+  "AESI": {
+    "earnings": "2026-11-02"
+  },
+  "AEVA": {
+    "earnings": "2026-11-04"
+  },
+  "AFL": {
+    "earnings": "2026-11-04"
+  },
+  "AGEN": {
+    "earnings": "2026-11-09"
+  },
+  "AGIO": {
+    "earnings": "2026-11-05"
+  },
+  "AGL": {
+    "earnings": "2026-11-04"
+  },
+  "AGM": {
+    "earnings": "2026-11-02"
+  },
+  "AGNT": {
+    "earnings": "2026-11-05"
+  },
+  "AGYS": {
+    "earnings": "2026-10-26"
+  },
+  "AHCO": {
+    "earnings": "2026-11-03"
+  },
+  "AHRT": {
+    "earnings": "2026-11-02"
+  },
+  "AIG": {
+    "earnings": "2026-11-03"
+  },
+  "AII": {
+    "earnings": "2026-11-10"
+  },
+  "AIN": {
+    "earnings": "2026-11-04"
+  },
+  "AIOT": {
+    "earnings": "2026-11-09"
+  },
+  "AIP": {
+    "earnings": "2026-11-03"
+  },
+  "AIRJ": {
+    "earnings": "2026-11-12"
+  },
+  "AIRO": {
+    "earnings": "2026-11-13"
+  },
+  "AIRS": {
+    "earnings": "2026-11-06"
+  },
+  "AIZ": {
+    "earnings": "2026-11-03"
+  },
+  "AJG": {
+    "earnings": "2026-10-29"
+  },
+  "AKAM": {
+    "earnings": "2026-11-05"
+  },
+  "AKBA": {
+    "earnings": "2026-11-09"
+  },
+  "AKR": {
+    "earnings": "2026-11-02"
+  },
+  "AKTS": {
+    "earnings": "2026-11-12"
+  },
+  "ALAB": {
+    "earnings": "2026-11-03"
+  },
+  "ALB": {
+    "earnings": "2026-11-04"
+  },
+  "ALEC": {
+    "earnings": "2026-11-05"
+  },
+  "ALG": {
+    "earnings": "2026-11-05"
+  },
+  "ALGN": {
+    "earnings": "2026-10-28"
+  },
+  "ALGT": {
+    "earnings": "2026-11-03"
+  },
+  "ALH": {
+    "earnings": "2026-11-12"
+  },
+  "ALHC": {
+    "earnings": "2026-10-29"
+  },
+  "ALKS": {
+    "earnings": "2026-10-27"
+  },
+  "ALKT": {
+    "earnings": "2026-10-28"
+  },
+  "ALL": {
+    "earnings": "2026-11-04"
+  },
+  "ALLE": {
+    "earnings": "2026-10-22"
+  },
+  "ALLO": {
+    "earnings": "2026-11-05"
+  },
+  "ALMR": {
+    "earnings": "2026-11-03"
+  },
+  "ALMS": {
+    "earnings": "2026-11-12"
+  },
+  "ALNT": {
+    "earnings": "2026-11-04"
+  },
+  "ALNY": {
+    "earnings": "2026-10-29"
+  },
+  "ALRM": {
+    "earnings": "2026-11-05"
+  },
+  "ALRS": {
+    "earnings": "2026-10-28"
+  },
+  "ALT": {
+    "earnings": "2026-11-05"
+  },
+  "ALTG": {
+    "earnings": "2026-11-05"
+  },
+  "ALTI": {
+    "earnings": "2026-11-11"
+  },
+  "ALTO": {
+    "earnings": "2026-11-04"
+  },
+  "ALX": {
+    "earnings": "2026-11-02"
+  },
+  "ALXO": {
+    "earnings": "2026-11-06"
+  },
+  "AMAL": {
+    "earnings": "2026-10-22"
+  },
+  "AMAT": {
+    "earnings": "2026-11-12"
+  },
+  "AMBP": {
+    "earnings": "2026-10-22"
+  },
+  "AMBQ": {
+    "earnings": "2026-11-05"
+  },
+  "AMC": {
+    "earnings": "2026-11-04"
+  },
+  "AMCR": {
+    "earnings": "2026-11-04"
+  },
+  "AMCX": {
+    "earnings": "2026-11-06"
+  },
+  "AMD": {
+    "earnings": "2026-11-03"
+  },
+  "AME": {
+    "earnings": "2026-10-29"
+  },
+  "AMGN": {
+    "earnings": "2026-11-03"
+  },
+  "AMLX": {
+    "earnings": "2026-11-05"
+  },
+  "AMN": {
+    "earnings": "2026-11-05"
+  },
+  "AMP": {
+    "earnings": "2026-10-29"
+  },
+  "AMPH": {
+    "earnings": "2026-11-05"
+  },
+  "AMPL": {
+    "earnings": "2026-11-04"
+  },
+  "AMPX": {
+    "earnings": "2026-11-05"
+  },
+  "AMPY": {
+    "earnings": "2026-11-04"
+  },
+  "AMR": {
+    "earnings": "2026-11-05"
+  },
+  "AMRC": {
+    "earnings": "2026-11-09"
+  },
+  "AMRX": {
+    "earnings": "2026-11-03"
+  },
+  "AMSC": {
+    "earnings": "2026-11-04"
+  },
+  "AMSF": {
+    "earnings": "2026-10-28"
+  },
+  "AMT": {
+    "earnings": "2026-10-27"
+  },
+  "AMTB": {
+    "earnings": "2026-10-22"
+  },
+  "AMTX": {
+    "earnings": "2026-11-05"
+  },
+  "AMZN": {
+    "earnings": "2026-10-29"
+  },
+  "ANAB": {
+    "earnings": "2026-11-03"
+  },
+  "ANDE": {
+    "earnings": "2026-11-03"
+  },
+  "ANET": {
+    "earnings": "2026-11-03"
+  },
+  "ANGI": {
+    "earnings": "2026-11-03"
+  },
+  "ANIK": {
+    "earnings": "2026-11-04"
+  },
+  "ANIP": {
+    "earnings": "2026-11-06"
+  },
+  "ANNX": {
+    "earnings": "2026-11-09"
+  },
+  "ANRO": {
+    "earnings": "2026-11-11"
+  },
+  "ANTX": {
+    "earnings": "2026-11-11"
+  },
+  "AOMR": {
+    "earnings": "2026-11-05"
+  },
+  "AON": {
+    "earnings": "2026-10-28"
+  },
+  "AORT": {
+    "earnings": "2026-11-05"
+  },
+  "AOS": {
+    "earnings": "2026-10-29"
+  },
+  "AOSL": {
+    "earnings": "2026-11-05"
+  },
+  "AP": {
+    "earnings": "2026-11-11"
+  },
+  "APA": {
+    "earnings": "2026-11-04"
+  },
+  "APAM": {
+    "earnings": "2026-10-27"
+  },
+  "APC": {
+    "earnings": "2026-11-05"
+  },
+  "APD": {
+    "earnings": "2026-11-05"
+  },
+  "APEI": {
+    "earnings": "2026-11-09"
+  },
+  "APH": {
+    "earnings": "2026-10-28"
+  },
+  "APLE": {
+    "earnings": "2026-11-05"
+  },
+  "APO": {
+    "earnings": "2026-11-03"
+  },
+  "APP": {
+    "earnings": "2026-11-04"
+  },
+  "APPN": {
+    "earnings": "2026-11-05"
+  },
+  "APPS": {
+    "earnings": "2026-11-03"
+  },
+  "APTV": {
+    "earnings": "2026-11-03"
+  },
+  "AQST": {
+    "earnings": "2026-11-04"
+  },
+  "ARCB": {
+    "earnings": "2026-11-04"
+  },
+  "ARCT": {
+    "earnings": "2026-11-09"
+  },
+  "ARDT": {
+    "earnings": "2026-11-11"
+  },
+  "ARDX": {
+    "earnings": "2026-10-29"
+  },
+  "ARE": {
+    "earnings": "2026-10-26"
+  },
+  "AREC": {
+    "earnings": "2026-11-13"
+  },
+  "ARES": {
+    "earnings": "2026-10-29"
+  },
+  "ARHS": {
+    "earnings": "2026-11-05"
+  },
+  "ARKO": {
+    "earnings": "2026-11-04"
+  },
+  "ARL": {
+    "earnings": "2026-11-05"
+  },
+  "ARLO": {
+    "earnings": "2026-11-05"
+  },
+  "ARM": {
+    "earnings": "2026-11-04"
+  },
+  "ARMP": {
+    "earnings": "2026-11-11"
+  },
+  "AROC": {
+    "earnings": "2026-10-27"
+  },
+  "AROW": {
+    "earnings": "2026-10-29"
+  },
+  "ARQT": {
+    "earnings": "2026-10-27"
+  },
+  "ARR": {
+    "earnings": "2026-10-28"
+  },
+  "ARRY": {
+    "earnings": "2026-11-04"
+  },
+  "ARTV": {
+    "earnings": "2026-11-11"
+  },
+  "ARVN": {
+    "earnings": "2026-11-04"
+  },
+  "ARX": {
+    "earnings": "2026-11-11"
+  },
+  "ASB": {
+    "earnings": "2026-10-22"
+  },
+  "ASC": {
+    "earnings": "2026-11-04"
+  },
+  "ASH": {
+    "earnings": "2026-11-03"
+  },
+  "ASIC": {
+    "earnings": "2026-10-21"
+  },
+  "ASIX": {
+    "earnings": "2026-11-04"
+  },
+  "ASLE": {
+    "earnings": "2026-11-05"
+  },
+  "ASMB": {
+    "earnings": "2026-11-09"
+  },
+  "ASPN": {
+    "earnings": "2026-11-05"
+  },
+  "ASST": {
+    "earnings": "2026-11-09"
+  },
+  "ASTE": {
+    "earnings": "2026-11-04"
+  },
+  "ASTH": {
+    "earnings": "2026-11-05"
+  },
+  "ASTS": {
+    "earnings": "2026-11-09"
+  },
+  "ASUR": {
+    "earnings": "2026-10-29"
+  },
+  "ATEC": {
+    "earnings": "2026-10-29"
+  },
+  "ATEN": {
+    "earnings": "2026-11-05"
+  },
+  "ATEX": {
+    "earnings": "2026-11-11"
+  },
+  "ATLC": {
+    "earnings": "2026-11-09"
+  },
+  "ATLO": {
+    "earnings": "2026-10-16"
+  },
+  "ATMU": {
+    "earnings": "2026-11-06"
+  },
+  "ATNI": {
+    "earnings": "2026-11-04"
+  },
+  "ATO": {
+    "earnings": "2026-11-04"
+  },
+  "ATOM": {
+    "earnings": "2026-10-27"
+  },
+  "ATRC": {
+    "earnings": "2026-11-03"
+  },
+  "ATRO": {
+    "earnings": "2026-11-03"
+  },
+  "AUB": {
+    "earnings": "2026-10-20"
+  },
+  "AUPH": {
+    "earnings": "2026-11-03"
+  },
+  "AURA": {
+    "earnings": "2026-11-12"
+  },
+  "AVA": {
+    "earnings": "2026-11-04"
+  },
+  "AVAH": {
+    "earnings": "2026-11-05"
+  },
+  "AVBC": {
+    "earnings": "2026-10-22"
+  },
+  "AVBH": {
+    "earnings": "2026-10-26"
+  },
+  "AVBP": {
+    "earnings": "2026-11-09"
+  },
+  "AVEX": {
+    "earnings": "2026-11-11"
+  },
+  "AVIR": {
+    "earnings": "2026-11-11"
+  },
+  "AVLN": {
+    "earnings": "2026-11-11"
+  },
+  "AVNT": {
+    "earnings": "2026-11-04"
+  },
+  "AVNW": {
+    "earnings": "2026-11-03"
+  },
+  "AVPT": {
+    "earnings": "2026-11-05"
+  },
+  "AVR": {
+    "earnings": "2026-11-11"
+  },
+  "AVTX": {
+    "earnings": "2026-11-05"
+  },
+  "AVY": {
+    "earnings": "2026-10-29"
+  },
+  "AWK": {
+    "earnings": "2026-10-28"
+  },
+  "AWR": {
+    "earnings": "2026-11-04"
+  },
+  "AX": {
+    "earnings": "2026-10-29"
+  },
+  "AXGN": {
+    "earnings": "2026-10-28"
+  },
+  "AXON": {
+    "earnings": "2026-11-03"
+  },
+  "AXP": {
+    "earnings": "2026-10-23"
+  },
+  "AXTI": {
+    "earnings": "2026-10-29"
+  },
+  "BA": {
+    "earnings": "2026-10-27"
+  },
+  "BAC": {
+    "earnings": "2026-10-14"
+  },
+  "BALL": {
+    "earnings": "2026-11-03"
+  },
+  "BALY": {
+    "earnings": "2026-11-11"
+  },
+  "BANC": {
+    "earnings": "2026-10-27"
+  },
+  "BAND": {
+    "earnings": "2026-10-29"
+  },
+  "BANF": {
+    "earnings": "2026-10-16"
+  },
+  "BANR": {
+    "earnings": "2026-10-21"
+  },
+  "BATRA": {
+    "earnings": "2026-11-04"
+  },
+  "BATRK": {
+    "earnings": "2026-11-04"
+  },
+  "BAX": {
+    "earnings": "2026-10-29"
+  },
+  "BBAI": {
+    "earnings": "2026-10-27"
+  },
+  "BBNX": {
+    "earnings": "2026-10-27"
+  },
+  "BBSI": {
+    "earnings": "2026-11-04"
+  },
+  "BBT": {
+    "earnings": "2026-10-21"
+  },
+  "BBUC": {
+    "earnings": "2026-11-05"
+  },
+  "BCAL": {
+    "earnings": "2026-10-27"
+  },
+  "BCAX": {
+    "earnings": "2026-11-09"
+  },
+  "BCBP": {
+    "earnings": "2026-10-26"
+  },
+  "BCC": {
+    "earnings": "2026-11-02"
+  },
+  "BCML": {
+    "earnings": "2026-10-22"
+  },
+  "BCO": {
+    "earnings": "2026-11-04"
+  },
+  "BCPC": {
+    "earnings": "2026-10-23"
+  },
+  "BCRX": {
+    "earnings": "2026-11-02"
+  },
+  "BDC": {
+    "earnings": "2026-10-29"
+  },
+  "BDN": {
+    "earnings": "2026-10-21"
+  },
+  "BDTX": {
+    "earnings": "2026-11-05"
+  },
+  "BDX": {
+    "earnings": "2026-11-05"
+  },
+  "BE": {
+    "earnings": "2026-10-22"
+  },
+  "BEAM": {
+    "earnings": "2026-11-03"
+  },
+  "BELFA": {
+    "earnings": "2026-11-04"
+  },
+  "BELFB": {
+    "earnings": "2026-11-04"
+  },
+  "BEN": {
+    "earnings": "2026-11-06"
+  },
+  "BETR": {
+    "earnings": "2026-11-12"
+  },
+  "BFC": {
+    "earnings": "2026-10-20"
+  },
+  "BFH": {
+    "earnings": "2026-10-22"
+  },
+  "BFLY": {
+    "earnings": "2026-10-29"
+  },
+  "BFS": {
+    "earnings": "2026-11-05"
+  },
+  "BFST": {
+    "earnings": "2026-10-26"
+  },
+  "BG": {
+    "earnings": "2026-10-29"
+  },
+  "BGC": {
+    "earnings": "2026-11-05"
+  },
+  "BGS": {
+    "earnings": "2026-11-04"
+  },
+  "BH": {
+    "earnings": "2026-11-06"
+  },
+  "BH.A": {
+    "earnings": "2026-11-06"
+  },
+  "BHB": {
+    "earnings": "2026-10-20"
+  },
+  "BHE": {
+    "earnings": "2026-11-03"
+  },
+  "BHR": {
+    "earnings": "2026-11-04"
+  },
+  "BHRB": {
+    "earnings": "2026-10-22"
+  },
+  "BHVN": {
+    "earnings": "2026-11-09"
+  },
+  "BIIB": {
+    "earnings": "2026-10-28"
+  },
+  "BIOA": {
+    "earnings": "2026-11-05"
+  },
+  "BJRI": {
+    "earnings": "2026-10-29"
+  },
+  "BKD": {
+    "earnings": "2026-11-05"
+  },
+  "BKH": {
+    "earnings": "2026-11-04"
+  },
+  "BKKT": {
+    "earnings": "2026-11-09"
+  },
+  "BKNG": {
+    "earnings": "2026-11-03"
+  },
+  "BKR": {
+    "earnings": "2026-10-27"
+  },
+  "BKSY": {
+    "earnings": "2026-11-05"
+  },
+  "BKTI": {
+    "earnings": "2026-11-05"
+  },
+  "BKU": {
+    "earnings": "2026-10-21"
+  },
+  "BKV": {
+    "earnings": "2026-11-09"
+  },
+  "BL": {
+    "earnings": "2026-11-05"
+  },
+  "BLKB": {
+    "earnings": "2026-10-28"
+  },
+  "BLMN": {
+    "earnings": "2026-11-05"
+  },
+  "BLND": {
+    "earnings": "2026-11-05"
+  },
+  "BLX": {
+    "earnings": "2026-10-26"
+  },
+  "BLZE": {
+    "earnings": "2026-11-02"
+  },
+  "BMBL": {
+    "earnings": "2026-11-04"
+  },
+  "BMI": {
+    "earnings": "2026-10-22"
+  },
+  "BMRC": {
+    "earnings": "2026-10-26"
+  },
+  "BMY": {
+    "earnings": "2026-10-29"
+  },
+  "BNL": {
+    "earnings": "2026-10-28"
+  },
+  "BNTC": {
+    "earnings": "2026-11-13"
+  },
+  "BNTX": {
+    "earnings": "2026-11-03"
+  },
+  "BOBS": {
+    "earnings": "2026-11-05"
+  },
+  "BOC": {
+    "earnings": "2026-11-12"
+  },
+  "BOH": {
+    "earnings": "2026-10-26"
+  },
+  "BOOT": {
+    "earnings": "2026-11-04"
+  },
+  "BORR": {
+    "earnings": "2026-11-04"
+  },
+  "BOW": {
+    "earnings": "2026-11-03"
+  },
+  "BPRN": {
+    "earnings": "2026-11-04"
+  },
+  "BR": {
+    "earnings": "2026-11-03"
+  },
+  "BRBS": {
+    "earnings": "2026-10-28"
+  },
+  "BRCB": {
+    "earnings": "2026-11-10"
+  },
+  "BRCC": {
+    "earnings": "2026-11-02"
+  },
+  "BRK.B": {
+    "earnings": "2026-11-06"
+  },
+  "BRO": {
+    "earnings": "2026-10-26"
+  },
+  "BRSL": {
+    "earnings": "2026-11-03"
+  },
+  "BRSP": {
+    "earnings": "2026-10-27"
+  },
+  "BRT": {
+    "earnings": "2026-11-05"
+  },
+  "BSRR": {
+    "earnings": "2026-10-26"
+  },
+  "BSX": {
+    "earnings": "2026-10-28"
+  },
+  "BTBT": {
+    "earnings": "2026-11-13"
+  },
+  "BTDR": {
+    "earnings": "2026-11-09"
+  },
+  "BTSG": {
+    "earnings": "2026-10-30"
+  },
+  "BTU": {
+    "earnings": "2026-10-29"
+  },
+  "BUR": {
+    "earnings": "2026-11-04"
+  },
+  "BUSE": {
+    "earnings": "2026-10-27"
+  },
+  "BVFL": {
+    "earnings": "2026-10-16"
+  },
+  "BVS": {
+    "earnings": "2026-11-03"
+  },
+  "BW": {
+    "earnings": "2026-11-03"
+  },
+  "BWB": {
+    "earnings": "2026-10-20"
+  },
+  "BWFG": {
+    "earnings": "2026-10-22"
+  },
+  "BWIN": {
+    "earnings": "2026-11-03"
+  },
+  "BWMN": {
+    "earnings": "2026-11-04"
+  },
+  "BX": {
+    "earnings": "2026-10-22"
+  },
+  "BXC": {
+    "earnings": "2026-11-03"
+  },
+  "BXDC": {
+    "earnings": "2026-11-03"
+  },
+  "BXMT": {
+    "earnings": "2026-10-29"
+  },
+  "BXP": {
+    "earnings": "2026-10-27"
+  },
+  "BY": {
+    "earnings": "2026-10-22"
+  },
+  "BZAI": {
+    "earnings": "2026-11-12"
+  },
+  "BZH": {
+    "earnings": "2026-11-12"
+  },
+  "CABA": {
+    "earnings": "2026-11-09"
+  },
+  "CABO": {
+    "earnings": "2026-11-05"
+  },
+  "CAC": {
+    "earnings": "2026-10-27"
+  },
+  "CADL": {
+    "earnings": "2026-11-12"
+  },
+  "CAH": {
+    "earnings": "2026-11-05"
+  },
+  "CAKE": {
+    "earnings": "2026-10-27"
+  },
+  "CALX": {
+    "earnings": "2026-11-02"
+  },
+  "CALY": {
+    "earnings": "2026-11-05"
+  },
+  "CAMP": {
+    "earnings": "2026-11-05"
+  },
+  "CAPR": {
+    "earnings": "2026-11-09"
+  },
+  "CARE": {
+    "earnings": "2026-10-22"
+  },
+  "CARG": {
+    "earnings": "2026-11-05"
+  },
+  "CARL": {
+    "earnings": "2026-11-05"
+  },
+  "CARR": {
+    "earnings": "2026-10-29"
+  },
+  "CARS": {
+    "earnings": "2026-11-05"
+  },
+  "CASH": {
+    "earnings": "2026-10-21"
+  },
+  "CASS": {
+    "earnings": "2026-10-22"
+  },
+  "CAT": {
+    "earnings": "2026-11-04"
+  },
+  "CATX": {
+    "earnings": "2026-11-09"
+  },
+  "CATY": {
+    "earnings": "2026-10-21"
+  },
+  "CB": {
+    "earnings": "2026-10-20"
+  },
+  "CBAN": {
+    "earnings": "2026-10-28"
+  },
+  "CBFV": {
+    "earnings": "2026-10-22"
+  },
+  "CBIO": {
+    "earnings": "2026-11-05"
+  },
+  "CBK": {
+    "earnings": "2026-10-26"
+  },
+  "CBL": {
+    "earnings": "2026-11-05"
+  },
+  "CBLL": {
+    "earnings": "2026-11-03"
+  },
+  "CBNA": {
+    "earnings": "2026-10-27"
+  },
+  "CBNK": {
+    "earnings": "2026-10-26"
+  },
+  "CBRE": {
+    "earnings": "2026-10-22"
+  },
+  "CBT": {
+    "earnings": "2026-11-02"
+  },
+  "CBU": {
+    "earnings": "2026-10-27"
+  },
+  "CBZ": {
+    "earnings": "2026-11-04"
+  },
+  "CC": {
+    "earnings": "2026-11-05"
+  },
+  "CCB": {
+    "earnings": "2026-11-04"
+  },
+  "CCBG": {
+    "earnings": "2026-10-20"
+  },
+  "CCCC": {
+    "earnings": "2026-11-05"
+  },
+  "CCI": {
+    "earnings": "2026-10-21"
+  },
+  "CCNE": {
+    "earnings": "2026-10-29"
+  },
+  "CCOI": {
+    "earnings": "2026-11-05"
+  },
+  "CCS": {
+    "earnings": "2026-10-28"
+  },
+  "CCSI": {
+    "earnings": "2026-11-05"
+  },
+  "CDNA": {
+    "earnings": "2026-11-03"
+  },
+  "CDNL": {
+    "earnings": "2026-11-10"
+  },
+  "CDNS": {
+    "earnings": "2026-10-26"
+  },
+  "CDP": {
+    "earnings": "2026-10-29"
+  },
+  "CDRE": {
+    "earnings": "2026-11-03"
+  },
+  "CDW": {
+    "earnings": "2026-11-03"
+  },
+  "CDXS": {
+    "earnings": "2026-11-05"
+  },
+  "CDZI": {
+    "earnings": "2026-11-12"
+  },
+  "CECO": {
+    "earnings": "2026-10-27"
+  },
+  "CEG": {
+    "earnings": "2026-11-06"
+  },
+  "CELC": {
+    "earnings": "2026-11-11"
+  },
+  "CENX": {
+    "earnings": "2026-11-05"
+  },
+  "CERS": {
+    "earnings": "2026-11-05"
+  },
+  "CERT": {
+    "earnings": "2026-11-05"
+  },
+  "CEVA": {
+    "earnings": "2026-11-09"
+  },
+  "CF": {
+    "earnings": "2026-11-04"
+  },
+  "CFBK": {
+    "earnings": "2026-11-02"
+  },
+  "CFFI": {
+    "earnings": "2026-10-22"
+  },
+  "CFFN": {
+    "earnings": "2026-11-04"
+  },
+  "CFG": {
+    "earnings": "2026-10-16"
+  },
+  "CGEM": {
+    "earnings": "2026-11-05"
+  },
+  "CGON": {
+    "earnings": "2026-11-13"
+  },
+  "CHCI": {
+    "earnings": "2026-11-12"
+  },
+  "CHCO": {
+    "earnings": "2026-10-28"
+  },
+  "CHCT": {
+    "earnings": "2026-10-27"
+  },
+  "CHD": {
+    "earnings": "2026-10-30"
+  },
+  "CHEF": {
+    "earnings": "2026-10-28"
+  },
+  "CHMG": {
+    "earnings": "2026-10-20"
+  },
+  "CHRS": {
+    "earnings": "2026-11-05"
+  },
+  "CHRW": {
+    "earnings": "2026-10-28"
+  },
+  "CHTR": {
+    "earnings": "2026-11-06"
+  },
+  "CI": {
+    "earnings": "2026-11-05"
+  },
+  "CIA": {
+    "earnings": "2026-11-05"
+  },
+  "CIFR": {
+    "earnings": "2026-11-02"
+  },
+  "CIM": {
+    "earnings": "2026-11-05"
+  },
+  "CINF": {
+    "earnings": "2026-10-26"
+  },
+  "CIVB": {
+    "earnings": "2026-10-22"
+  },
+  "CIX": {
+    "earnings": "2026-11-04"
+  },
+  "CL": {
+    "earnings": "2026-10-30"
+  },
+  "CLB": {
+    "earnings": "2026-10-28"
+  },
+  "CLBK": {
+    "earnings": "2026-10-19"
+  },
+  "CLDT": {
+    "earnings": "2026-11-04"
+  },
+  "CLDX": {
+    "earnings": "2026-11-09"
+  },
+  "CLMB": {
+    "earnings": "2026-11-04"
+  },
+  "CLMT": {
+    "earnings": "2026-11-06"
+  },
+  "CLNE": {
+    "earnings": "2026-11-05"
+  },
+  "CLOV": {
+    "earnings": "2026-11-04"
+  },
+  "CLPT": {
+    "earnings": "2026-11-05"
+  },
+  "CLVT": {
+    "earnings": "2026-11-03"
+  },
+  "CLW": {
+    "earnings": "2026-10-26"
+  },
+  "CLX": {
+    "earnings": "2026-11-02"
+  },
+  "CLYM": {
+    "earnings": "2026-11-05"
+  },
+  "CMCL": {
+    "earnings": "2026-11-09"
+  },
+  "CMCO": {
+    "earnings": "2026-10-29"
+  },
+  "CMCSA": {
+    "earnings": "2026-10-22"
+  },
+  "CMDB": {
+    "earnings": "2026-11-13"
+  },
+  "CME": {
+    "earnings": "2026-10-21"
+  },
+  "CMG": {
+    "earnings": "2026-10-28"
+  },
+  "CMI": {
+    "earnings": "2026-11-05"
+  },
+  "CMPR": {
+    "earnings": "2026-11-04"
+  },
+  "CMPX": {
+    "earnings": "2026-11-04"
+  },
+  "CMRC": {
+    "earnings": "2026-11-05"
+  },
+  "CMRE": {
+    "earnings": "2026-11-03"
+  },
+  "CMS": {
+    "earnings": "2026-10-27"
+  },
+  "CMT": {
+    "earnings": "2026-11-03"
+  },
+  "CMTG": {
+    "earnings": "2026-11-04"
+  },
+  "CMTV": {
+    "earnings": "2026-11-13"
+  },
+  "CNC": {
+    "earnings": "2026-10-27"
+  },
+  "CNDT": {
+    "earnings": "2026-11-06"
+  },
+  "CNK": {
+    "earnings": "2026-11-04"
+  },
+  "CNMD": {
+    "earnings": "2026-10-28"
+  },
+  "CNNE": {
+    "earnings": "2026-11-09"
+  },
+  "CNO": {
+    "earnings": "2026-11-02"
+  },
+  "CNOB": {
+    "earnings": "2026-10-22"
+  },
+  "CNP": {
+    "earnings": "2026-10-27"
+  },
+  "CNR": {
+    "earnings": "2026-11-05"
+  },
+  "CNTB": {
+    "earnings": "2026-11-11"
+  },
+  "CNTN": {
+    "earnings": "2026-11-11"
+  },
+  "CNTX": {
+    "earnings": "2026-11-04"
+  },
+  "CNX": {
+    "earnings": "2026-10-29"
+  },
+  "CNXN": {
+    "earnings": "2026-11-04"
+  },
+  "COAG": {
+    "earnings": "2026-11-10"
+  },
+  "COCO": {
+    "earnings": "2026-10-22"
+  },
+  "COF": {
+    "earnings": "2026-10-20"
+  },
+  "COFS": {
+    "earnings": "2026-10-23"
+  },
+  "COGT": {
+    "earnings": "2026-11-06"
+  },
+  "COHR": {
+    "earnings": "2026-11-04"
+  },
+  "COHU": {
+    "earnings": "2026-11-04"
+  },
+  "COIN": {
+    "earnings": "2026-10-29"
+  },
+  "COLL": {
+    "earnings": "2026-11-05"
+  },
+  "COMP": {
+    "earnings": "2026-11-03"
+  },
+  "CON": {
+    "earnings": "2026-11-05"
+  },
+  "COP": {
+    "earnings": "2026-11-05"
+  },
+  "COR": {
+    "earnings": "2026-11-04"
+  },
+  "CORZ": {
+    "earnings": "2026-10-23"
+  },
+  "COSO": {
+    "earnings": "2026-10-19"
+  },
+  "COTY": {
+    "earnings": "2026-11-04"
+  },
+  "COUR": {
+    "earnings": "2026-10-22"
+  },
+  "CPAY": {
+    "earnings": "2026-11-04"
+  },
+  "CPF": {
+    "earnings": "2026-10-28"
+  },
+  "CPK": {
+    "earnings": "2026-11-05"
+  },
+  "CPRI": {
+    "earnings": "2026-11-03"
+  },
+  "CPS": {
+    "earnings": "2026-10-29"
+  },
+  "CPSS": {
+    "earnings": "2026-11-09"
+  },
+  "CPT": {
+    "earnings": "2026-11-05"
+  },
+  "CRAI": {
+    "earnings": "2026-10-29"
+  },
+  "CRBP": {
+    "earnings": "2026-11-11"
+  },
+  "CRBU": {
+    "earnings": "2026-11-11"
+  },
+  "CRC": {
+    "earnings": "2026-11-02"
+  },
+  "CRCT": {
+    "earnings": "2026-11-03"
+  },
+  "CRD.A": {
+    "earnings": "2026-11-02"
+  },
+  "CRGY": {
+    "earnings": "2026-11-02"
+  },
+  "CRH": {
+    "earnings": "2026-11-04"
+  },
+  "CRI": {
+    "earnings": "2026-10-26"
+  },
+  "CRK": {
+    "earnings": "2026-11-04"
+  },
+  "CRL": {
+    "earnings": "2026-11-04"
+  },
+  "CRMD": {
+    "earnings": "2026-11-11"
+  },
+  "CRSP": {
+    "earnings": "2026-11-09"
+  },
+  "CRSR": {
+    "earnings": "2026-11-05"
+  },
+  "CRVL": {
+    "earnings": "2026-11-03"
+  },
+  "CRVS": {
+    "earnings": "2026-11-03"
+  },
+  "CRWV": {
+    "earnings": "2026-11-09"
+  },
+  "CSCO": {
+    "earnings": "2026-11-11"
+  },
+  "CSGP": {
+    "earnings": "2026-10-27"
+  },
+  "CSIQ": {
+    "earnings": "2026-11-12"
+  },
+  "CSR": {
+    "earnings": "2026-11-02"
+  },
+  "CSTL": {
+    "earnings": "2026-11-02"
+  },
+  "CSTM": {
+    "earnings": "2026-10-28"
+  },
+  "CSV": {
+    "earnings": "2026-11-04"
+  },
+  "CSW": {
+    "earnings": "2026-10-29"
+  },
+  "CSX": {
+    "earnings": "2026-10-21"
+  },
+  "CTBI": {
+    "earnings": "2026-10-21"
+  },
+  "CTEV": {
+    "earnings": "2026-11-09"
+  },
+  "CTGO": {
+    "earnings": "2026-11-12"
+  },
+  "CTKB": {
+    "earnings": "2026-11-04"
+  },
+  "CTMX": {
+    "earnings": "2026-11-05"
+  },
+  "CTNM": {
+    "earnings": "2026-10-29"
+  },
+  "CTO": {
+    "earnings": "2026-10-27"
+  },
+  "CTOS": {
+    "earnings": "2026-10-26"
+  },
+  "CTRE": {
+    "earnings": "2026-11-04"
+  },
+  "CTRI": {
+    "earnings": "2026-11-04"
+  },
+  "CTS": {
+    "earnings": "2026-10-27"
+  },
+  "CTSH": {
+    "earnings": "2026-10-29"
+  },
+  "CUBI": {
+    "earnings": "2026-10-22"
+  },
+  "CURB": {
+    "earnings": "2026-10-22"
+  },
+  "CURI": {
+    "earnings": "2026-11-11"
+  },
+  "CV": {
+    "earnings": "2026-11-12"
+  },
+  "CVBF": {
+    "earnings": "2026-10-21"
+  },
+  "CVCO": {
+    "earnings": "2026-10-29"
+  },
+  "CVEO": {
+    "earnings": "2026-10-30"
+  },
+  "CVGI": {
+    "earnings": "2026-11-09"
+  },
+  "CVI": {
+    "earnings": "2026-11-04"
+  },
+  "CVLG": {
+    "earnings": "2026-10-29"
+  },
+  "CVLT": {
+    "earnings": "2026-10-27"
+  },
+  "CVNA": {
+    "earnings": "2026-10-28"
+  },
+  "CVRX": {
+    "earnings": "2026-11-04"
+  },
+  "CVS": {
+    "earnings": "2026-11-04"
+  },
+  "CVSA": {
+    "earnings": "2026-10-29"
+  },
+  "CVX": {
+    "earnings": "2026-10-30"
+  },
+  "CWCO": {
+    "earnings": "2026-11-09"
+  },
+  "CWH": {
+    "earnings": "2026-10-27"
+  },
+  "CWK": {
+    "earnings": "2026-10-29"
+  },
+  "CWST": {
+    "earnings": "2026-11-09"
+  },
+  "CWT": {
+    "earnings": "2026-10-29"
+  },
+  "CXDO": {
+    "earnings": "2026-11-03"
+  },
+  "CXT": {
+    "earnings": "2026-11-04"
+  },
+  "CXW": {
+    "earnings": "2026-11-04"
+  },
+  "CYH": {
+    "earnings": "2026-10-28"
+  },
+  "CYRX": {
+    "earnings": "2026-11-03"
+  },
+  "CYTK": {
+    "earnings": "2026-11-04"
+  },
+  "CZFS": {
+    "earnings": "2026-10-29"
+  },
+  "CZNC": {
+    "earnings": "2026-10-22"
+  },
+  "CZWI": {
+    "earnings": "2026-10-26"
+  },
+  "D": {
+    "earnings": "2026-10-30"
+  },
+  "DAN": {
+    "earnings": "2026-10-28"
+  },
+  "DASH": {
+    "earnings": "2026-11-04"
+  },
+  "DAVE": {
+    "earnings": "2026-11-03"
+  },
+  "DBD": {
+    "earnings": "2026-10-28"
+  },
+  "DC": {
+    "earnings": "2026-11-12"
+  },
+  "DCH": {
+    "earnings": "2026-11-06"
+  },
+  "DCO": {
+    "earnings": "2026-11-05"
+  },
+  "DCOM": {
+    "earnings": "2026-10-22"
+  },
+  "DCTH": {
+    "earnings": "2026-11-03"
+  },
+  "DD": {
+    "earnings": "2026-11-03"
+  },
+  "DDD": {
+    "earnings": "2026-11-03"
+  },
+  "DDOG": {
+    "earnings": "2026-11-05"
+  },
+  "DEA": {
+    "earnings": "2026-10-26"
+  },
+  "DEC": {
+    "earnings": "2026-11-04"
+  },
+  "DECK": {
+    "earnings": "2026-10-22"
+  },
+  "DEI": {
+    "earnings": "2026-11-03"
+  },
+  "DFH": {
+    "earnings": "2026-10-29"
+  },
+  "DFIN": {
+    "earnings": "2026-11-04"
+  },
+  "DFTX": {
+    "earnings": "2026-11-05"
+  },
+  "DGICA": {
+    "earnings": "2026-10-29"
+  },
+  "DGII": {
+    "earnings": "2026-11-11"
+  },
+  "DGX": {
+    "earnings": "2026-10-22"
+  },
+  "DHC": {
+    "earnings": "2026-11-02"
+  },
+  "DHI": {
+    "earnings": "2026-10-29"
+  },
+  "DHR": {
+    "earnings": "2026-10-21"
+  },
+  "DHT": {
+    "earnings": "2026-11-04"
+  },
+  "DIBS": {
+    "earnings": "2026-11-05"
+  },
+  "DIN": {
+    "earnings": "2026-11-04"
+  },
+  "DIOD": {
+    "earnings": "2026-11-05"
+  },
+  "DK": {
+    "earnings": "2026-11-06"
+  },
+  "DLO": {
+    "earnings": "2026-11-12"
+  },
+  "DLR": {
+    "earnings": "2026-10-29"
+  },
+  "DLX": {
+    "earnings": "2026-11-04"
+  },
+  "DMAC": {
+    "earnings": "2026-11-11"
+  },
+  "DMC": {
+    "earnings": "2026-10-28"
+  },
+  "DMRA": {
+    "earnings": "2026-11-05"
+  },
+  "DMRC": {
+    "earnings": "2026-10-29"
+  },
+  "DNA": {
+    "earnings": "2026-11-05"
+  },
+  "DNLI": {
+    "earnings": "2026-11-05"
+  },
+  "DNOW": {
+    "earnings": "2026-11-04"
+  },
+  "DNTH": {
+    "earnings": "2026-11-04"
+  },
+  "DNUT": {
+    "earnings": "2026-11-05"
+  },
+  "DOC": {
+    "earnings": "2026-11-02"
+  },
+  "DOLE": {
+    "earnings": "2026-11-09"
+  },
+  "DORM": {
+    "earnings": "2026-10-26"
+  },
+  "DOUG": {
+    "earnings": "2026-11-03"
+  },
+  "DOV": {
+    "earnings": "2026-10-22"
+  },
+  "DOW": {
+    "earnings": "2026-10-22"
+  },
+  "DRH": {
+    "earnings": "2026-11-03"
+  },
+  "DRVN": {
+    "earnings": "2026-11-03"
+  },
+  "DSGN": {
+    "earnings": "2026-11-04"
+  },
+  "DSGR": {
+    "earnings": "2026-10-29"
+  },
+  "DSP": {
+    "earnings": "2026-11-09"
+  },
+  "DTE": {
+    "earnings": "2026-10-29"
+  },
+  "DTIL": {
+    "earnings": "2026-11-02"
+  },
+  "DUK": {
+    "earnings": "2026-11-05"
+  },
+  "DUOT": {
+    "earnings": "2026-11-11"
+  },
+  "DV": {
+    "earnings": "2026-11-06"
+  },
+  "DVA": {
+    "earnings": "2026-11-04"
+  },
+  "DVN": {
+    "earnings": "2026-11-05"
+  },
+  "DX": {
+    "earnings": "2026-10-19"
+  },
+  "DXC": {
+    "earnings": "2026-10-29"
+  },
+  "DXCM": {
+    "earnings": "2026-10-29"
+  },
+  "DXPE": {
+    "earnings": "2026-11-05"
+  },
+  "DYN": {
+    "earnings": "2026-11-04"
+  },
+  "EAF": {
+    "earnings": "2026-10-23"
+  },
+  "EAT": {
+    "earnings": "2026-11-04"
+  },
+  "EBAY": {
+    "earnings": "2026-11-04"
+  },
+  "EBC": {
+    "earnings": "2026-10-22"
+  },
+  "EBMT": {
+    "earnings": "2026-10-27"
+  },
+  "EBS": {
+    "earnings": "2026-11-04"
+  },
+  "ECBK": {
+    "earnings": "2026-10-28"
+  },
+  "ECHO": {
+    "earnings": "2026-11-05"
+  },
+  "ECL": {
+    "earnings": "2026-10-27"
+  },
+  "ECPG": {
+    "earnings": "2026-11-04"
+  },
+  "ECVT": {
+    "earnings": "2026-11-03"
+  },
+  "ED": {
+    "earnings": "2026-11-05"
+  },
+  "EDIT": {
+    "earnings": "2026-11-09"
+  },
+  "EE": {
+    "earnings": "2026-11-04"
+  },
+  "EFC": {
+    "earnings": "2026-11-04"
+  },
+  "EFOR": {
+    "earnings": "2026-10-28"
+  },
+  "EFSC": {
+    "earnings": "2026-10-21"
+  },
+  "EFSI": {
+    "earnings": "2026-10-22"
+  },
+  "EFX": {
+    "earnings": "2026-10-20"
+  },
+  "EG": {
+    "earnings": "2026-10-28"
+  },
+  "EGAN": {
+    "earnings": "2026-11-11"
+  },
+  "EGBN": {
+    "earnings": "2026-10-21"
+  },
+  "EGHT": {
+    "earnings": "2026-11-03"
+  },
+  "EGY": {
+    "earnings": "2026-11-09"
+  },
+  "EIG": {
+    "earnings": "2026-10-28"
+  },
+  "EIKN": {
+    "earnings": "2026-11-12"
+  },
+  "EIX": {
+    "earnings": "2026-10-29"
+  },
+  "EL": {
+    "earnings": "2026-11-02"
+  },
+  "ELA": {
+    "earnings": "2026-11-04"
+  },
+  "ELDN": {
+    "earnings": "2026-11-13"
+  },
+  "ELE": {
+    "earnings": "2026-11-10"
+  },
+  "ELMD": {
+    "earnings": "2026-11-11"
+  },
+  "ELMT": {
+    "earnings": "2026-11-12"
+  },
+  "ELTX": {
+    "earnings": "2026-11-12"
+  },
+  "ELV": {
+    "earnings": "2026-10-21"
+  },
+  "ELVN": {
+    "earnings": "2026-11-11"
+  },
+  "EME": {
+    "earnings": "2026-10-29"
+  },
+  "EMR": {
+    "earnings": "2026-11-04"
+  },
+  "ENOV": {
+    "earnings": "2026-11-05"
+  },
+  "ENPH": {
+    "earnings": "2026-10-27"
+  },
+  "ENS": {
+    "earnings": "2026-11-04"
+  },
+  "ENVA": {
+    "earnings": "2026-10-22"
+  },
+  "ENVX": {
+    "earnings": "2026-11-04"
+  },
+  "EOG": {
+    "earnings": "2026-11-05"
+  },
+  "EOLS": {
+    "earnings": "2026-11-04"
+  },
+  "EOSE": {
+    "earnings": "2026-11-04"
+  },
+  "EPAC": {
+    "earnings": "2026-10-21"
+  },
+  "EPC": {
+    "earnings": "2026-11-12"
+  },
+  "EPM": {
+    "earnings": "2026-11-10"
+  },
+  "EPRT": {
+    "earnings": "2026-10-21"
+  },
+  "EPSN": {
+    "earnings": "2026-11-04"
+  },
+  "EQIX": {
+    "earnings": "2026-10-28"
+  },
+  "EQT": {
+    "earnings": "2026-10-27"
+  },
+  "ERAS": {
+    "earnings": "2026-11-11"
+  },
+  "ERIE": {
+    "earnings": "2026-10-29"
+  },
+  "ERII": {
+    "earnings": "2026-11-04"
+  },
+  "EROC": {
+    "earnings": "2026-11-10"
+  },
+  "ES": {
+    "earnings": "2026-11-03"
+  },
+  "ESCA": {
+    "earnings": "2026-10-29"
+  },
+  "ESNT": {
+    "earnings": "2026-11-06"
+  },
+  "ESP": {
+    "earnings": "2026-11-11"
+  },
+  "ESQ": {
+    "earnings": "2026-10-27"
+  },
+  "ESRT": {
+    "earnings": "2026-11-02"
+  },
+  "ESS": {
+    "earnings": "2026-10-27"
+  },
+  "ESTA": {
+    "earnings": "2026-11-04"
+  },
+  "ETD": {
+    "earnings": "2026-11-04"
+  },
+  "ETN": {
+    "earnings": "2026-11-03"
+  },
+  "ETON": {
+    "earnings": "2026-11-05"
+  },
+  "ETR": {
+    "earnings": "2026-11-04"
+  },
+  "EU": {
+    "earnings": "2026-11-09"
+  },
+  "EVC": {
+    "earnings": "2026-11-03"
+  },
+  "EVCM": {
+    "earnings": "2026-11-05"
+  },
+  "EVER": {
+    "earnings": "2026-11-02"
+  },
+  "EVEX": {
+    "earnings": "2026-11-03"
+  },
+  "EVGO": {
+    "earnings": "2026-11-09"
+  },
+  "EVH": {
+    "earnings": "2026-11-05"
+  },
+  "EVI": {
+    "earnings": "2026-11-09"
+  },
+  "EVLV": {
+    "earnings": "2026-11-10"
+  },
+  "EVRG": {
+    "earnings": "2026-11-05"
+  },
+  "EVTC": {
+    "earnings": "2026-11-05"
+  },
+  "EW": {
+    "earnings": "2026-11-04"
+  },
+  "EWTX": {
+    "earnings": "2026-11-05"
+  },
+  "EXC": {
+    "earnings": "2026-10-30"
+  },
+  "EXE": {
+    "earnings": "2026-10-27"
+  },
+  "EXPD": {
+    "earnings": "2026-11-03"
+  },
+  "EXPE": {
+    "earnings": "2026-11-04"
+  },
+  "EXPO": {
+    "earnings": "2026-10-29"
+  },
+  "EXR": {
+    "earnings": "2026-10-27"
+  },
+  "EXTR": {
+    "earnings": "2026-10-28"
+  },
+  "EYE": {
+    "earnings": "2026-11-04"
+  },
+  "EYPT": {
+    "earnings": "2026-11-04"
+  },
+  "F": {
+    "earnings": "2026-10-28"
+  },
+  "FA": {
+    "earnings": "2026-11-05"
+  },
+  "FANG": {
+    "earnings": "2026-11-02"
+  },
+  "FBIZ": {
+    "earnings": "2026-10-29"
+  },
+  "FBLA": {
+    "earnings": "2026-11-11"
+  },
+  "FBNC": {
+    "earnings": "2026-10-28"
+  },
+  "FBP": {
+    "earnings": "2026-10-22"
+  },
+  "FBRT": {
+    "earnings": "2026-10-28"
+  },
+  "FBYD": {
+    "earnings": "2026-11-13"
+  },
+  "FC": {
+    "earnings": "2026-11-04"
+  },
+  "FCAP": {
+    "earnings": "2026-10-23"
+  },
+  "FCBC": {
+    "earnings": "2026-10-27"
+  },
+  "FCBM": {
+    "earnings": "2026-10-29"
+  },
+  "FCCO": {
+    "earnings": "2026-10-21"
+  },
+  "FCF": {
+    "earnings": "2026-10-27"
+  },
+  "FCFS": {
+    "earnings": "2026-10-22"
+  },
+  "FCPT": {
+    "earnings": "2026-10-28"
+  },
+  "FCX": {
+    "earnings": "2026-10-27"
+  },
+  "FDBC": {
+    "earnings": "2026-10-28"
+  },
+  "FDMT": {
+    "earnings": "2026-11-09"
+  },
+  "FDX": {
+    "earnings": "2026-10-28"
+  },
+  "FDXF": {
+    "earnings": "2026-10-29"
+  },
+  "FE": {
+    "earnings": "2026-10-27"
+  },
+  "FELE": {
+    "earnings": "2026-10-28"
+  },
+  "FENC": {
+    "earnings": "2026-11-12"
+  },
+  "FET": {
+    "earnings": "2026-10-29"
+  },
+  "FF": {
+    "earnings": "2026-11-09"
+  },
+  "FFBC": {
+    "earnings": "2026-10-27"
+  },
+  "FFIN": {
+    "earnings": "2026-10-22"
+  },
+  "FFIV": {
+    "earnings": "2026-10-27"
+  },
+  "FG": {
+    "earnings": "2026-11-05"
+  },
+  "FHTX": {
+    "earnings": "2026-11-04"
+  },
+  "FIBK": {
+    "earnings": "2026-10-22"
+  },
+  "FICO": {
+    "earnings": "2026-11-04"
+  },
+  "FIGS": {
+    "earnings": "2026-11-05"
+  },
+  "FINW": {
+    "earnings": "2026-10-28"
+  },
+  "FIP": {
+    "earnings": "2026-11-05"
+  },
+  "FIS": {
+    "earnings": "2026-11-03"
+  },
+  "FISI": {
+    "earnings": "2026-10-29"
+  },
+  "FISV": {
+    "earnings": "2026-11-03"
+  },
+  "FITB": {
+    "earnings": "2026-10-19"
+  },
+  "FIVN": {
+    "earnings": "2026-11-05"
+  },
+  "FIX": {
+    "earnings": "2026-10-22"
+  },
+  "FLEX": {
+    "earnings": "2026-10-28"
+  },
+  "FLG": {
+    "earnings": "2026-10-23"
+  },
+  "FLGT": {
+    "earnings": "2026-11-06"
+  },
+  "FLNG": {
+    "earnings": "2026-11-11"
+  },
+  "FLO": {
+    "earnings": "2026-11-05"
+  },
+  "FLOC": {
+    "earnings": "2026-11-04"
+  },
+  "FLR": {
+    "earnings": "2026-11-06"
+  },
+  "FLWS": {
+    "earnings": "2026-10-29"
+  },
+  "FLXS": {
+    "earnings": "2026-10-26"
+  },
+  "FLY": {
+    "earnings": "2026-11-11"
+  },
+  "FLYW": {
+    "earnings": "2026-11-03"
+  },
+  "FLYX": {
+    "earnings": "2026-11-11"
+  },
+  "FMAO": {
+    "earnings": "2026-10-26"
+  },
+  "FMBH": {
+    "earnings": "2026-10-29"
+  },
+  "FMC": {
+    "earnings": "2026-10-29"
+  },
+  "FMNB": {
+    "earnings": "2026-10-28"
+  },
+  "FNKO": {
+    "earnings": "2026-11-05"
+  },
+  "FNLC": {
+    "earnings": "2026-10-28"
+  },
+  "FNRN": {
+    "earnings": "2026-11-04"
+  },
+  "FOA": {
+    "earnings": "2026-11-03"
+  },
+  "FOR": {
+    "earnings": "2026-10-29"
+  },
+  "FOSL": {
+    "earnings": "2026-11-12"
+  },
+  "FOX": {
+    "earnings": "2026-11-02"
+  },
+  "FOXA": {
+    "earnings": "2026-11-02"
+  },
+  "FOXF": {
+    "earnings": "2026-11-05"
+  },
+  "FPI": {
+    "earnings": "2026-11-04"
+  },
+  "FRAF": {
+    "earnings": "2026-10-27"
+  },
+  "FRBA": {
+    "earnings": "2026-10-22"
+  },
+  "FRD": {
+    "earnings": "2026-11-09"
+  },
+  "FRME": {
+    "earnings": "2026-10-21"
+  },
+  "FROG": {
+    "earnings": "2026-11-05"
+  },
+  "FRPH": {
+    "earnings": "2026-11-04"
+  },
+  "FRSH": {
+    "earnings": "2026-11-03"
+  },
+  "FRST": {
+    "earnings": "2026-10-22"
+  },
+  "FRT": {
+    "earnings": "2026-10-30"
+  },
+  "FSBC": {
+    "earnings": "2026-10-26"
+  },
+  "FSBW": {
+    "earnings": "2026-10-20"
+  },
+  "FSLR": {
+    "earnings": "2026-10-29"
+  },
+  "FSLY": {
+    "earnings": "2026-11-04"
+  },
+  "FSS": {
+    "earnings": "2026-10-29"
+  },
+  "FSTR": {
+    "earnings": "2026-11-02"
+  },
+  "FSUN": {
+    "earnings": "2026-10-26"
+  },
+  "FTDR": {
+    "earnings": "2026-11-05"
+  },
+  "FTK": {
+    "earnings": "2026-11-03"
+  },
+  "FTNT": {
+    "earnings": "2026-10-28"
+  },
+  "FTRE": {
+    "earnings": "2026-10-29"
+  },
+  "FTV": {
+    "earnings": "2026-10-28"
+  },
+  "FUBO": {
+    "earnings": "2026-11-02"
+  },
+  "FULC": {
+    "earnings": "2026-11-04"
+  },
+  "FULT": {
+    "earnings": "2026-10-21"
+  },
+  "FUN": {
+    "earnings": "2026-11-05"
+  },
+  "FUNC": {
+    "earnings": "2026-10-19"
+  },
+  "FVCB": {
+    "earnings": "2026-10-20"
+  },
+  "FVR": {
+    "earnings": "2026-11-05"
+  },
+  "FWRD": {
+    "earnings": "2026-11-04"
+  },
+  "FWRG": {
+    "earnings": "2026-11-03"
+  },
+  "FXNC": {
+    "earnings": "2026-10-29"
+  },
+  "GABC": {
+    "earnings": "2026-10-26"
+  },
+  "GALT": {
+    "earnings": "2026-11-13"
+  },
+  "GATX": {
+    "earnings": "2026-10-29"
+  },
+  "GBCI": {
+    "earnings": "2026-10-22"
+  },
+  "GBFH": {
+    "earnings": "2026-10-27"
+  },
+  "GBX": {
+    "earnings": "2026-10-26"
+  },
+  "GCBC": {
+    "earnings": "2026-10-20"
+  },
+  "GCMG": {
+    "earnings": "2026-11-04"
+  },
+  "GCT": {
+    "earnings": "2026-11-05"
+  },
+  "GD": {
+    "earnings": "2026-10-30"
+  },
+  "GDDY": {
+    "earnings": "2026-10-29"
+  },
+  "GDOT": {
+    "earnings": "2026-11-09"
+  },
+  "GDYN": {
+    "earnings": "2026-10-29"
+  },
+  "GE": {
+    "earnings": "2026-10-20"
+  },
+  "GEF": {
+    "earnings": "2026-11-03"
+  },
+  "GEF.B": {
+    "earnings": "2026-11-03"
+  },
+  "GEHC": {
+    "earnings": "2026-10-28"
+  },
+  "GEMI": {
+    "earnings": "2026-11-09"
+  },
+  "GEN": {
+    "earnings": "2026-10-28"
+  },
+  "GENB": {
+    "earnings": "2026-11-05"
+  },
+  "GENI": {
+    "earnings": "2026-11-03"
+  },
+  "GEO": {
+    "earnings": "2026-11-05"
+  },
+  "GERN": {
+    "earnings": "2026-11-04"
+  },
+  "GEV": {
+    "earnings": "2026-10-28"
+  },
+  "GEVO": {
+    "earnings": "2026-11-09"
+  },
+  "GHC": {
+    "earnings": "2026-11-04"
+  },
+  "GHM": {
+    "earnings": "2026-11-06"
+  },
+  "GIC": {
+    "earnings": "2026-10-27"
+  },
+  "GILD": {
+    "earnings": "2026-10-29"
+  },
+  "GKOS": {
+    "earnings": "2026-10-28"
+  },
+  "GL": {
+    "earnings": "2026-10-21"
+  },
+  "GLIBA": {
+    "earnings": "2026-11-05"
+  },
+  "GLIBK": {
+    "earnings": "2026-11-05"
+  },
+  "GLNG": {
+    "earnings": "2026-11-04"
+  },
+  "GLOB": {
+    "earnings": "2026-11-12"
+  },
+  "GLRE": {
+    "earnings": "2026-11-02"
+  },
+  "GLSI": {
+    "earnings": "2026-11-13"
+  },
+  "GLUE": {
+    "earnings": "2026-11-05"
+  },
+  "GLW": {
+    "earnings": "2026-10-27"
+  },
+  "GM": {
+    "earnings": "2026-10-20"
+  },
+  "GMRS": {
+    "earnings": "2026-11-09"
+  },
+  "GNE": {
+    "earnings": "2026-11-02"
+  },
+  "GNK": {
+    "earnings": "2026-11-04"
+  },
+  "GNL": {
+    "earnings": "2026-11-04"
+  },
+  "GNRC": {
+    "earnings": "2026-10-28"
+  },
+  "GNW": {
+    "earnings": "2026-11-04"
+  },
+  "GO": {
+    "earnings": "2026-11-03"
+  },
+  "GOGO": {
+    "earnings": "2026-11-05"
+  },
+  "GOLD": {
+    "earnings": "2026-11-05"
+  },
+  "GOLF": {
+    "earnings": "2026-11-04"
+  },
+  "GOOD": {
+    "earnings": "2026-11-02"
+  },
+  "GOOG": {
+    "earnings": "2026-10-28"
+  },
+  "GOOGL": {
+    "earnings": "2026-10-28"
+  },
+  "GPC": {
+    "earnings": "2026-10-20"
+  },
+  "GPGI": {
+    "earnings": "2026-11-02"
+  },
+  "GPI": {
+    "earnings": "2026-10-28"
+  },
+  "GPN": {
+    "earnings": "2026-11-03"
+  },
+  "GPOR": {
+    "earnings": "2026-11-03"
+  },
+  "GPRE": {
+    "earnings": "2026-11-04"
+  },
+  "GPRO": {
+    "earnings": "2026-11-05"
+  },
+  "GRAL": {
+    "earnings": "2026-11-11"
+  },
+  "GRBK": {
+    "earnings": "2026-10-28"
+  },
+  "GRC": {
+    "earnings": "2026-10-23"
+  },
+  "GRDN": {
+    "earnings": "2026-11-09"
+  },
+  "GRMN": {
+    "earnings": "2026-10-28"
+  },
+  "GRND": {
+    "earnings": "2026-11-05"
+  },
+  "GRNT": {
+    "earnings": "2026-11-05"
+  },
+  "GRPN": {
+    "earnings": "2026-11-05"
+  },
+  "GSBC": {
+    "earnings": "2026-10-21"
+  },
+  "GSHD": {
+    "earnings": "2026-10-28"
+  },
+  "GSIT": {
+    "earnings": "2026-10-29"
+  },
+  "GSM": {
+    "earnings": "2026-11-04"
+  },
+  "GT": {
+    "earnings": "2026-11-02"
+  },
+  "GTM": {
+    "earnings": "2026-11-04"
+  },
+  "GTN": {
+    "earnings": "2026-11-06"
+  },
+  "GTX": {
+    "earnings": "2026-10-29"
+  },
+  "GTY": {
+    "earnings": "2026-10-21"
+  },
+  "GVA": {
+    "earnings": "2026-11-05"
+  },
+  "GWRS": {
+    "earnings": "2026-11-05"
+  },
+  "GWW": {
+    "earnings": "2026-11-04"
+  },
+  "GYRE": {
+    "earnings": "2026-11-06"
+  },
+  "HAE": {
+    "earnings": "2026-11-05"
+  },
+  "HAFC": {
+    "earnings": "2026-10-27"
+  },
+  "HAL": {
+    "earnings": "2026-10-20"
+  },
+  "HAPN": {
+    "earnings": "2026-10-28"
+  },
+  "HAS": {
+    "earnings": "2026-10-20"
+  },
+  "HASI": {
+    "earnings": "2026-11-05"
+  },
+  "HAWK": {
+    "earnings": "2026-11-12"
+  },
+  "HBAN": {
+    "earnings": "2026-10-22"
+  },
+  "HBB": {
+    "earnings": "2026-11-04"
+  },
+  "HBCP": {
+    "earnings": "2026-10-19"
+  },
+  "HBNC": {
+    "earnings": "2026-10-21"
+  },
+  "HBT": {
+    "earnings": "2026-10-26"
+  },
+  "HCA": {
+    "earnings": "2026-10-27"
+  },
+  "HCC": {
+    "earnings": "2026-11-04"
+  },
+  "HCI": {
+    "earnings": "2026-11-05"
+  },
+  "HCKT": {
+    "earnings": "2026-11-03"
+  },
+  "HCSG": {
+    "earnings": "2026-10-21"
+  },
+  "HDSN": {
+    "earnings": "2026-10-28"
+  },
+  "HE": {
+    "earnings": "2026-11-06"
+  },
+  "HFWA": {
+    "earnings": "2026-10-22"
+  },
+  "HG": {
+    "earnings": "2026-10-29"
+  },
+  "HGV": {
+    "earnings": "2026-10-29"
+  },
+  "HIFS": {
+    "earnings": "2026-10-16"
+  },
+  "HIG": {
+    "earnings": "2026-10-26"
+  },
+  "HII": {
+    "earnings": "2026-10-29"
+  },
+  "HIMS": {
+    "earnings": "2026-11-09"
+  },
+  "HIPO": {
+    "earnings": "2026-10-29"
+  },
+  "HIW": {
+    "earnings": "2026-10-27"
+  },
+  "HLF": {
+    "earnings": "2026-11-02"
+  },
+  "HLIO": {
+    "earnings": "2026-11-02"
+  },
+  "HLIT": {
+    "earnings": "2026-11-02"
+  },
+  "HLLY": {
+    "earnings": "2026-11-06"
+  },
+  "HLMN": {
+    "earnings": "2026-11-02"
+  },
+  "HLT": {
+    "earnings": "2026-10-27"
+  },
+  "HMH": {
+    "earnings": "2026-11-04"
+  },
+  "HMN": {
+    "earnings": "2026-11-03"
+  },
+  "HNGE": {
+    "earnings": "2026-11-02"
+  },
+  "HNI": {
+    "earnings": "2026-10-27"
+  },
+  "HNRG": {
+    "earnings": "2026-11-09"
+  },
+  "HNST": {
+    "earnings": "2026-11-04"
+  },
+  "HNVR": {
+    "earnings": "2026-10-29"
+  },
+  "HOG": {
+    "earnings": "2026-10-29"
+  },
+  "HON": {
+    "earnings": "2026-10-22"
+  },
+  "HONA": {
+    "earnings": "2026-10-28"
+  },
+  "HOOD": {
+    "earnings": "2026-10-27"
+  },
+  "HOPE": {
+    "earnings": "2026-10-27"
+  },
+  "HOS": {
+    "earnings": "2026-10-28"
+  },
+  "HPK": {
+    "earnings": "2026-11-04"
+  },
+  "HPP": {
+    "earnings": "2026-11-05"
+  },
+  "HQI": {
+    "earnings": "2026-11-05"
+  },
+  "HRI": {
+    "earnings": "2026-10-27"
+  },
+  "HRMY": {
+    "earnings": "2026-11-03"
+  },
+  "HROW": {
+    "earnings": "2026-11-09"
+  },
+  "HRTG": {
+    "earnings": "2026-11-04"
+  },
+  "HRTX": {
+    "earnings": "2026-11-03"
+  },
+  "HSHP": {
+    "earnings": "2026-11-05"
+  },
+  "HSIC": {
+    "earnings": "2026-11-03"
+  },
+  "HST": {
+    "earnings": "2026-11-04"
+  },
+  "HSTM": {
+    "earnings": "2026-11-02"
+  },
+  "HSY": {
+    "earnings": "2026-10-29"
+  },
+  "HTB": {
+    "earnings": "2026-10-28"
+  },
+  "HTFL": {
+    "earnings": "2026-11-11"
+  },
+  "HTH": {
+    "earnings": "2026-10-22"
+  },
+  "HTLD": {
+    "earnings": "2026-10-30"
+  },
+  "HTO": {
+    "earnings": "2026-10-26"
+  },
+  "HTZ": {
+    "earnings": "2026-11-05"
+  },
+  "HUBB": {
+    "earnings": "2026-10-27"
+  },
+  "HUBG": {
+    "earnings": "2026-10-29"
+  },
+  "HUM": {
+    "earnings": "2026-11-06"
+  },
+  "HUN": {
+    "earnings": "2026-11-02"
+  },
+  "HURN": {
+    "earnings": "2026-10-27"
+  },
+  "HUT": {
+    "earnings": "2026-11-04"
+  },
+  "HVT": {
+    "earnings": "2026-11-04"
+  },
+  "HWBK": {
+    "earnings": "2026-11-04"
+  },
+  "HWC": {
+    "earnings": "2026-10-20"
+  },
+  "HWKN": {
+    "earnings": "2026-10-26"
+  },
+  "HWM": {
+    "earnings": "2026-10-29"
+  },
+  "HY": {
+    "earnings": "2026-11-03"
+  },
+  "HYLN": {
+    "earnings": "2026-11-10"
+  },
+  "HYMC": {
+    "earnings": "2026-10-27"
+  },
+  "HYPR": {
+    "earnings": "2026-11-09"
+  },
+  "HZO": {
+    "earnings": "2026-11-12"
+  },
+  "IART": {
+    "earnings": "2026-10-21"
+  },
+  "IBCP": {
+    "earnings": "2026-10-27"
+  },
+  "IBEX": {
+    "earnings": "2026-11-05"
+  },
+  "IBM": {
+    "earnings": "2026-10-21"
+  },
+  "IBOC": {
+    "earnings": "2026-11-05"
+  },
+  "IBP": {
+    "earnings": "2026-11-04"
+  },
+  "IBRX": {
+    "earnings": "2026-11-03"
+  },
+  "IBTA": {
+    "earnings": "2026-11-02"
+  },
+  "ICE": {
+    "earnings": "2026-10-29"
+  },
+  "ICFI": {
+    "earnings": "2026-11-05"
+  },
+  "ICHR": {
+    "earnings": "2026-11-02"
+  },
+  "ICUI": {
+    "earnings": "2026-11-05"
+  },
+  "IDCC": {
+    "earnings": "2026-10-29"
+  },
+  "IDN": {
+    "earnings": "2026-11-11"
+  },
+  "IDR": {
+    "earnings": "2026-11-11"
+  },
+  "IDXX": {
+    "earnings": "2026-11-02"
+  },
+  "IDYA": {
+    "earnings": "2026-11-03"
+  },
+  "IE": {
+    "earnings": "2026-11-04"
+  },
+  "IEX": {
+    "earnings": "2026-10-28"
+  },
+  "IFF": {
+    "earnings": "2026-11-03"
+  },
+  "IHRT": {
+    "earnings": "2026-11-09"
+  },
+  "III": {
+    "earnings": "2026-11-02"
+  },
+  "IIIN": {
+    "earnings": "2026-10-22"
+  },
+  "IIPR": {
+    "earnings": "2026-11-02"
+  },
+  "IKT": {
+    "earnings": "2026-11-13"
+  },
+  "ILMN": {
+    "earnings": "2026-10-29"
+  },
+  "ILPT": {
+    "earnings": "2026-10-28"
+  },
+  "IMAX": {
+    "earnings": "2026-10-22"
+  },
+  "IMMX": {
+    "earnings": "2026-11-06"
+  },
+  "IMNM": {
+    "earnings": "2026-11-05"
+  },
+  "IMRX": {
+    "earnings": "2026-11-11"
+  },
+  "IMVT": {
+    "earnings": "2026-11-09"
+  },
+  "IMXI": {
+    "earnings": "2026-11-09"
+  },
+  "INBK": {
+    "earnings": "2026-10-29"
+  },
+  "INBX": {
+    "earnings": "2026-11-13"
+  },
+  "INCY": {
+    "earnings": "2026-10-29"
+  },
+  "INDI": {
+    "earnings": "2026-11-05"
+  },
+  "INDV": {
+    "earnings": "2026-10-29"
+  },
+  "INFQ": {
+    "earnings": "2026-11-11"
+  },
+  "INFU": {
+    "earnings": "2026-11-03"
+  },
+  "INGN": {
+    "earnings": "2026-11-04"
+  },
+  "INN": {
+    "earnings": "2026-11-03"
+  },
+  "INNV": {
+    "earnings": "2026-11-03"
+  },
+  "INOD": {
+    "earnings": "2026-11-05"
+  },
+  "INR": {
+    "earnings": "2026-11-09"
+  },
+  "INSE": {
+    "earnings": "2026-11-04"
+  },
+  "INSG": {
+    "earnings": "2026-11-05"
+  },
+  "INSP": {
+    "earnings": "2026-11-02"
+  },
+  "INSW": {
+    "earnings": "2026-11-05"
+  },
+  "INTA": {
+    "earnings": "2026-10-27"
+  },
+  "INTC": {
+    "earnings": "2026-10-29"
+  },
+  "INTT": {
+    "earnings": "2026-11-06"
+  },
+  "INV": {
+    "earnings": "2026-11-12"
+  },
+  "INVA": {
+    "earnings": "2026-11-04"
+  },
+  "INVH": {
+    "earnings": "2026-10-28"
+  },
+  "INVX": {
+    "earnings": "2026-11-02"
+  },
+  "IONQ": {
+    "earnings": "2026-11-04"
+  },
+  "IOSP": {
+    "earnings": "2026-11-03"
+  },
+  "IOVA": {
+    "earnings": "2026-11-05"
+  },
+  "IP": {
+    "earnings": "2026-10-28"
+  },
+  "IPAR": {
+    "earnings": "2026-11-04"
+  },
+  "IPI": {
+    "earnings": "2026-11-04"
+  },
+  "IPSC": {
+    "earnings": "2026-11-12"
+  },
+  "IQV": {
+    "earnings": "2026-10-27"
+  },
+  "IR": {
+    "earnings": "2026-10-29"
+  },
+  "IRD": {
+    "earnings": "2026-11-11"
+  },
+  "IRM": {
+    "earnings": "2026-11-04"
+  },
+  "IRMD": {
+    "earnings": "2026-11-02"
+  },
+  "IRON": {
+    "earnings": "2026-11-05"
+  },
+  "IRT": {
+    "earnings": "2026-11-04"
+  },
+  "IRTC": {
+    "earnings": "2026-10-29"
+  },
+  "IRWD": {
+    "earnings": "2026-11-09"
+  },
+  "ISBA": {
+    "earnings": "2026-10-26"
+  },
+  "ISRG": {
+    "earnings": "2026-10-20"
+  },
+  "ISTR": {
+    "earnings": "2026-10-19"
+  },
+  "IT": {
+    "earnings": "2026-11-03"
+  },
+  "ITG": {
+    "earnings": "2026-11-11"
+  },
+  "ITGR": {
+    "earnings": "2026-10-22"
+  },
+  "ITIC": {
+    "earnings": "2026-11-04"
+  },
+  "ITRI": {
+    "earnings": "2026-10-27"
+  },
+  "ITW": {
+    "earnings": "2026-10-23"
+  },
+  "IVR": {
+    "earnings": "2026-10-29"
+  },
+  "IVT": {
+    "earnings": "2026-10-27"
+  },
+  "IVVD": {
+    "earnings": "2026-11-05"
+  },
+  "IVZ": {
+    "earnings": "2026-10-27"
+  },
+  "JAKK": {
+    "earnings": "2026-10-22"
+  },
+  "JANX": {
+    "earnings": "2026-11-05"
+  },
+  "JBGS": {
+    "earnings": "2026-10-27"
+  },
+  "JBI": {
+    "earnings": "2026-11-05"
+  },
+  "JBIO": {
+    "earnings": "2026-11-12"
+  },
+  "JBLU": {
+    "earnings": "2026-10-27"
+  },
+  "JBSS": {
+    "earnings": "2026-11-04"
+  },
+  "JBTM": {
+    "earnings": "2026-11-02"
+  },
+  "JCAP": {
+    "earnings": "2026-11-12"
+  },
+  "JCI": {
+    "earnings": "2026-10-27"
+  },
+  "JKHY": {
+    "earnings": "2026-11-03"
+  },
+  "JMSB": {
+    "earnings": "2026-10-28"
+  },
+  "JNJ": {
+    "earnings": "2026-10-13"
+  },
+  "JOBY": {
+    "earnings": "2026-11-04"
+  },
+  "JOE": {
+    "earnings": "2026-11-04"
+  },
+  "JPM": {
+    "earnings": "2026-10-13"
+  },
+  "JRVR": {
+    "earnings": "2026-11-02"
+  },
+  "JXN": {
+    "earnings": "2026-11-03"
+  },
+  "KAI": {
+    "earnings": "2026-10-27"
+  },
+  "KALU": {
+    "earnings": "2026-10-21"
+  },
+  "KARD": {
+    "earnings": "2026-11-10"
+  },
+  "KDP": {
+    "earnings": "2026-11-03"
+  },
+  "KE": {
+    "earnings": "2026-11-04"
+  },
+  "KEEL": {
+    "earnings": "2026-11-12"
+  },
+  "KELYA": {
+    "earnings": "2026-11-05"
+  },
+  "KEY": {
+    "earnings": "2026-10-20"
+  },
+  "KFRC": {
+    "earnings": "2026-10-26"
+  },
+  "KGEI": {
+    "earnings": "2026-11-11"
+  },
+  "KGS": {
+    "earnings": "2026-11-03"
+  },
+  "KHC": {
+    "earnings": "2026-11-04"
+  },
+  "KIDS": {
+    "earnings": "2026-10-27"
+  },
+  "KIM": {
+    "earnings": "2026-10-29"
+  },
+  "KINS": {
+    "earnings": "2026-11-05"
+  },
+  "KKR": {
+    "earnings": "2026-11-09"
+  },
+  "KLAC": {
+    "earnings": "2026-11-04"
+  },
+  "KLC": {
+    "earnings": "2026-11-11"
+  },
+  "KLRA": {
+    "earnings": "2026-11-11"
+  },
+  "KLTR": {
+    "earnings": "2026-11-09"
+  },
+  "KMB": {
+    "earnings": "2026-10-29"
+  },
+  "KMI": {
+    "earnings": "2026-10-21"
+  },
+  "KMPR": {
+    "earnings": "2026-11-04"
+  },
+  "KMT": {
+    "earnings": "2026-11-04"
+  },
+  "KN": {
+    "earnings": "2026-10-22"
+  },
+  "KNF": {
+    "earnings": "2026-11-03"
+  },
+  "KNSA": {
+    "earnings": "2026-10-27"
+  },
+  "KNTK": {
+    "earnings": "2026-11-04"
+  },
+  "KO": {
+    "earnings": "2026-10-27"
+  },
+  "KOD": {
+    "earnings": "2026-11-12"
+  },
+  "KODK": {
+    "earnings": "2026-11-05"
+  },
+  "KOP": {
+    "earnings": "2026-11-06"
+  },
+  "KOPN": {
+    "earnings": "2026-11-11"
+  },
+  "KOS": {
+    "earnings": "2026-11-02"
+  },
+  "KPTI": {
+    "earnings": "2026-11-02"
+  },
+  "KREF": {
+    "earnings": "2026-10-20"
+  },
+  "KRG": {
+    "earnings": "2026-10-30"
+  },
+  "KRMD": {
+    "earnings": "2026-11-11"
+  },
+  "KRNY": {
+    "earnings": "2026-10-22"
+  },
+  "KRO": {
+    "earnings": "2026-11-05"
+  },
+  "KROS": {
+    "earnings": "2026-11-04"
+  },
+  "KRRO": {
+    "earnings": "2026-11-11"
+  },
+  "KRT": {
+    "earnings": "2026-11-05"
+  },
+  "KRUS": {
+    "earnings": "2026-11-05"
+  },
+  "KRYS": {
+    "earnings": "2026-11-02"
+  },
+  "KTB": {
+    "earnings": "2026-11-02"
+  },
+  "KURA": {
+    "earnings": "2026-11-03"
+  },
+  "KVHI": {
+    "earnings": "2026-11-05"
+  },
+  "KVUE": {
+    "earnings": "2026-11-02"
+  },
+  "KWR": {
+    "earnings": "2026-10-29"
+  },
+  "KWY": {
+    "earnings": "2026-11-05"
+  },
+  "KYMR": {
+    "earnings": "2026-11-03"
+  },
+  "KYTX": {
+    "earnings": "2026-11-11"
+  },
+  "L": {
+    "earnings": "2026-11-02"
+  },
+  "LADR": {
+    "earnings": "2026-10-22"
+  },
+  "LAND": {
+    "earnings": "2026-11-04"
+  },
+  "LARK": {
+    "earnings": "2026-11-04"
+  },
+  "LASR": {
+    "earnings": "2026-11-05"
+  },
+  "LAUR": {
+    "earnings": "2026-10-29"
+  },
+  "LAW": {
+    "earnings": "2026-11-04"
+  },
+  "LBRT": {
+    "earnings": "2026-10-21"
+  },
+  "LBRX": {
+    "earnings": "2026-11-05"
+  },
+  "LCID": {
+    "earnings": "2026-11-09"
+  },
+  "LCII": {
+    "earnings": "2026-10-29"
+  },
+  "LCLN": {
+    "earnings": "2026-11-05"
+  },
+  "LCNB": {
+    "earnings": "2026-10-28"
+  },
+  "LCTX": {
+    "earnings": "2026-11-05"
+  },
+  "LCUT": {
+    "earnings": "2026-11-05"
+  },
+  "LDI": {
+    "earnings": "2026-11-05"
+  },
+  "LDOS": {
+    "earnings": "2026-11-03"
+  },
+  "LEGH": {
+    "earnings": "2026-11-06"
+  },
+  "LENZ": {
+    "earnings": "2026-11-04"
+  },
+  "LEU": {
+    "earnings": "2026-11-04"
+  },
+  "LFST": {
+    "earnings": "2026-11-05"
+  },
+  "LFTO": {
+    "earnings": "2026-11-11"
+  },
+  "LGIH": {
+    "earnings": "2026-11-03"
+  },
+  "LGN": {
+    "earnings": "2026-11-12"
+  },
+  "LGND": {
+    "earnings": "2026-11-05"
+  },
+  "LH": {
+    "earnings": "2026-10-28"
+  },
+  "LHX": {
+    "earnings": "2026-10-29"
+  },
+  "LIF": {
+    "earnings": "2026-11-09"
+  },
+  "LII": {
+    "earnings": "2026-10-28"
+  },
+  "LILA": {
+    "earnings": "2026-11-04"
+  },
+  "LILAK": {
+    "earnings": "2026-11-04"
+  },
+  "LIME": {
+    "earnings": "2026-11-03"
+  },
+  "LIN": {
+    "earnings": "2026-10-29"
+  },
+  "LINC": {
+    "earnings": "2026-11-09"
+  },
+  "LIND": {
+    "earnings": "2026-11-03"
+  },
+  "LION": {
+    "earnings": "2026-11-05"
+  },
+  "LITE": {
+    "earnings": "2026-11-05"
+  },
+  "LIVN": {
+    "earnings": "2026-11-04"
+  },
+  "LKFN": {
+    "earnings": "2026-10-26"
+  },
+  "LLY": {
+    "earnings": "2026-10-29"
+  },
+  "LMAT": {
+    "earnings": "2026-11-04"
+  },
+  "LMB": {
+    "earnings": "2026-11-03"
+  },
+  "LMND": {
+    "earnings": "2026-11-04"
+  },
+  "LMRI": {
+    "earnings": "2026-11-11"
+  },
+  "LMT": {
+    "earnings": "2026-10-22"
+  },
+  "LNN": {
+    "earnings": "2026-10-22"
+  },
+  "LNT": {
+    "earnings": "2026-10-29"
+  },
+  "LNTH": {
+    "earnings": "2026-11-05"
+  },
+  "LOB": {
+    "earnings": "2026-10-21"
+  },
+  "LOCO": {
+    "earnings": "2026-10-29"
+  },
+  "LODE": {
+    "earnings": "2026-10-29"
+  },
+  "LPG": {
+    "earnings": "2026-11-05"
+  },
+  "LPTH": {
+    "earnings": "2026-11-10"
+  },
+  "LQDA": {
+    "earnings": "2026-11-02"
+  },
+  "LRCX": {
+    "earnings": "2026-10-21"
+  },
+  "LRMR": {
+    "earnings": "2026-11-04"
+  },
+  "LRN": {
+    "earnings": "2026-10-20"
+  },
+  "LTBR": {
+    "earnings": "2026-11-04"
+  },
+  "LTC": {
+    "earnings": "2026-11-03"
+  },
+  "LTH": {
+    "earnings": "2026-10-29"
+  },
+  "LTRX": {
+    "earnings": "2026-11-04"
+  },
+  "LUCD": {
+    "earnings": "2026-11-11"
+  },
+  "LUMN": {
+    "earnings": "2026-11-04"
+  },
+  "LUNR": {
+    "earnings": "2026-11-12"
+  },
+  "LUV": {
+    "earnings": "2026-10-21"
+  },
+  "LVS": {
+    "earnings": "2026-10-28"
+  },
+  "LVWR": {
+    "earnings": "2026-11-03"
+  },
+  "LWAY": {
+    "earnings": "2026-11-11"
+  },
+  "LWLG": {
+    "earnings": "2026-11-13"
+  },
+  "LXEO": {
+    "earnings": "2026-11-04"
+  },
+  "LXFR": {
+    "earnings": "2026-10-27"
+  },
+  "LXP": {
+    "earnings": "2026-10-29"
+  },
+  "LXRX": {
+    "earnings": "2026-11-05"
+  },
+  "LXU": {
+    "earnings": "2026-10-28"
+  },
+  "LYB": {
+    "earnings": "2026-10-30"
+  },
+  "LYEL": {
+    "earnings": "2026-11-11"
+  },
+  "LYTS": {
+    "earnings": "2026-11-05"
+  },
+  "LYV": {
+    "earnings": "2026-11-03"
+  },
+  "LZ": {
+    "earnings": "2026-11-04"
+  },
+  "MA": {
+    "earnings": "2026-10-29"
+  },
+  "MAA": {
+    "earnings": "2026-10-28"
+  },
+  "MAC": {
+    "earnings": "2026-11-04"
+  },
+  "MAGN": {
+    "earnings": "2026-11-04"
+  },
+  "MANE": {
+    "earnings": "2026-11-10"
+  },
+  "MAR": {
+    "earnings": "2026-11-02"
+  },
+  "MARA": {
+    "earnings": "2026-11-03"
+  },
+  "MAS": {
+    "earnings": "2026-10-28"
+  },
+  "MASS": {
+    "earnings": "2026-11-09"
+  },
+  "MATV": {
+    "earnings": "2026-11-04"
+  },
+  "MATX": {
+    "earnings": "2026-11-03"
+  },
+  "MAX": {
+    "earnings": "2026-10-28"
+  },
+  "MAZE": {
+    "earnings": "2026-11-05"
+  },
+  "MBC": {
+    "earnings": "2026-11-05"
+  },
+  "MBI": {
+    "earnings": "2026-11-03"
+  },
+  "MBIN": {
+    "earnings": "2026-10-28"
+  },
+  "MBUU": {
+    "earnings": "2026-10-29"
+  },
+  "MBWM": {
+    "earnings": "2026-10-20"
+  },
+  "MBX": {
+    "earnings": "2026-11-05"
+  },
+  "MC": {
+    "earnings": "2026-11-04"
+  },
+  "MCB": {
+    "earnings": "2026-10-20"
+  },
+  "MCBS": {
+    "earnings": "2026-10-16"
+  },
+  "MCD": {
+    "earnings": "2026-11-04"
+  },
+  "MCFT": {
+    "earnings": "2026-11-05"
+  },
+  "MCHB": {
+    "earnings": "2026-10-29"
+  },
+  "MCHP": {
+    "earnings": "2026-11-05"
+  },
+  "MCK": {
+    "earnings": "2026-11-04"
+  },
+  "MCO": {
+    "earnings": "2026-10-21"
+  },
+  "MCRI": {
+    "earnings": "2026-10-27"
+  },
+  "MCS": {
+    "earnings": "2026-10-30"
+  },
+  "MCY": {
+    "earnings": "2026-11-03"
+  },
+  "MD": {
+    "earnings": "2026-11-02"
+  },
+  "MDLZ": {
+    "earnings": "2026-10-27"
+  },
+  "MDXG": {
+    "earnings": "2026-11-04"
+  },
+  "MEC": {
+    "earnings": "2026-11-03"
+  },
+  "MELI": {
+    "earnings": "2026-11-04"
+  },
+  "MET": {
+    "earnings": "2026-11-04"
+  },
+  "META": {
+    "earnings": "2026-10-21"
+  },
+  "METC": {
+    "earnings": "2026-10-26"
+  },
+  "METCB": {
+    "earnings": "2026-10-26"
+  },
+  "MFA": {
+    "earnings": "2026-11-04"
+  },
+  "MFIN": {
+    "earnings": "2026-11-04"
+  },
+  "MG": {
+    "earnings": "2026-11-03"
+  },
+  "MGEE": {
+    "earnings": "2026-11-04"
+  },
+  "MGM": {
+    "earnings": "2026-10-28"
+  },
+  "MGNI": {
+    "earnings": "2026-11-04"
+  },
+  "MGNX": {
+    "earnings": "2026-11-11"
+  },
+  "MGPI": {
+    "earnings": "2026-10-28"
+  },
+  "MGRC": {
+    "earnings": "2026-10-28"
+  },
+  "MGTX": {
+    "earnings": "2026-11-12"
+  },
+  "MGY": {
+    "earnings": "2026-11-04"
+  },
+  "MH": {
+    "earnings": "2026-11-05"
+  },
+  "MHO": {
+    "earnings": "2026-10-21"
+  },
+  "MIAX": {
+    "earnings": "2026-10-29"
+  },
+  "MIR": {
+    "earnings": "2026-10-27"
+  },
+  "MIRM": {
+    "earnings": "2026-11-03"
+  },
+  "MITT": {
+    "earnings": "2026-11-03"
+  },
+  "MKTW": {
+    "earnings": "2026-11-05"
+  },
+  "MLAB": {
+    "earnings": "2026-11-05"
+  },
+  "MLM": {
+    "earnings": "2026-11-03"
+  },
+  "MLP": {
+    "earnings": "2026-11-13"
+  },
+  "MLR": {
+    "earnings": "2026-11-04"
+  },
+  "MLYS": {
+    "earnings": "2026-11-09"
+  },
+  "MMI": {
+    "earnings": "2026-11-06"
+  },
+  "MMM": {
+    "earnings": "2026-10-20"
+  },
+  "MMSI": {
+    "earnings": "2026-10-29"
+  },
+  "MNKD": {
+    "earnings": "2026-11-04"
+  },
+  "MNPR": {
+    "earnings": "2026-11-12"
+  },
+  "MNRO": {
+    "earnings": "2026-11-04"
+  },
+  "MNSB": {
+    "earnings": "2026-10-26"
+  },
+  "MNST": {
+    "earnings": "2026-11-05"
+  },
+  "MNTK": {
+    "earnings": "2026-11-04"
+  },
+  "MNTN": {
+    "earnings": "2026-11-03"
+  },
+  "MO": {
+    "earnings": "2026-10-29"
+  },
+  "MOBI": {
+    "earnings": "2026-11-10"
+  },
+  "MOS": {
+    "earnings": "2026-11-03"
+  },
+  "MPAA": {
+    "earnings": "2026-11-09"
+  },
+  "MPB": {
+    "earnings": "2026-10-28"
+  },
+  "MPC": {
+    "earnings": "2026-11-03"
+  },
+  "MPTI": {
+    "earnings": "2026-11-11"
+  },
+  "MPWR": {
+    "earnings": "2026-10-29"
+  },
+  "MQ": {
+    "earnings": "2026-11-03"
+  },
+  "MRAM": {
+    "earnings": "2026-11-04"
+  },
+  "MRBK": {
+    "earnings": "2026-10-22"
+  },
+  "MRCY": {
+    "earnings": "2026-11-10"
+  },
+  "MRK": {
+    "earnings": "2026-10-29"
+  },
+  "MRNA": {
+    "earnings": "2026-11-06"
+  },
+  "MRTN": {
+    "earnings": "2026-10-22"
+  },
+  "MRVI": {
+    "earnings": "2026-11-05"
+  },
+  "MRX": {
+    "earnings": "2026-11-05"
+  },
+  "MSBI": {
+    "earnings": "2026-10-22"
+  },
+  "MSCI": {
+    "earnings": "2026-10-20"
+  },
+  "MSEX": {
+    "earnings": "2026-10-30"
+  },
+  "MSFT": {
+    "earnings": "2026-10-28"
+  },
+  "MSGE": {
+    "earnings": "2026-11-05"
+  },
+  "MSI": {
+    "earnings": "2026-10-29"
+  },
+  "MSTR": {
+    "earnings": "2026-10-29"
+  },
+  "MTB": {
+    "earnings": "2026-10-16"
+  },
+  "MTD": {
+    "earnings": "2026-11-05"
+  },
+  "MTH": {
+    "earnings": "2026-10-28"
+  },
+  "MTRN": {
+    "earnings": "2026-11-04"
+  },
+  "MTRX": {
+    "earnings": "2026-11-04"
+  },
+  "MTUS": {
+    "earnings": "2026-11-02"
+  },
+  "MTW": {
+    "earnings": "2026-11-04"
+  },
+  "MTX": {
+    "earnings": "2026-10-29"
+  },
+  "MUR": {
+    "earnings": "2026-11-04"
+  },
+  "MUX": {
+    "earnings": "2026-11-04"
+  },
+  "MVBF": {
+    "earnings": "2026-11-04"
+  },
+  "MVST": {
+    "earnings": "2026-11-09"
+  },
+  "MWA": {
+    "earnings": "2026-11-05"
+  },
+  "MXL": {
+    "earnings": "2026-10-22"
+  },
+  "MYE": {
+    "earnings": "2026-10-29"
+  },
+  "MYFW": {
+    "earnings": "2026-10-22"
+  },
+  "MYGN": {
+    "earnings": "2026-11-02"
+  },
+  "MYRG": {
+    "earnings": "2026-11-04"
+  },
+  "MZTI": {
+    "earnings": "2026-11-03"
+  },
+  "NABL": {
+    "earnings": "2026-11-05"
+  },
+  "NAGE": {
+    "earnings": "2026-11-03"
+  },
+  "NATH": {
+    "earnings": "2026-11-05"
+  },
+  "NATL": {
+    "earnings": "2026-11-04"
+  },
+  "NATR": {
+    "earnings": "2026-11-05"
+  },
+  "NAUT": {
+    "earnings": "2026-10-26"
+  },
+  "NAVI": {
+    "earnings": "2026-11-04"
+  },
+  "NB": {
+    "earnings": "2026-11-12"
+  },
+  "NBBK": {
+    "earnings": "2026-10-28"
+  },
+  "NBHC": {
+    "earnings": "2026-10-27"
+  },
+  "NBIS": {
+    "earnings": "2026-11-10"
+  },
+  "NBN": {
+    "earnings": "2026-10-27"
+  },
+  "NBR": {
+    "earnings": "2026-10-27"
+  },
+  "NBTB": {
+    "earnings": "2026-10-27"
+  },
+  "NC": {
+    "earnings": "2026-11-04"
+  },
+  "NCLH": {
+    "earnings": "2026-11-03"
+  },
+  "NCMI": {
+    "earnings": "2026-10-29"
+  },
+  "NDAQ": {
+    "earnings": "2026-10-22"
+  },
+  "NE": {
+    "earnings": "2026-10-26"
+  },
+  "NECB": {
+    "earnings": "2026-10-22"
+  },
+  "NEE": {
+    "earnings": "2026-10-21"
+  },
+  "NEM": {
+    "earnings": "2026-10-22"
+  },
+  "NEO": {
+    "earnings": "2026-10-28"
+  },
+  "NERV": {
+    "earnings": "2026-11-04"
+  },
+  "NESR": {
+    "earnings": "2026-11-12"
+  },
+  "NET": {
+    "earnings": "2026-11-05"
+  },
+  "NEWT": {
+    "earnings": "2026-11-04"
+  },
+  "NEXN": {
+    "earnings": "2026-11-12"
+  },
+  "NEXT": {
+    "earnings": "2026-10-29"
+  },
+  "NFLX": {
+    "earnings": "2026-10-20"
+  },
+  "NGNE": {
+    "earnings": "2026-11-12"
+  },
+  "NGS": {
+    "earnings": "2026-11-09"
+  },
+  "NGVT": {
+    "earnings": "2026-11-04"
+  },
+  "NHC": {
+    "earnings": "2026-11-06"
+  },
+  "NHI": {
+    "earnings": "2026-11-09"
+  },
+  "NHP": {
+    "earnings": "2026-11-04"
+  },
+  "NI": {
+    "earnings": "2026-11-04"
+  },
+  "NIC": {
+    "earnings": "2026-10-22"
+  },
+  "NKSH": {
+    "earnings": "2026-10-22"
+  },
+  "NKTR": {
+    "earnings": "2026-11-05"
+  },
+  "NKTX": {
+    "earnings": "2026-11-09"
+  },
+  "NL": {
+    "earnings": "2026-11-05"
+  },
+  "NLOP": {
+    "earnings": "2026-11-06"
+  },
+  "NMAX": {
+    "earnings": "2026-11-12"
+  },
+  "NMIH": {
+    "earnings": "2026-11-03"
+  },
+  "NMRA": {
+    "earnings": "2026-11-05"
+  },
+  "NMRK": {
+    "earnings": "2026-10-29"
+  },
+  "NN": {
+    "earnings": "2026-11-05"
+  },
+  "NNI": {
+    "earnings": "2026-11-05"
+  },
+  "NOC": {
+    "earnings": "2026-10-20"
+  },
+  "NODK": {
+    "earnings": "2026-11-06"
+  },
+  "NOG": {
+    "earnings": "2026-11-05"
+  },
+  "NOVT": {
+    "earnings": "2026-11-09"
+  },
+  "NOW": {
+    "earnings": "2026-10-28"
+  },
+  "NP": {
+    "earnings": "2026-10-20"
+  },
+  "NPB": {
+    "earnings": "2026-10-20"
+  },
+  "NPCE": {
+    "earnings": "2026-11-03"
+  },
+  "NPK": {
+    "earnings": "2026-10-26"
+  },
+  "NPKI": {
+    "earnings": "2026-10-29"
+  },
+  "NPO": {
+    "earnings": "2026-11-03"
+  },
+  "NPWR": {
+    "earnings": "2026-11-12"
+  },
+  "NRC": {
+    "earnings": "2026-10-26"
+  },
+  "NRDS": {
+    "earnings": "2026-11-05"
+  },
+  "NREF": {
+    "earnings": "2026-11-05"
+  },
+  "NRG": {
+    "earnings": "2026-11-05"
+  },
+  "NRGV": {
+    "earnings": "2026-11-10"
+  },
+  "NRIM": {
+    "earnings": "2026-10-28"
+  },
+  "NSC": {
+    "earnings": "2026-10-22"
+  },
+  "NSIT": {
+    "earnings": "2026-10-29"
+  },
+  "NSP": {
+    "earnings": "2026-10-29"
+  },
+  "NSSC": {
+    "earnings": "2026-11-02"
+  },
+  "NTB": {
+    "earnings": "2026-10-27"
+  },
+  "NTCT": {
+    "earnings": "2026-11-05"
+  },
+  "NTGR": {
+    "earnings": "2026-11-04"
+  },
+  "NTLA": {
+    "earnings": "2026-11-05"
+  },
+  "NTRS": {
+    "earnings": "2026-10-21"
+  },
+  "NTST": {
+    "earnings": "2026-10-21"
+  },
+  "NUAI": {
+    "earnings": "2026-11-12"
+  },
+  "NUE": {
+    "earnings": "2026-10-26"
+  },
+  "NUS": {
+    "earnings": "2026-11-05"
+  },
+  "NUVB": {
+    "earnings": "2026-11-02"
+  },
+  "NVAX": {
+    "earnings": "2026-11-05"
+  },
+  "NVCR": {
+    "earnings": "2026-10-29"
+  },
+  "NVCT": {
+    "earnings": "2026-11-03"
+  },
+  "NVEC": {
+    "earnings": "2026-10-28"
+  },
+  "NVGS": {
+    "earnings": "2026-11-03"
+  },
+  "NVR": {
+    "earnings": "2026-10-28"
+  },
+  "NVRI": {
+    "earnings": "2026-11-05"
+  },
+  "NVTS": {
+    "earnings": "2026-11-03"
+  },
+  "NWBI": {
+    "earnings": "2026-10-26"
+  },
+  "NWE": {
+    "earnings": "2026-11-04"
+  },
+  "NWFL": {
+    "earnings": "2026-10-27"
+  },
+  "NWL": {
+    "earnings": "2026-10-30"
+  },
+  "NWN": {
+    "earnings": "2026-11-05"
+  },
+  "NWPX": {
+    "earnings": "2026-11-04"
+  },
+  "NWS": {
+    "earnings": "2026-11-05"
+  },
+  "NWSA": {
+    "earnings": "2026-11-05"
+  },
+  "NXDR": {
+    "earnings": "2026-11-04"
+  },
+  "NXH": {
+    "earnings": "2026-10-26"
+  },
+  "NXPI": {
+    "earnings": "2026-10-27"
+  },
+  "NXRT": {
+    "earnings": "2026-11-03"
+  },
+  "O": {
+    "earnings": "2026-11-02"
+  },
+  "OABI": {
+    "earnings": "2026-11-03"
+  },
+  "OBIO": {
+    "earnings": "2026-11-09"
+  },
+  "OBT": {
+    "earnings": "2026-11-04"
+  },
+  "OCFC": {
+    "earnings": "2026-10-27"
+  },
+  "OCGN": {
+    "earnings": "2026-11-04"
+  },
+  "OCUL": {
+    "earnings": "2026-11-03"
+  },
+  "ODFL": {
+    "earnings": "2026-10-28"
+  },
+  "ODTX": {
+    "earnings": "2026-11-04"
+  },
+  "OEC": {
+    "earnings": "2026-11-03"
+  },
+  "OFG": {
+    "earnings": "2026-10-21"
+  },
+  "OFIX": {
+    "earnings": "2026-11-03"
+  },
+  "OFLX": {
+    "earnings": "2026-11-04"
+  },
+  "OFRM": {
+    "earnings": "2026-11-05"
+  },
+  "OGS": {
+    "earnings": "2026-11-02"
+  },
+  "OI": {
+    "earnings": "2026-10-27"
+  },
+  "OII": {
+    "earnings": "2026-10-21"
+  },
+  "OIS": {
+    "earnings": "2026-10-30"
+  },
+  "OKE": {
+    "earnings": "2026-10-27"
+  },
+  "OKUR": {
+    "earnings": "2026-11-05"
+  },
+  "OLMA": {
+    "earnings": "2026-11-09"
+  },
+  "OLP": {
+    "earnings": "2026-11-05"
+  },
+  "OMC": {
+    "earnings": "2026-10-20"
+  },
+  "OMCL": {
+    "earnings": "2026-10-29"
+  },
+  "OMDA": {
+    "earnings": "2026-11-05"
+  },
+  "OMER": {
+    "earnings": "2026-11-12"
+  },
+  "ON": {
+    "earnings": "2026-11-02"
+  },
+  "ONB": {
+    "earnings": "2026-10-21"
+  },
+  "ONDS": {
+    "earnings": "2026-11-12"
+  },
+  "ONEW": {
+    "earnings": "2026-11-12"
+  },
+  "ONIT": {
+    "earnings": "2026-11-05"
+  },
+  "ONL": {
+    "earnings": "2026-11-05"
+  },
+  "ONT": {
+    "earnings": "2026-11-03"
+  },
+  "OPAL": {
+    "earnings": "2026-11-05"
+  },
+  "OPBK": {
+    "earnings": "2026-10-22"
+  },
+  "OPCH": {
+    "earnings": "2026-10-29"
+  },
+  "OPEN": {
+    "earnings": "2026-11-05"
+  },
+  "OPFI": {
+    "earnings": "2026-11-04"
+  },
+  "OPK": {
+    "earnings": "2026-11-04"
+  },
+  "OPLN": {
+    "earnings": "2026-11-04"
+  },
+  "OPRT": {
+    "earnings": "2026-11-03"
+  },
+  "OPTU": {
+    "earnings": "2026-11-05"
+  },
+  "OPTX": {
+    "earnings": "2026-11-12"
+  },
+  "ORA": {
+    "earnings": "2026-11-04"
+  },
+  "ORC": {
+    "earnings": "2026-10-22"
+  },
+  "ORGO": {
+    "earnings": "2026-11-05"
+  },
+  "ORIC": {
+    "earnings": "2026-11-12"
+  },
+  "ORKA": {
+    "earnings": "2026-11-11"
+  },
+  "ORLY": {
+    "earnings": "2026-10-28"
+  },
+  "ORMP": {
+    "earnings": "2026-11-12"
+  },
+  "ORN": {
+    "earnings": "2026-10-27"
+  },
+  "ORRF": {
+    "earnings": "2026-10-20"
+  },
+  "OSBC": {
+    "earnings": "2026-10-21"
+  },
+  "OSCR": {
+    "earnings": "2026-11-05"
+  },
+  "OSG": {
+    "earnings": "2026-11-09"
+  },
+  "OSIS": {
+    "earnings": "2026-10-29"
+  },
+  "OSPN": {
+    "earnings": "2026-10-29"
+  },
+  "OSS": {
+    "earnings": "2026-11-04"
+  },
+  "OSUR": {
+    "earnings": "2026-11-04"
+  },
+  "OSW": {
+    "earnings": "2026-11-04"
+  },
+  "OTIS": {
+    "earnings": "2026-10-28"
+  },
+  "OTTR": {
+    "earnings": "2026-11-02"
+  },
+  "OUST": {
+    "earnings": "2026-11-03"
+  },
+  "OUT": {
+    "earnings": "2026-11-05"
+  },
+  "OVBC": {
+    "earnings": "2026-10-26"
+  },
+  "OVID": {
+    "earnings": "2026-11-11"
+  },
+  "OVLY": {
+    "earnings": "2026-10-28"
+  },
+  "OXY": {
+    "earnings": "2026-11-09"
+  },
+  "PACB": {
+    "earnings": "2026-11-04"
+  },
+  "PACK": {
+    "earnings": "2026-10-29"
+  },
+  "PAGS": {
+    "earnings": "2026-11-11"
+  },
+  "PAHC": {
+    "earnings": "2026-11-04"
+  },
+  "PAL": {
+    "earnings": "2026-11-12"
+  },
+  "PALI": {
+    "earnings": "2026-11-09"
+  },
+  "PAMT": {
+    "earnings": "2026-10-27"
+  },
+  "PANL": {
+    "earnings": "2026-11-05"
+  },
+  "PAR": {
+    "earnings": "2026-11-05"
+  },
+  "PARR": {
+    "earnings": "2026-11-03"
+  },
+  "PATK": {
+    "earnings": "2026-10-29"
+  },
+  "PAX": {
+    "earnings": "2026-11-03"
+  },
+  "PAY": {
+    "earnings": "2026-11-02"
+  },
+  "PAYO": {
+    "earnings": "2026-11-04"
+  },
+  "PAYS": {
+    "earnings": "2026-11-09"
+  },
+  "PBF": {
+    "earnings": "2026-10-29"
+  },
+  "PBFS": {
+    "earnings": "2026-11-06"
+  },
+  "PBH": {
+    "earnings": "2026-11-05"
+  },
+  "PBI": {
+    "earnings": "2026-11-04"
+  },
+  "PBLS": {
+    "earnings": "2026-11-12"
+  },
+  "PBYI": {
+    "earnings": "2026-11-05"
+  },
+  "PCAR": {
+    "earnings": "2026-10-27"
+  },
+  "PCB": {
+    "earnings": "2026-10-22"
+  },
+  "PCG": {
+    "earnings": "2026-10-22"
+  },
+  "PCRX": {
+    "earnings": "2026-11-05"
+  },
+  "PCT": {
+    "earnings": "2026-11-05"
+  },
+  "PCVX": {
+    "earnings": "2026-11-03"
+  },
+  "PCYO": {
+    "earnings": "2026-11-11"
+  },
+  "PDEX": {
+    "earnings": "2026-10-29"
+  },
+  "PDFS": {
+    "earnings": "2026-11-05"
+  },
+  "PDLB": {
+    "earnings": "2026-10-23"
+  },
+  "PDM": {
+    "earnings": "2026-10-26"
+  },
+  "PDYN": {
+    "earnings": "2026-11-11"
+  },
+  "PEB": {
+    "earnings": "2026-10-29"
+  },
+  "PEBK": {
+    "earnings": "2026-10-19"
+  },
+  "PEBO": {
+    "earnings": "2026-10-20"
+  },
+  "PECO": {
+    "earnings": "2026-10-26"
+  },
+  "PEG": {
+    "earnings": "2026-11-02"
+  },
+  "PENN": {
+    "earnings": "2026-11-05"
+  },
+  "PESI": {
+    "earnings": "2026-11-09"
+  },
+  "PFBC": {
+    "earnings": "2026-10-23"
+  },
+  "PFE": {
+    "earnings": "2026-11-03"
+  },
+  "PFG": {
+    "earnings": "2026-10-26"
+  },
+  "PFIS": {
+    "earnings": "2026-10-29"
+  },
+  "PFS": {
+    "earnings": "2026-10-28"
+  },
+  "PFSI": {
+    "earnings": "2026-10-29"
+  },
+  "PG": {
+    "earnings": "2026-10-22"
+  },
+  "PGC": {
+    "earnings": "2026-10-27"
+  },
+  "PGEN": {
+    "earnings": "2026-11-12"
+  },
+  "PGNY": {
+    "earnings": "2026-11-05"
+  },
+  "PH": {
+    "earnings": "2026-11-05"
+  },
+  "PHAT": {
+    "earnings": "2026-10-29"
+  },
+  "PHIN": {
+    "earnings": "2026-10-29"
+  },
+  "PHM": {
+    "earnings": "2026-10-22"
+  },
+  "PI": {
+    "earnings": "2026-10-28"
+  },
+  "PII": {
+    "earnings": "2026-10-27"
+  },
+  "PINE": {
+    "earnings": "2026-10-22"
+  },
+  "PIPR": {
+    "earnings": "2026-10-30"
+  },
+  "PJT": {
+    "earnings": "2026-11-03"
+  },
+  "PK": {
+    "earnings": "2026-11-04"
+  },
+  "PKBK": {
+    "earnings": "2026-10-28"
+  },
+  "PKG": {
+    "earnings": "2026-10-21"
+  },
+  "PKOH": {
+    "earnings": "2026-11-04"
+  },
+  "PLBC": {
+    "earnings": "2026-10-21"
+  },
+  "PLBY": {
+    "earnings": "2026-11-11"
+  },
+  "PLGO": {
+    "earnings": "2026-11-11"
+  },
+  "PLMR": {
+    "earnings": "2026-11-05"
+  },
+  "PLOW": {
+    "earnings": "2026-11-02"
+  },
+  "PLPC": {
+    "earnings": "2026-11-04"
+  },
+  "PLSE": {
+    "earnings": "2026-11-04"
+  },
+  "PLTK": {
+    "earnings": "2026-11-05"
+  },
+  "PLTR": {
+    "earnings": "2026-11-02"
+  },
+  "PLUG": {
+    "earnings": "2026-11-09"
+  },
+  "PLUS": {
+    "earnings": "2026-11-05"
+  },
+  "PLX": {
+    "earnings": "2026-11-12"
+  },
+  "PLXS": {
+    "earnings": "2026-10-28"
+  },
+  "PM": {
+    "earnings": "2026-10-21"
+  },
+  "PMT": {
+    "earnings": "2026-10-29"
+  },
+  "PMTS": {
+    "earnings": "2026-11-03"
+  },
+  "PNR": {
+    "earnings": "2026-10-27"
+  },
+  "PNTG": {
+    "earnings": "2026-11-04"
+  },
+  "PNW": {
+    "earnings": "2026-11-03"
+  },
+  "PODD": {
+    "earnings": "2026-11-04"
+  },
+  "POR": {
+    "earnings": "2026-10-29"
+  },
+  "POWI": {
+    "earnings": "2026-11-04"
+  },
+  "PPG": {
+    "earnings": "2026-10-27"
+  },
+  "PPHC": {
+    "earnings": "2026-11-09"
+  },
+  "PPL": {
+    "earnings": "2026-11-04"
+  },
+  "PPTA": {
+    "earnings": "2026-11-13"
+  },
+  "PRAA": {
+    "earnings": "2026-11-02"
+  },
+  "PRAX": {
+    "earnings": "2026-11-04"
+  },
+  "PRCH": {
+    "earnings": "2026-11-04"
+  },
+  "PRCT": {
+    "earnings": "2026-11-04"
+  },
+  "PRDO": {
+    "earnings": "2026-11-03"
+  },
+  "PRG": {
+    "earnings": "2026-10-28"
+  },
+  "PRGO": {
+    "earnings": "2026-11-04"
+  },
+  "PRK": {
+    "earnings": "2026-10-26"
+  },
+  "PRKS": {
+    "earnings": "2026-11-05"
+  },
+  "PRLB": {
+    "earnings": "2026-10-29"
+  },
+  "PRLD": {
+    "earnings": "2026-11-11"
+  },
+  "PRM": {
+    "earnings": "2026-10-29"
+  },
+  "PRME": {
+    "earnings": "2026-11-06"
+  },
+  "PROK": {
+    "earnings": "2026-11-09"
+  },
+  "PRSU": {
+    "earnings": "2026-11-04"
+  },
+  "PRTA": {
+    "earnings": "2026-11-05"
+  },
+  "PRTH": {
+    "earnings": "2026-11-05"
+  },
+  "PRU": {
+    "earnings": "2026-11-03"
+  },
+  "PRVA": {
+    "earnings": "2026-11-05"
+  },
+  "PSA": {
+    "earnings": "2026-10-26"
+  },
+  "PSFE": {
+    "earnings": "2026-11-12"
+  },
+  "PSIX": {
+    "earnings": "2026-11-05"
+  },
+  "PSMT": {
+    "earnings": "2026-10-26"
+  },
+  "PSNL": {
+    "earnings": "2026-11-03"
+  },
+  "PSTL": {
+    "earnings": "2026-11-03"
+  },
+  "PSX": {
+    "earnings": "2026-10-28"
+  },
+  "PTC": {
+    "earnings": "2026-11-04"
+  },
+  "PTCT": {
+    "earnings": "2026-11-03"
+  },
+  "PTEN": {
+    "earnings": "2026-10-28"
+  },
+  "PTGX": {
+    "earnings": "2026-11-05"
+  },
+  "PTLO": {
+    "earnings": "2026-11-05"
+  },
+  "PTON": {
+    "earnings": "2026-11-05"
+  },
+  "PTRN": {
+    "earnings": "2026-11-04"
+  },
+  "PUBM": {
+    "earnings": "2026-11-09"
+  },
+  "PUMP": {
+    "earnings": "2026-10-28"
+  },
+  "PVLA": {
+    "earnings": "2026-11-10"
+  },
+  "PWP": {
+    "earnings": "2026-11-06"
+  },
+  "PWR": {
+    "earnings": "2026-10-29"
+  },
+  "PYPL": {
+    "earnings": "2026-10-27"
+  },
+  "PZZA": {
+    "earnings": "2026-11-05"
+  },
+  "Q": {
+    "earnings": "2026-11-04"
+  },
+  "QBTS": {
+    "earnings": "2026-11-05"
+  },
+  "QCOM": {
+    "earnings": "2026-11-04"
+  },
+  "QCRH": {
+    "earnings": "2026-10-20"
+  },
+  "QDEL": {
+    "earnings": "2026-11-04"
+  },
+  "QLYS": {
+    "earnings": "2026-11-03"
+  },
+  "QMCO": {
+    "earnings": "2026-11-12"
+  },
+  "QNST": {
+    "earnings": "2026-11-04"
+  },
+  "QSI": {
+    "earnings": "2026-11-04"
+  },
+  "QTRX": {
+    "earnings": "2026-11-09"
+  },
+  "QTWO": {
+    "earnings": "2026-11-04"
+  },
+  "QUAD": {
+    "earnings": "2026-10-28"
+  },
+  "QUBT": {
+    "earnings": "2026-11-13"
+  },
+  "QUIK": {
+    "earnings": "2026-11-10"
+  },
+  "RAIL": {
+    "earnings": "2026-11-09"
+  },
+  "RAMP": {
+    "earnings": "2026-11-04"
+  },
+  "RAPP": {
+    "earnings": "2026-11-05"
+  },
+  "RARE": {
+    "earnings": "2026-11-03"
+  },
+  "RBB": {
+    "earnings": "2026-10-19"
+  },
+  "RBBN": {
+    "earnings": "2026-10-27"
+  },
+  "RBCAA": {
+    "earnings": "2026-10-16"
+  },
+  "RBKB": {
+    "earnings": "2026-10-27"
+  },
+  "RC": {
+    "earnings": "2026-11-05"
+  },
+  "RCAT": {
+    "earnings": "2026-11-12"
+  },
+  "RCKT": {
+    "earnings": "2026-11-05"
+  },
+  "RCKY": {
+    "earnings": "2026-10-27"
+  },
+  "RCL": {
+    "earnings": "2026-10-27"
+  },
+  "RCMT": {
+    "earnings": "2026-11-04"
+  },
+  "RCUS": {
+    "earnings": "2026-10-27"
+  },
+  "RDDT": {
+    "earnings": "2026-10-29"
+  },
+  "RDN": {
+    "earnings": "2026-11-04"
+  },
+  "RDNT": {
+    "earnings": "2026-11-09"
+  },
+  "RDNW": {
+    "earnings": "2026-11-03"
+  },
+  "RDVT": {
+    "earnings": "2026-11-04"
+  },
+  "RDW": {
+    "earnings": "2026-11-04"
+  },
+  "RDZN": {
+    "earnings": "2026-11-13"
+  },
+  "REA": {
+    "earnings": "2026-11-10"
+  },
+  "REAL": {
+    "earnings": "2026-11-09"
+  },
+  "REAX": {
+    "earnings": "2026-10-29"
+  },
+  "REFI": {
+    "earnings": "2026-11-03"
+  },
+  "REG": {
+    "earnings": "2026-11-05"
+  },
+  "REGN": {
+    "earnings": "2026-10-30"
+  },
+  "REI": {
+    "earnings": "2026-11-05"
+  },
+  "RELY": {
+    "earnings": "2026-11-04"
+  },
+  "REPL": {
+    "earnings": "2026-11-05"
+  },
+  "REPX": {
+    "earnings": "2026-11-04"
+  },
+  "RES": {
+    "earnings": "2026-10-29"
+  },
+  "REZI": {
+    "earnings": "2026-11-04"
+  },
+  "RF": {
+    "earnings": "2026-10-16"
+  },
+  "RGNX": {
+    "earnings": "2026-11-05"
+  },
+  "RGR": {
+    "earnings": "2026-11-04"
+  },
+  "RGTI": {
+    "earnings": "2026-11-09"
+  },
+  "RHLD": {
+    "earnings": "2026-11-02"
+  },
+  "RHP": {
+    "earnings": "2026-11-02"
+  },
+  "RIG": {
+    "earnings": "2026-11-02"
+  },
+  "RIGL": {
+    "earnings": "2026-11-03"
+  },
+  "RIOT": {
+    "earnings": "2026-10-29"
+  },
+  "RIVN": {
+    "earnings": "2026-10-29"
+  },
+  "RJET": {
+    "earnings": "2026-10-29"
+  },
+  "RJF": {
+    "earnings": "2026-10-28"
+  },
+  "RKLB": {
+    "earnings": "2026-11-09"
+  },
+  "RL": {
+    "earnings": "2026-11-05"
+  },
+  "RLAY": {
+    "earnings": "2026-11-05"
+  },
+  "RLGT": {
+    "earnings": "2026-11-09"
+  },
+  "RLJ": {
+    "earnings": "2026-11-04"
+  },
+  "RLMD": {
+    "earnings": "2026-11-12"
+  },
+  "RM": {
+    "earnings": "2026-10-28"
+  },
+  "RMBI": {
+    "earnings": "2026-10-22"
+  },
+  "RMD": {
+    "earnings": "2026-10-29"
+  },
+  "RMNI": {
+    "earnings": "2026-10-29"
+  },
+  "RMR": {
+    "earnings": "2026-11-11"
+  },
+  "RNA": {
+    "earnings": "2026-11-12"
+  },
+  "RNAC": {
+    "earnings": "2026-11-05"
+  },
+  "RNGR": {
+    "earnings": "2026-11-09"
+  },
+  "RNST": {
+    "earnings": "2026-10-27"
+  },
+  "ROCK": {
+    "earnings": "2026-10-29"
+  },
+  "ROG": {
+    "earnings": "2026-10-27"
+  },
+  "ROK": {
+    "earnings": "2026-11-05"
+  },
+  "ROL": {
+    "earnings": "2026-10-21"
+  },
+  "ROOT": {
+    "earnings": "2026-11-04"
+  },
+  "ROP": {
+    "earnings": "2026-10-22"
+  },
+  "RPAY": {
+    "earnings": "2026-11-09"
+  },
+  "RPC": {
+    "earnings": "2026-11-04"
+  },
+  "RPD": {
+    "earnings": "2026-11-03"
+  },
+  "RRBI": {
+    "earnings": "2026-10-29"
+  },
+  "RRR": {
+    "earnings": "2026-11-03"
+  },
+  "RSG": {
+    "earnings": "2026-10-29"
+  },
+  "RSI": {
+    "earnings": "2026-10-28"
+  },
+  "RSVR": {
+    "earnings": "2026-11-03"
+  },
+  "RTX": {
+    "earnings": "2026-10-20"
+  },
+  "RUM": {
+    "earnings": "2026-11-09"
+  },
+  "RUN": {
+    "earnings": "2026-11-04"
+  },
+  "RUSHA": {
+    "earnings": "2026-10-27"
+  },
+  "RUSHB": {
+    "earnings": "2026-10-27"
+  },
+  "RVLV": {
+    "earnings": "2026-11-03"
+  },
+  "RVTY": {
+    "earnings": "2026-11-03"
+  },
+  "RWT": {
+    "earnings": "2026-11-03"
+  },
+  "RXO": {
+    "earnings": "2026-11-05"
+  },
+  "RXRX": {
+    "earnings": "2026-11-04"
+  },
+  "RXST": {
+    "earnings": "2026-11-04"
+  },
+  "RXT": {
+    "earnings": "2026-11-05"
+  },
+  "RYAM": {
+    "earnings": "2026-11-03"
+  },
+  "RYTM": {
+    "earnings": "2026-11-03"
+  },
+  "RYZ": {
+    "earnings": "2026-10-28"
+  },
+  "RZLT": {
+    "earnings": "2026-11-05"
+  },
+  "SABR": {
+    "earnings": "2026-11-04"
+  },
+  "SABS": {
+    "earnings": "2026-11-13"
+  },
+  "SAFE": {
+    "earnings": "2026-11-04"
+  },
+  "SAFT": {
+    "earnings": "2026-11-02"
+  },
+  "SAH": {
+    "earnings": "2026-10-29"
+  },
+  "SAM": {
+    "earnings": "2026-10-22"
+  },
+  "SAMG": {
+    "earnings": "2026-10-29"
+  },
+  "SANA": {
+    "earnings": "2026-11-05"
+  },
+  "SATL": {
+    "earnings": "2026-11-09"
+  },
+  "SBAC": {
+    "earnings": "2026-11-02"
+  },
+  "SBC": {
+    "earnings": "2026-11-13"
+  },
+  "SBCF": {
+    "earnings": "2026-10-27"
+  },
+  "SBET": {
+    "earnings": "2026-11-11"
+  },
+  "SBGI": {
+    "earnings": "2026-11-04"
+  },
+  "SBH": {
+    "earnings": "2026-11-12"
+  },
+  "SBMT": {
+    "earnings": "2026-11-12"
+  },
+  "SBRA": {
+    "earnings": "2026-11-04"
+  },
+  "SBSI": {
+    "earnings": "2026-10-23"
+  },
+  "SBUX": {
+    "earnings": "2026-10-29"
+  },
+  "SCL": {
+    "earnings": "2026-10-28"
+  },
+  "SCSC": {
+    "earnings": "2026-11-05"
+  },
+  "SD": {
+    "earnings": "2026-11-04"
+  },
+  "SDGR": {
+    "earnings": "2026-11-04"
+  },
+  "SDRL": {
+    "earnings": "2026-11-03"
+  },
+  "SEDG": {
+    "earnings": "2026-11-04"
+  },
+  "SEG": {
+    "earnings": "2026-11-09"
+  },
+  "SEI": {
+    "earnings": "2026-11-04"
+  },
+  "SENEA": {
+    "earnings": "2026-11-04"
+  },
+  "SENS": {
+    "earnings": "2026-11-04"
+  },
+  "SEPN": {
+    "earnings": "2026-11-09"
+  },
+  "SERV": {
+    "earnings": "2026-11-11"
+  },
+  "SES": {
+    "earnings": "2026-11-04"
+  },
+  "SEVN": {
+    "earnings": "2026-10-27"
+  },
+  "SEZL": {
+    "earnings": "2026-11-04"
+  },
+  "SFBS": {
+    "earnings": "2026-10-19"
+  },
+  "SFL": {
+    "earnings": "2026-11-11"
+  },
+  "SFST": {
+    "earnings": "2026-10-27"
+  },
+  "SG": {
+    "earnings": "2026-11-05"
+  },
+  "SGC": {
+    "earnings": "2026-11-02"
+  },
+  "SGHC": {
+    "earnings": "2026-11-02"
+  },
+  "SGHT": {
+    "earnings": "2026-11-05"
+  },
+  "SGMT": {
+    "earnings": "2026-11-12"
+  },
+  "SGP": {
+    "earnings": "2026-11-05"
+  },
+  "SGRY": {
+    "earnings": "2026-11-09"
+  },
+  "SHAK": {
+    "earnings": "2026-10-29"
+  },
+  "SHAZ": {
+    "earnings": "2026-11-05"
+  },
+  "SHBI": {
+    "earnings": "2026-10-22"
+  },
+  "SHEN": {
+    "earnings": "2026-11-04"
+  },
+  "SHIM": {
+    "earnings": "2026-11-12"
+  },
+  "SHLS": {
+    "earnings": "2026-11-03"
+  },
+  "SHO": {
+    "earnings": "2026-11-06"
+  },
+  "SHOO": {
+    "earnings": "2026-11-04"
+  },
+  "SHOP": {
+    "earnings": "2026-11-03"
+  },
+  "SHW": {
+    "earnings": "2026-10-27"
+  },
+  "SI": {
+    "earnings": "2026-11-10"
+  },
+  "SIBN": {
+    "earnings": "2026-11-09"
+  },
+  "SIDU": {
+    "earnings": "2026-11-13"
+  },
+  "SIGA": {
+    "earnings": "2026-11-05"
+  },
+  "SIGI": {
+    "earnings": "2026-10-22"
+  },
+  "SION": {
+    "earnings": "2026-11-04"
+  },
+  "SITC": {
+    "earnings": "2026-11-04"
+  },
+  "SKT": {
+    "earnings": "2026-11-04"
+  },
+  "SKWD": {
+    "earnings": "2026-11-05"
+  },
+  "SKY": {
+    "earnings": "2026-11-03"
+  },
+  "SKYD": {
+    "earnings": "2026-11-03"
+  },
+  "SKYH": {
+    "earnings": "2026-11-11"
+  },
+  "SKYW": {
+    "earnings": "2026-10-29"
+  },
+  "SLAB": {
+    "earnings": "2026-11-03"
+  },
+  "SLB": {
+    "earnings": "2026-10-23"
+  },
+  "SLDB": {
+    "earnings": "2026-11-02"
+  },
+  "SLDE": {
+    "earnings": "2026-10-27"
+  },
+  "SLDP": {
+    "earnings": "2026-11-03"
+  },
+  "SLG": {
+    "earnings": "2026-10-21"
+  },
+  "SLNH": {
+    "earnings": "2026-11-13"
+  },
+  "SLS": {
+    "earnings": "2026-11-11"
+  },
+  "SLVM": {
+    "earnings": "2026-11-06"
+  },
+  "SM": {
+    "earnings": "2026-11-03"
+  },
+  "SMA": {
+    "earnings": "2026-11-04"
+  },
+  "SMBC": {
+    "earnings": "2026-10-28"
+  },
+  "SMBK": {
+    "earnings": "2026-10-19"
+  },
+  "SMC": {
+    "earnings": "2026-11-09"
+  },
+  "SMCI": {
+    "earnings": "2026-11-03"
+  },
+  "SMHI": {
+    "earnings": "2026-11-04"
+  },
+  "SMID": {
+    "earnings": "2026-11-12"
+  },
+  "SMP": {
+    "earnings": "2026-10-30"
+  },
+  "SMPL": {
+    "earnings": "2026-10-27"
+  },
+  "SMR": {
+    "earnings": "2026-11-05"
+  },
+  "SMRT": {
+    "earnings": "2026-11-04"
+  },
+  "SMTI": {
+    "earnings": "2026-11-11"
+  },
+  "SNA": {
+    "earnings": "2026-10-22"
+  },
+  "SND": {
+    "earnings": "2026-11-11"
+  },
+  "SNDA": {
+    "earnings": "2026-11-09"
+  },
+  "SNDK": {
+    "earnings": "2026-10-29"
+  },
+  "SNDX": {
+    "earnings": "2026-11-02"
+  },
+  "SNFCA": {
+    "earnings": "2026-11-12"
+  },
+  "SO": {
+    "earnings": "2026-11-05"
+  },
+  "SOC": {
+    "earnings": "2026-11-12"
+  },
+  "SOLV": {
+    "earnings": "2026-11-05"
+  },
+  "SONO": {
+    "earnings": "2026-11-04"
+  },
+  "SOUN": {
+    "earnings": "2026-11-05"
+  },
+  "SPB": {
+    "earnings": "2026-11-12"
+  },
+  "SPCE": {
+    "earnings": "2026-11-12"
+  },
+  "SPCX": {
+    "earnings": "2026-11-03"
+  },
+  "SPFI": {
+    "earnings": "2026-10-22"
+  },
+  "SPG": {
+    "earnings": "2026-11-05"
+  },
+  "SPGI": {
+    "earnings": "2026-10-27"
+  },
+  "SPHR": {
+    "earnings": "2026-11-03"
+  },
+  "SPNT": {
+    "earnings": "2026-10-29"
+  },
+  "SPOK": {
+    "earnings": "2026-11-04"
+  },
+  "SPRB": {
+    "earnings": "2026-11-09"
+  },
+  "SPRY": {
+    "earnings": "2026-11-09"
+  },
+  "SPSC": {
+    "earnings": "2026-10-29"
+  },
+  "SPT": {
+    "earnings": "2026-11-03"
+  },
+  "SPTX": {
+    "earnings": "2026-11-02"
+  },
+  "SR": {
+    "earnings": "2026-11-13"
+  },
+  "SRBK": {
+    "earnings": "2026-10-29"
+  },
+  "SRCE": {
+    "earnings": "2026-10-22"
+  },
+  "SRE": {
+    "earnings": "2026-11-04"
+  },
+  "SRI": {
+    "earnings": "2026-11-04"
+  },
+  "SRPT": {
+    "earnings": "2026-11-02"
+  },
+  "SRRK": {
+    "earnings": "2026-11-13"
+  },
+  "SRTA": {
+    "earnings": "2026-11-09"
+  },
+  "SRZN": {
+    "earnings": "2026-11-06"
+  },
+  "SSMR": {
+    "earnings": "2026-11-11"
+  },
+  "SSP": {
+    "earnings": "2026-11-05"
+  },
+  "SSRM": {
+    "earnings": "2026-11-03"
+  },
+  "SSTK": {
+    "earnings": "2026-11-05"
+  },
+  "STAA": {
+    "earnings": "2026-11-04"
+  },
+  "STBA": {
+    "earnings": "2026-10-22"
+  },
+  "STC": {
+    "earnings": "2026-10-21"
+  },
+  "STE": {
+    "earnings": "2026-11-04"
+  },
+  "STEP": {
+    "earnings": "2026-11-05"
+  },
+  "STGW": {
+    "earnings": "2026-10-29"
+  },
+  "STLD": {
+    "earnings": "2026-10-19"
+  },
+  "STLN": {
+    "earnings": "2026-11-12"
+  },
+  "STNE": {
+    "earnings": "2026-11-12"
+  },
+  "STNG": {
+    "earnings": "2026-10-29"
+  },
+  "STOK": {
+    "earnings": "2026-11-03"
+  },
+  "STRA": {
+    "earnings": "2026-11-05"
+  },
+  "STRO": {
+    "earnings": "2026-11-05"
+  },
+  "STRT": {
+    "earnings": "2026-10-29"
+  },
+  "STRW": {
+    "earnings": "2026-11-05"
+  },
+  "STRZ": {
+    "earnings": "2026-10-29"
+  },
+  "STTK": {
+    "earnings": "2026-11-05"
+  },
+  "STUB": {
+    "earnings": "2026-11-12"
+  },
+  "STX": {
+    "earnings": "2026-10-27"
+  },
+  "STXS": {
+    "earnings": "2026-11-10"
+  },
+  "SUPN": {
+    "earnings": "2026-11-03"
+  },
+  "SVC": {
+    "earnings": "2026-11-04"
+  },
+  "SVCO": {
+    "earnings": "2026-11-11"
+  },
+  "SVIA": {
+    "earnings": "2026-11-12"
+  },
+  "SVRA": {
+    "earnings": "2026-11-11"
+  },
+  "SVV": {
+    "earnings": "2026-10-29"
+  },
+  "SW": {
+    "earnings": "2026-11-04"
+  },
+  "SWIM": {
+    "earnings": "2026-11-03"
+  },
+  "SWK": {
+    "earnings": "2026-11-04"
+  },
+  "SWKS": {
+    "earnings": "2026-10-27"
+  },
+  "SWMR": {
+    "earnings": "2026-11-12"
+  },
+  "SWX": {
+    "earnings": "2026-11-04"
+  },
+  "SXC": {
+    "earnings": "2026-11-03"
+  },
+  "SXI": {
+    "earnings": "2026-10-29"
+  },
+  "SXT": {
+    "earnings": "2026-10-30"
+  },
+  "SYBT": {
+    "earnings": "2026-11-04"
+  },
+  "SYF": {
+    "earnings": "2026-10-20"
+  },
+  "SYK": {
+    "earnings": "2026-10-29"
+  },
+  "SYNA": {
+    "earnings": "2026-11-05"
+  },
+  "SYRE": {
+    "earnings": "2026-11-03"
+  },
+  "SYY": {
+    "earnings": "2026-11-03"
+  },
+  "T": {
+    "earnings": "2026-10-21"
+  },
+  "TALO": {
+    "earnings": "2026-11-03"
+  },
+  "TARA": {
+    "earnings": "2026-11-09"
+  },
+  "TARS": {
+    "earnings": "2026-11-03"
+  },
+  "TATT": {
+    "earnings": "2026-11-11"
+  },
+  "TBBK": {
+    "earnings": "2026-10-29"
+  },
+  "TBCH": {
+    "earnings": "2026-11-05"
+  },
+  "TBI": {
+    "earnings": "2026-11-02"
+  },
+  "TBLA": {
+    "earnings": "2026-11-04"
+  },
+  "TCBK": {
+    "earnings": "2026-10-22"
+  },
+  "TCBX": {
+    "earnings": "2026-10-21"
+  },
+  "TCI": {
+    "earnings": "2026-11-05"
+  },
+  "TCMD": {
+    "earnings": "2026-11-02"
+  },
+  "TCX": {
+    "earnings": "2026-11-05"
+  },
+  "TDAY": {
+    "earnings": "2026-10-29"
+  },
+  "TDC": {
+    "earnings": "2026-11-03"
+  },
+  "TDG": {
+    "earnings": "2026-11-11"
+  },
+  "TDOC": {
+    "earnings": "2026-11-04"
+  },
+  "TDS": {
+    "earnings": "2026-11-06"
+  },
+  "TDUP": {
+    "earnings": "2026-11-04"
+  },
+  "TDW": {
+    "earnings": "2026-11-09"
+  },
+  "TDY": {
+    "earnings": "2026-10-28"
+  },
+  "TE": {
+    "earnings": "2026-11-13"
+  },
+  "TECH": {
+    "earnings": "2026-11-04"
+  },
+  "TECX": {
+    "earnings": "2026-11-05"
+  },
+  "TEL": {
+    "earnings": "2026-10-28"
+  },
+  "TENB": {
+    "earnings": "2026-10-28"
+  },
+  "TENX": {
+    "earnings": "2026-11-11"
+  },
+  "TER": {
+    "earnings": "2026-10-27"
+  },
+  "TEX": {
+    "earnings": "2026-10-29"
+  },
+  "TFC": {
+    "earnings": "2026-10-16"
+  },
+  "TFIN": {
+    "earnings": "2026-10-21"
+  },
+  "TG": {
+    "earnings": "2026-11-06"
+  },
+  "TGLS": {
+    "earnings": "2026-11-05"
+  },
+  "TGTX": {
+    "earnings": "2026-11-02"
+  },
+  "TH": {
+    "earnings": "2026-11-05"
+  },
+  "THFF": {
+    "earnings": "2026-10-27"
+  },
+  "THRM": {
+    "earnings": "2026-10-22"
+  },
+  "THRY": {
+    "earnings": "2026-10-29"
+  },
+  "TIC": {
+    "earnings": "2026-11-11"
+  },
+  "TILE": {
+    "earnings": "2026-11-06"
+  },
+  "TIPT": {
+    "earnings": "2026-10-30"
+  },
+  "TK": {
+    "earnings": "2026-11-04"
+  },
+  "TKNO": {
+    "earnings": "2026-11-05"
+  },
+  "TKO": {
+    "earnings": "2026-11-04"
+  },
+  "TLS": {
+    "earnings": "2026-11-09"
+  },
+  "TLSI": {
+    "earnings": "2026-11-12"
+  },
+  "TMDX": {
+    "earnings": "2026-11-04"
+  },
+  "TMO": {
+    "earnings": "2026-10-21"
+  },
+  "TMP": {
+    "earnings": "2026-10-23"
+  },
+  "TMUS": {
+    "earnings": "2026-10-28"
+  },
+  "TNC": {
+    "earnings": "2026-11-02"
+  },
+  "TNDM": {
+    "earnings": "2026-11-05"
+  },
+  "TNET": {
+    "earnings": "2026-11-04"
+  },
+  "TNGX": {
+    "earnings": "2026-11-03"
+  },
+  "TNK": {
+    "earnings": "2026-11-04"
+  },
+  "TNXP": {
+    "earnings": "2026-11-09"
+  },
+  "TOWN": {
+    "earnings": "2026-10-28"
+  },
+  "TPB": {
+    "earnings": "2026-11-04"
+  },
+  "TPC": {
+    "earnings": "2026-11-04"
+  },
+  "TPL": {
+    "earnings": "2026-11-04"
+  },
+  "TPR": {
+    "earnings": "2026-11-05"
+  },
+  "TRAK": {
+    "earnings": "2026-11-12"
+  },
+  "TRAX": {
+    "earnings": "2026-11-11"
+  },
+  "TRC": {
+    "earnings": "2026-11-05"
+  },
+  "TRDA": {
+    "earnings": "2026-11-05"
+  },
+  "TREE": {
+    "earnings": "2026-10-29"
+  },
+  "TRGP": {
+    "earnings": "2026-11-05"
+  },
+  "TRI": {
+    "earnings": "2026-11-03"
+  },
+  "TRIP": {
+    "earnings": "2026-11-05"
+  },
+  "TRMB": {
+    "earnings": "2026-11-04"
+  },
+  "TRMK": {
+    "earnings": "2026-10-27"
+  },
+  "TRN": {
+    "earnings": "2026-10-29"
+  },
+  "TRNO": {
+    "earnings": "2026-11-04"
+  },
+  "TRNS": {
+    "earnings": "2026-11-02"
+  },
+  "TRON": {
+    "earnings": "2026-11-09"
+  },
+  "TROW": {
+    "earnings": "2026-10-29"
+  },
+  "TROX": {
+    "earnings": "2026-11-04"
+  },
+  "TRS": {
+    "earnings": "2026-10-29"
+  },
+  "TRST": {
+    "earnings": "2026-10-21"
+  },
+  "TRTX": {
+    "earnings": "2026-10-27"
+  },
+  "TRUP": {
+    "earnings": "2026-11-05"
+  },
+  "TRV": {
+    "earnings": "2026-10-16"
+  },
+  "TRVI": {
+    "earnings": "2026-11-12"
+  },
+  "TSBK": {
+    "earnings": "2026-10-29"
+  },
+  "TSCO": {
+    "earnings": "2026-10-22"
+  },
+  "TSHA": {
+    "earnings": "2026-11-03"
+  },
+  "TSLA": {
+    "earnings": "2026-10-21"
+  },
+  "TSM": {
+    "earnings": "2026-10-15"
+  },
+  "TSSI": {
+    "earnings": "2026-11-12"
+  },
+  "TT": {
+    "earnings": "2026-10-29"
+  },
+  "TTAM": {
+    "earnings": "2026-11-04"
+  },
+  "TTGT": {
+    "earnings": "2026-11-09"
+  },
+  "TTI": {
+    "earnings": "2026-11-02"
+  },
+  "TTWO": {
+    "earnings": "2026-11-09"
+  },
+  "TVTX": {
+    "earnings": "2026-10-29"
+  },
+  "TWI": {
+    "earnings": "2026-10-29"
+  },
+  "TWIN": {
+    "earnings": "2026-11-04"
+  },
+  "TWLO": {
+    "earnings": "2026-10-29"
+  },
+  "TWST": {
+    "earnings": "2026-11-13"
+  },
+  "TXG": {
+    "earnings": "2026-11-05"
+  },
+  "TXN": {
+    "earnings": "2026-10-21"
+  },
+  "TXNM": {
+    "earnings": "2026-10-30"
+  },
+  "TXT": {
+    "earnings": "2026-10-29"
+  },
+  "TYGO": {
+    "earnings": "2026-10-27"
+  },
+  "TYL": {
+    "earnings": "2026-10-28"
+  },
+  "TYRA": {
+    "earnings": "2026-11-04"
+  },
+  "UA": {
+    "earnings": "2026-11-05"
+  },
+  "UAA": {
+    "earnings": "2026-11-05"
+  },
+  "UAL": {
+    "earnings": "2026-10-20"
+  },
+  "UAMY": {
+    "earnings": "2026-11-11"
+  },
+  "UBER": {
+    "earnings": "2026-11-04"
+  },
+  "UBSI": {
+    "earnings": "2026-10-22"
+  },
+  "UCB": {
+    "earnings": "2026-10-20"
+  },
+  "UCTT": {
+    "earnings": "2026-10-27"
+  },
+  "UDR": {
+    "earnings": "2026-11-04"
+  },
+  "UE": {
+    "earnings": "2026-10-28"
+  },
+  "UFCS": {
+    "earnings": "2026-11-03"
+  },
+  "UFPI": {
+    "earnings": "2026-10-28"
+  },
+  "UFPT": {
+    "earnings": "2026-11-02"
+  },
+  "UHS": {
+    "earnings": "2026-10-27"
+  },
+  "UHT": {
+    "earnings": "2026-10-26"
+  },
+  "UIS": {
+    "earnings": "2026-11-04"
+  },
+  "ULCC": {
+    "earnings": "2026-11-04"
+  },
+  "ULH": {
+    "earnings": "2026-11-05"
+  },
+  "UMAC": {
+    "earnings": "2026-11-05"
+  },
+  "UMBF": {
+    "earnings": "2026-10-27"
+  },
+  "UMH": {
+    "earnings": "2026-11-02"
+  },
+  "UNCY": {
+    "earnings": "2026-11-11"
+  },
+  "UNF": {
+    "earnings": "2026-10-21"
+  },
+  "UNIT": {
+    "earnings": "2026-11-09"
+  },
+  "UNP": {
+    "earnings": "2026-10-22"
+  },
+  "UP": {
+    "earnings": "2026-11-04"
+  },
+  "UPB": {
+    "earnings": "2026-11-04"
+  },
+  "UPBD": {
+    "earnings": "2026-10-29"
+  },
+  "UPS": {
+    "earnings": "2026-10-27"
+  },
+  "UPST": {
+    "earnings": "2026-11-03"
+  },
+  "UPWK": {
+    "earnings": "2026-11-02"
+  },
+  "URG": {
+    "earnings": "2026-11-02"
+  },
+  "URGN": {
+    "earnings": "2026-11-05"
+  },
+  "URI": {
+    "earnings": "2026-10-21"
+  },
+  "USAR": {
+    "earnings": "2026-11-05"
+  },
+  "USCB": {
+    "earnings": "2026-10-22"
+  },
+  "USGO": {
+    "earnings": "2026-11-12"
+  },
+  "USLM": {
+    "earnings": "2026-11-04"
+  },
+  "USNA": {
+    "earnings": "2026-11-03"
+  },
+  "USPH": {
+    "earnings": "2026-11-04"
+  },
+  "UTL": {
+    "earnings": "2026-11-02"
+  },
+  "UTMD": {
+    "earnings": "2026-10-22"
+  },
+  "UTZ": {
+    "earnings": "2026-10-29"
+  },
+  "UUUU": {
+    "earnings": "2026-11-02"
+  },
+  "UVE": {
+    "earnings": "2026-10-22"
+  },
+  "UVSP": {
+    "earnings": "2026-10-28"
+  },
+  "UVV": {
+    "earnings": "2026-11-04"
+  },
+  "V": {
+    "earnings": "2026-10-27"
+  },
+  "VABK": {
+    "earnings": "2026-10-22"
+  },
+  "VAC": {
+    "earnings": "2026-11-03"
+  },
+  "VAL": {
+    "earnings": "2026-11-04"
+  },
+  "VATE": {
+    "earnings": "2026-11-11"
+  },
+  "VC": {
+    "earnings": "2026-10-22"
+  },
+  "VCEL": {
+    "earnings": "2026-11-05"
+  },
+  "VCTR": {
+    "earnings": "2026-11-05"
+  },
+  "VCYT": {
+    "earnings": "2026-11-03"
+  },
+  "VECO": {
+    "earnings": "2026-11-04"
+  },
+  "VEL": {
+    "earnings": "2026-11-05"
+  },
+  "VELO": {
+    "earnings": "2026-11-09"
+  },
+  "VENU": {
+    "earnings": "2026-11-13"
+  },
+  "VERA": {
+    "earnings": "2026-11-04"
+  },
+  "VERI": {
+    "earnings": "2026-11-05"
+  },
+  "VERX": {
+    "earnings": "2026-11-02"
+  },
+  "VGNT": {
+    "earnings": "2026-11-04"
+  },
+  "VGZ": {
+    "earnings": "2026-11-11"
+  },
+  "VHI": {
+    "earnings": "2026-11-05"
+  },
+  "VIA": {
+    "earnings": "2026-11-09"
+  },
+  "VICI": {
+    "earnings": "2026-10-28"
+  },
+  "VIR": {
+    "earnings": "2026-11-04"
+  },
+  "VISN": {
+    "earnings": "2026-10-29"
+  },
+  "VITL": {
+    "earnings": "2026-11-03"
+  },
+  "VLO": {
+    "earnings": "2026-10-22"
+  },
+  "VLTO": {
+    "earnings": "2026-10-29"
+  },
+  "VLY": {
+    "earnings": "2026-10-22"
+  },
+  "VMC": {
+    "earnings": "2026-10-29"
+  },
+  "VMD": {
+    "earnings": "2026-11-04"
+  },
+  "VMRK": {
+    "earnings": "2026-11-04"
+  },
+  "VNDA": {
+    "earnings": "2026-11-04"
+  },
+  "VOR": {
+    "earnings": "2026-11-12"
+  },
+  "VOXR": {
+    "earnings": "2026-11-11"
+  },
+  "VOYG": {
+    "earnings": "2026-11-02"
+  },
+  "VPG": {
+    "earnings": "2026-11-04"
+  },
+  "VRDN": {
+    "earnings": "2026-11-04"
+  },
+  "VRNS": {
+    "earnings": "2026-10-27"
+  },
+  "VRRM": {
+    "earnings": "2026-11-04"
+  },
+  "VRSK": {
+    "earnings": "2026-11-05"
+  },
+  "VRSN": {
+    "earnings": "2026-10-22"
+  },
+  "VRT": {
+    "earnings": "2026-10-28"
+  },
+  "VRTS": {
+    "earnings": "2026-10-30"
+  },
+  "VRTX": {
+    "earnings": "2026-11-02"
+  },
+  "VSAT": {
+    "earnings": "2026-11-06"
+  },
+  "VSEC": {
+    "earnings": "2026-11-04"
+  },
+  "VSH": {
+    "earnings": "2026-11-04"
+  },
+  "VST": {
+    "earnings": "2026-11-06"
+  },
+  "VSTM": {
+    "earnings": "2026-11-03"
+  },
+  "VTOL": {
+    "earnings": "2026-11-03"
+  },
+  "VTR": {
+    "earnings": "2026-10-27"
+  },
+  "VTRS": {
+    "earnings": "2026-11-05"
+  },
+  "VTS": {
+    "earnings": "2026-11-02"
+  },
+  "VUZI": {
+    "earnings": "2026-11-12"
+  },
+  "VVX": {
+    "earnings": "2026-11-02"
+  },
+  "VYGR": {
+    "earnings": "2026-11-09"
+  },
+  "VYLR": {
+    "earnings": "2026-11-11"
+  },
+  "VYX": {
+    "earnings": "2026-11-05"
+  },
+  "VZ": {
+    "earnings": "2026-10-26"
+  },
+  "WAB": {
+    "earnings": "2026-10-21"
+  },
+  "WASH": {
+    "earnings": "2026-10-19"
+  },
+  "WAT": {
+    "earnings": "2026-11-03"
+  },
+  "WATT": {
+    "earnings": "2026-11-11"
+  },
+  "WAY": {
+    "earnings": "2026-11-04"
+  },
+  "WBTN": {
+    "earnings": "2026-11-11"
+  },
+  "WD": {
+    "earnings": "2026-11-05"
+  },
+  "WDC": {
+    "earnings": "2026-10-22"
+  },
+  "WDFC": {
+    "earnings": "2026-10-21"
+  },
+  "WEAV": {
+    "earnings": "2026-10-29"
+  },
+  "WEC": {
+    "earnings": "2026-10-29"
+  },
+  "WELL": {
+    "earnings": "2026-10-26"
+  },
+  "WEN": {
+    "earnings": "2026-11-05"
+  },
+  "WERN": {
+    "earnings": "2026-10-27"
+  },
+  "WEST": {
+    "earnings": "2026-11-05"
+  },
+  "WEYS": {
+    "earnings": "2026-11-03"
+  },
+  "WGO": {
+    "earnings": "2026-10-21"
+  },
+  "WGS": {
+    "earnings": "2026-10-27"
+  },
+  "WHD": {
+    "earnings": "2026-11-04"
+  },
+  "WHG": {
+    "earnings": "2026-10-29"
+  },
+  "WHK": {
+    "earnings": "2026-11-12"
+  },
+  "WHWK": {
+    "earnings": "2026-11-05"
+  },
+  "WK": {
+    "earnings": "2026-11-05"
+  },
+  "WKC": {
+    "earnings": "2026-10-22"
+  },
+  "WLDN": {
+    "earnings": "2026-11-05"
+  },
+  "WLFC": {
+    "earnings": "2026-11-03"
+  },
+  "WM": {
+    "earnings": "2026-10-27"
+  },
+  "WMB": {
+    "earnings": "2026-11-02"
+  },
+  "WMK": {
+    "earnings": "2026-11-03"
+  },
+  "WNC": {
+    "earnings": "2026-10-29"
+  },
+  "WNEB": {
+    "earnings": "2026-10-27"
+  },
+  "WOLF": {
+    "earnings": "2026-11-04"
+  },
+  "WRB": {
+    "earnings": "2026-10-19"
+  },
+  "WRBY": {
+    "earnings": "2026-11-05"
+  },
+  "WRLD": {
+    "earnings": "2026-10-22"
+  },
+  "WSBC": {
+    "earnings": "2026-10-21"
+  },
+  "WSBF": {
+    "earnings": "2026-10-22"
+  },
+  "WSFS": {
+    "earnings": "2026-10-22"
+  },
+  "WST": {
+    "earnings": "2026-10-29"
+  },
+  "WT": {
+    "earnings": "2026-10-30"
+  },
+  "WTBA": {
+    "earnings": "2026-10-29"
+  },
+  "WTI": {
+    "earnings": "2026-11-04"
+  },
+  "WTTR": {
+    "earnings": "2026-11-03"
+  },
+  "WTW": {
+    "earnings": "2026-10-29"
+  },
+  "WVE": {
+    "earnings": "2026-11-09"
+  },
+  "WWW": {
+    "earnings": "2026-11-04"
+  },
+  "WY": {
+    "earnings": "2026-10-29"
+  },
+  "WYFI": {
+    "earnings": "2026-11-12"
+  },
+  "WYNN": {
+    "earnings": "2026-11-05"
+  },
+  "XEL": {
+    "earnings": "2026-10-29"
+  },
+  "XENE": {
+    "earnings": "2026-11-02"
+  },
+  "XERS": {
+    "earnings": "2026-11-05"
+  },
+  "XFOR": {
+    "earnings": "2026-11-04"
+  },
+  "XHR": {
+    "earnings": "2026-11-03"
+  },
+  "XMAX": {
+    "earnings": "2026-11-13"
+  },
+  "XMTR": {
+    "earnings": "2026-11-03"
+  },
+  "XNCR": {
+    "earnings": "2026-11-04"
+  },
+  "XOM": {
+    "earnings": "2026-10-30"
+  },
+  "XPEL": {
+    "earnings": "2026-11-04"
+  },
+  "XPER": {
+    "earnings": "2026-11-04"
+  },
+  "XPOF": {
+    "earnings": "2026-11-05"
+  },
+  "XPRO": {
+    "earnings": "2026-10-22"
+  },
+  "XRAY": {
+    "earnings": "2026-11-05"
+  },
+  "XRN": {
+    "earnings": "2026-11-03"
+  },
+  "XRX": {
+    "earnings": "2026-10-29"
+  },
+  "XYL": {
+    "earnings": "2026-10-27"
+  },
+  "XYZ": {
+    "earnings": "2026-11-03"
+  },
+  "YELP": {
+    "earnings": "2026-11-05"
+  },
+  "YORW": {
+    "earnings": "2026-11-05"
+  },
+  "YOU": {
+    "earnings": "2026-11-05"
+  },
+  "YSS": {
+    "earnings": "2026-11-12"
+  },
+  "YSWY": {
+    "earnings": "2026-11-12"
+  },
+  "YUM": {
+    "earnings": "2026-11-03"
+  },
+  "ZBH": {
+    "earnings": "2026-11-04"
+  },
+  "ZBRA": {
+    "earnings": "2026-11-03"
+  },
+  "ZD": {
+    "earnings": "2026-11-05"
+  },
+  "ZENA": {
+    "earnings": "2026-11-10"
+  },
+  "ZETA": {
+    "earnings": "2026-11-03"
+  },
+  "ZGN": {
+    "earnings": "2026-10-22"
+  },
+  "ZIP": {
+    "earnings": "2026-11-04"
+  },
+  "ZNTL": {
+    "earnings": "2026-11-09"
+  },
+  "ZSQR": {
+    "earnings": "2026-11-12"
+  },
+  "ZTS": {
+    "earnings": "2026-11-05"
+  },
+  "ZURA": {
+    "earnings": "2026-11-12"
+  },
+  "ZVRA": {
+    "earnings": "2026-11-04"
+  },
+  "ZWS": {
+    "earnings": "2026-10-27"
+  },
+  "ZYME": {
+    "earnings": "2026-11-05"
+  },
+  "_note": "Curated earnings dates for the screener's earnings-in-window reject rule (#33). Format: {\"SYM\": {\"earnings\": \"YYYY-MM-DD\"}}. Only add dates verified against company IR or major calendars. Unknown symbols keep the 'earnings date unknown' flag."
+}
