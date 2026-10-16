@@ -111,5 +111,50 @@ class TestBuildStockMap(unittest.TestCase):
         self.assertIn("GOOGL", m)
 
 
+class TestSupportResistance(unittest.TestCase):
+    def test_extracts_levels(self):
+        stock = {
+            "price": 250,
+            "pivot_highs": 260,
+            "pivot_lows": 240,
+            "fib_levels": {"38.2%": 245, "61.8%": 255},
+        }
+        sr = ra.support_resistance(stock)
+        self.assertIn("supports", sr)
+        self.assertIn("resistances", sr)
+
+    def test_no_data(self):
+        sr = ra.support_resistance({})
+        self.assertEqual(sr["levels"], [])
+
+
+class TestBollinger(unittest.TestCase):
+    def test_mid_band(self):
+        self.assertIn("mid-band", ra.bollinger_reading({"bollinger_pct_b": 0.5}))
+
+    def test_extended(self):
+        self.assertIn("extended", ra.bollinger_reading({"bollinger_pct_b": 1.2}))
+
+    def test_no_data(self):
+        self.assertIn("No ", ra.bollinger_reading({}))
+
+
+class TestFundamentals(unittest.TestCase):
+    def test_no_key_returns_unavailable(self):
+        # Ensure no key is set
+        import os
+        old_fh = os.environ.pop("FINNHUB_API_KEY", None)
+        old_fmp = os.environ.pop("FMP_API_KEY", None)
+        try:
+            result = ra.fetch_fundamentals("AMZN")
+            self.assertFalse(result["available"])
+            self.assertIn("reason", result)
+        finally:
+            if old_fh:
+                os.environ["FINNHUB_API_KEY"] = old_fh
+            if old_fmp:
+                os.environ["FMP_API_KEY"] = old_fmp
+
+
 if __name__ == "__main__":
     unittest.main()
