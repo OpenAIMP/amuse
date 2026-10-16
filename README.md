@@ -274,7 +274,14 @@ Outputs conviction-ranked breakout candidates with near-miss diagnostics.
 Evaluates poor-man's covered calls as pairs: 0.80–0.95Δ LEAPS (270–800 DTE)
 × 0.15–0.35Δ short calls (21–60 DTE), gated on liquidity, friction,
 capital efficiency, and earnings. Ranks by 30-day premium-to-debit.
-Monthly cadence — answers the long-horizon income question.
+Runs daily — answers the long-horizon income question.
+
+**How PMCC ranking works:** Every LEAPS × short-call combination is evaluated
+per symbol. Gates: P/D >= 4.0% (minimum income), breach <= 8% (upside risk),
+no earnings in short-call window, sufficient liquidity. The report shows both
+the winners ("Best PMCC pair by underlying") and the full audit trail
+("Evaluated PMCC pairs" — every combination with pass/fail reasons).
+This transparency lets you see what was discarded and why.
 
 **`tastytrade_backtest.py` — "Did this strategy actually make money historically?"**
 Submits backtests to Tastytrade's API (bull puts, bear calls, iron condors;
