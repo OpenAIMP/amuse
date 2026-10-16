@@ -147,7 +147,82 @@ class TestFormatTable(unittest.TestCase):
 
 class TestViews(unittest.TestCase):
     def test_all_views_valid(self):
-        self.assertEqual(set(compare.VIEWS), {"bullish", "bearish", "neutral"})
+        self.assertEqual(set(compare.VIEWS),
+                         {"bullish", "bearish", "neutral", "directional"})
+
+    def test_directional_picks_stronger_side(self):
+        # Strong uptrend → directional picks bullish
+        m = _metrics(trend="UP", bias="bullish", score=28)
+        s, reasons = compare._score_for_view(m, "directional")
+        self.assertTrue(any("bullish" in r for r in reasons))
+        # Strong downtrend → directional picks bearish
+        m2 = _metrics(trend="DN", bias="bearish", score=22)
+        s2, reasons2 = compare._score_for_view(m2, "directional")
+        self.assertTrue(any("bearish" in r for r in reasons2))
+
+
+class TestUniverse(unittest.TestCase):
+    def test_load_universe(self):
+        syms = compare.load_universe("lev_etf")
+        self.assertIn("TQQQ", syms)
+        self.assertIn("SQQQ", syms)
+        self.assertGreater(len(syms), 20)
+
+    def test_rank_universe_sorting(self):
+        # Mock extract_metrics to avoid network calls
+        orig = compare.extract_metrics
+        def fake(sym):
+            scores = {"AAA": 30.0, "BBB": 20.0, "CCC": 25.0}
+            m = _metrics(symbol=sym, score=scores.get(sym, 15.0))
+            return m, None
+        compare.extract_metrics = fake
+        try:
+            results, errors = compare.rank_universe(
+                ["AAA", "BBB", "CCC"], views=["bullish"])
+            ranked = results["bullish"]
+            self.assertEqual(ranked[0][0], "AAA")
+            self.assertEqual(ranked[1][0], "CCC")
+            self.assertEqual(ranked[2][0], "BBB")
+            self.assertEqual(errors, {})
+        finally:
+            compare.extract_metrics = orig
+
+    def test_rank_universe_top_n(self):
+        orig = compare.extract_metrics
+        compare.extract_metrics = lambda s: (_metrics(symbol=s), None)
+        try:
+            results, _ = compare.rank_universe(
+                ["A", "B", "C", "D"], views=["bullish"], top=2)
+            self.assertEqual(len(results["bullish"]), 2)
+        finally:
+            compare.extract_metrics = orig
+
+    def test_rank_universe_handles_errors(self):
+        orig = compare.extract_metrics
+        def fake(sym):
+            if sym == "BAD":
+                return None, "data error"
+            return _metrics(symbol=sym), None
+        compare.extract_metrics = fake
+        try:
+            results, errors = compare.rank_universe(
+                ["GOOD", "BAD"], views=["bullish"])
+            self.assertIn("BAD", errors)
+            self.assertEqual(len(results["bullish"]), 1)
+        finally:
+            compare.extract_metrics = orig
+
+    def test_format_leaderboard(self):
+        results = {
+            "bullish": [("AAA", 30.0, _metrics(symbol="AAA", price=100.0))],
+            "bearish": [("BBB", 28.0, _metrics(symbol="BBB", price=200.0))],
+        }
+        out = compare.format_leaderboard(results, {}, "test_uni")
+        self.assertIn("test_uni", out)
+        self.assertIn("Bullish", out)
+        self.assertIn("Bearish", out)
+        self.assertIn("AAA", out)
+        self.assertIn("Not investment advice", out)
 
 
 if __name__ == "__main__":
