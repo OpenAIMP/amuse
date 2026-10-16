@@ -130,7 +130,7 @@ Earnings dates flagged as a caveat — check the window before trading binary ev
             "<th>Price</th><th>30d</th><th>YTD</th><th>Trend</th>"
             "<th>RSI</th><th>Verdict</th></tr></thead><tbody>"
         )
-        for rank, (sym, score, m) in enumerate(ranked, 1):
+        for rank, (sym, score, m, reasons) in enumerate(ranked, 1):
             price = f"${m['price']:,.2f}" if m.get("price") else "—"
             rsi = f"{m['rsi14']:.0f}" if m.get("rsi14") else "—"
             parts.append(
@@ -144,7 +144,22 @@ Earnings dates flagged as a caveat — check the window before trading binary ev
                 f"<td>{rsi}</td>"
                 f"<td>{_badge(m.get('verdict'))}</td></tr>"
             )
-        parts.append("</tbody></table></div></div></div>")
+        parts.append("</tbody></table></div>")
+
+        # Leader's scoring breakdown
+        if ranked:
+            lead_sym, lead_score, _, lead_reasons = ranked[0]
+            parts.append(
+                f'<div style="margin-top:12px;padding:12px;background:#0d1117;'
+                f'border-radius:8px;border:1px solid var(--border)">'
+                f'<strong>Why {esc(lead_sym)} leads ({view}):</strong>'
+                f'<span style="color:var(--dim)"> score {lead_score}</span><br>'
+            )
+            for r in lead_reasons:
+                parts.append(f'<span style="color:var(--dim)">• {esc(r)}</span><br>')
+            parts.append('</div>')
+
+        parts.append("</div></div>")
 
     # Tab switching JS
     parts.append("""<script>
