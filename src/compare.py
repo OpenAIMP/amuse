@@ -367,8 +367,8 @@ def rank_universe(symbols, views=None, top=None):
     """
     Score every symbol across all views (or a subset).
 
-    Returns {view: [(symbol, score, metrics), ...]} sorted by score desc.
-    Symbols that fail screening are skipped (listed in errors).
+    Returns ({view: [(symbol, score, metrics, reasons), ...]}, errors)
+    sorted by score desc. Symbols that fail screening are skipped.
     """
     views = views or VIEWS
     results = {v: [] for v in views}
@@ -380,8 +380,8 @@ def rank_universe(symbols, views=None, top=None):
             errors[sym] = err or "screening failed"
             continue
         for view in views:
-            score, _ = _score_for_view(metrics, view)
-            results[view].append((sym, score, metrics))
+            score, reasons = _score_for_view(metrics, view)
+            results[view].append((sym, score, metrics, reasons))
 
     for view in views:
         results[view].sort(key=lambda x: x[1], reverse=True)
@@ -461,7 +461,7 @@ def main(argv):
                          "price": m.get("price"),
                          "trend": m.get("trend"),
                          "verdict": m.get("verdict")}
-                        for s, sc, m in ranked]
+                        for s, sc, m, _ in ranked]
                     for v, ranked in results.items()
                 },
                 "errors": errors,
