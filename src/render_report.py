@@ -43,6 +43,26 @@ from screening_common import qualification_counts, sort_evaluations
 CHAIN_INLINE_LIMIT = 200
 _PENDING_CHAIN = []
 
+# Column header tooltips - injected before </body> in rendered pages.
+# Maps header text to plain-English explanation. See column_tooltips.py.
+import json as _json
+from column_tooltips import TOOLTIPS as _TOOLTIPS
+_TOOLTIP_DICT = _json.dumps(_TOOLTIPS)
+TOOLTIP_JS = (
+    "<script>\n"
+    "const COLUMN_TIPS = " + _TOOLTIP_DICT + ";\n"
+    "document.addEventListener('DOMContentLoaded', () => {\n"
+    "  document.querySelectorAll('th').forEach(th => {\n"
+    "    const text = th.textContent.trim();\n"
+    "    if (COLUMN_TIPS[text] && !th.hasAttribute('title')) {\n"
+    "      th.setAttribute('title', COLUMN_TIPS[text]);\n"
+    "      th.style.cursor = 'help';\n"
+    "    }\n"
+    "  });\n"
+    "});\n"
+    "</script>\n"
+)
+
 # ---------------------------------------------------------------- helpers
 
 def load_json(path):
@@ -2159,6 +2179,9 @@ def main():
     )
     outdir = os.path.dirname(os.path.abspath(out))
     os.makedirs(outdir, exist_ok=True)
+    # Inject column tooltips before </body>
+    if "</body>" in page:
+        page = page.replace("</body>", TOOLTIP_JS + "</body>", 1)
     with open(out, "w") as f:
         f.write(page)
     print(f"wrote {out} ({os.path.getsize(out)} bytes)")
