@@ -8,8 +8,12 @@ the repo's no-dependency convention.
 API host: https://backtester.vast.tastyworks.com
 Docs: https://developer.tastytrade.com/docs/guides/backtesting/
 
-Auth: requires a Tastytrade account. Set TT_USERNAME and TT_PASSWORD
-environment variables, or pass a session token directly.
+Auth: OAuth2 only. The legacy POST /sessions username/password flow was
+decommissioned by Tastytrade on 2026-02-11 and no longer exists.
+Create an OAuth application at my.tastytrade.com -> Manage -> My Profile
+-> API -> OAuth Applications, then "Create Grant" for a personal
+refresh token. Set TASTYTRADE_CLIENT_SECRET and TASTYTRADE_REFRESH_TOKEN
+environment variables.
 
 Usage:
     python3 src/tastytrade_backtest.py --symbol SPY --strategy bull_put \
@@ -22,6 +26,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -33,32 +38,99 @@ from datetime import datetime
 AUTH_HOST = "https://api.tastyworks.com"
 BACKTEST_HOST = "https://backtester.vast.tastyworks.com"
 
+# Refresh the access token this many seconds before it expires.
+# Renewal is proactive, never a retry after 401: a POST that may have
+# placed an order must not be replayed.
+REFRESH_MARGIN_SECS = 60
+
 # ---------------------------------------------------------------------------
-# Authentication
+# Authentication (OAuth2)
 # ---------------------------------------------------------------------------
 
 
-def get_session_token(username=None, password=None):
-    """Authenticate and return a session token."""
-    username = username or os.environ.get("TT_USERNAME")
-    password = password or os.environ.get("TT_PASSWORD")
-    if not username or not password:
-        raise ValueError(
-            "Tastytrade credentials required. Set TT_USERNAME and TT_PASSWORD "
-            "environment variables."
+class OAuthSession:
+    """
+    OAuth2 session using the personal refresh-token grant.
+
+    POSTs form-encoded grant_type=refresh_token to /oauth/token and
+    keeps a short-lived access token (~15 min), refreshing proactively
+    before expiry. Secrets never appear in exceptions, logs, or repr.
+    """
+
+    def __init__(self, client_secret=None, refresh_token=None,
+                 base_url=AUTH_HOST):
+        self._client_secret = (
+            client_secret or os.environ.get("TASTYTRADE_CLIENT_SECRET")
+        )
+        self._refresh_token = (
+            refresh_token or os.environ.get("TASTYTRADE_REFRESH_TOKEN")
+        )
+        if not self._client_secret or not self._refresh_token:
+            raise ValueError(
+                "Tastytrade OAuth credentials required. Set "
+                "TASTYTRADE_CLIENT_SECRET and TASTYTRADE_REFRESH_TOKEN "
+                "environment variables. Create them at my.tastytrade.com "
+                "-> Manage -> My Profile -> API -> OAuth Applications."
+            )
+        self.base_url = base_url
+        self._access_token = None
+        self._expires_at = 0
+
+    def __repr__(self):
+        return (
+            f"OAuthSession(base_url={self.base_url!r}, "
+            f"authenticated={self._access_token is not None})"
         )
 
-    url = f"{AUTH_HOST}/sessions"
-    body = json.dumps({"login": username, "password": password}).encode()
-    req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["data"]["session-token"]
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Authentication failed: HTTP {e.code}") from e
+    def get_access_token(self):
+        """Return a valid access token, refreshing proactively if needed."""
+        if (self._access_token is None
+                or time.time() >= self._expires_at - REFRESH_MARGIN_SECS):
+            self._refresh()
+        return self._access_token
+
+    def _refresh(self):
+        """Exchange the refresh token for a new access token."""
+        body = urllib.parse.urlencode({
+            "grant_type": "refresh_token",
+            "refresh_token": self._refresh_token,
+            "client_secret": self._client_secret,
+        }).encode()
+        req = urllib.request.Request(
+            f"{self.base_url}/oauth/token",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            # Never include secrets in the error. Read a short body
+            # for diagnostics, scrubbing nothing because the body
+            # comes from the server, not from us.
+            err_body = e.read().decode()[:300]
+            raise RuntimeError(
+                f"OAuth token refresh failed: HTTP {e.code}: {err_body}"
+            ) from e
+        try:
+            self._access_token = data["access_token"]
+            expires_in = int(data.get("expires_in", 900))
+        except (KeyError, ValueError, TypeError) as e:
+            raise RuntimeError(
+                "OAuth token response missing access_token/expires_in"
+            ) from e
+        # The server may rotate the refresh token; keep the latest.
+        if data.get("refresh_token"):
+            self._refresh_token = data["refresh_token"]
+        self._expires_at = time.time() + expires_in
+
+
+def get_access_token(client_secret=None, refresh_token=None):
+    """Convenience: build an OAuthSession and return an access token."""
+    return OAuthSession(
+        client_secret=client_secret,
+        refresh_token=refresh_token,
+    ).get_access_token()
 
 
 def _headers(token):
@@ -315,13 +387,6 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
-    token = get_session_token()
-
-    if args.check_dates:
-        dates = get_available_dates(token, args.symbol)
-        print(json.dumps(dates, indent=2))
-        return 0
-
     payload = build_backtest(
         symbol=args.symbol,
         strategy=args.strategy,
@@ -334,6 +399,15 @@ def main(argv):
 
     if args.dry_run:
         print(json.dumps(payload, indent=2))
+        return 0
+
+    # Authenticate only when we actually need the API.
+    session = OAuthSession()
+    token = session.get_access_token()
+
+    if args.check_dates:
+        dates = get_available_dates(token, args.symbol)
+        print(json.dumps(dates, indent=2))
         return 0
 
     result = run_backtest(token, payload)
