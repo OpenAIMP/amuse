@@ -1,12 +1,17 @@
 """
-Trade comparison: side-by-side setup analysis for two symbols (#114).
+Trade comparison: side-by-side setup analysis for two symbols,
+or leaderboard across a universe for all views (#114).
 
 Answers "which has the better setup?" for a given directional view
-(bullish/bearish/neutral) using the screener's own data — never invented numbers.
+(bullish/bearish/neutral/directional) using the screener's own data —
+never invented numbers.
 
 Usage:
     python3 src/compare.py --a NVDA --b AMD --view bullish
     python3 src/compare.py --a SPY --b QQQ --view neutral --json
+    python3 src/compare.py --universe lev_etf
+    python3 src/compare.py --universe lev_etf --view bearish
+    python3 src/compare.py --universe lev_etf --top 10 --json
 """
 
 import json
@@ -124,7 +129,7 @@ def extract_metrics(sym):
 # Comparison logic
 # ---------------------------------------------------------------------------
 
-VIEWS = ("bullish", "bearish", "neutral")
+VIEWS = ("bullish", "bearish", "neutral", "directional")
 
 
 def _score_for_view(m, view):
@@ -143,6 +148,16 @@ def _score_for_view(m, view):
 
     trend = m.get("trend", "")
     bias = m.get("bias", "")
+
+    # Directional: best of bullish/bearish — for symbols with a strong
+    # trend in either direction. Useful for universe scans.
+    if view == "directional":
+        b_score, b_reasons = _score_for_view(m, "bullish")
+        r_score, r_reasons = _score_for_view(m, "bearish")
+        if b_score >= r_score:
+            return b_score, [f"directional→bullish ({b_score})"] + b_reasons
+        else:
+            return r_score, [f"directional→bearish ({r_score})"] + r_reasons
 
     if view == "bullish":
         if trend == "UP":
@@ -336,6 +351,76 @@ def format_table(result):
 
 
 # ---------------------------------------------------------------------------
+# Universe leaderboard
+# ---------------------------------------------------------------------------
+
+def load_universe(name):
+    """Load symbols from src/universes/<name>.txt."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "universes", f"{name}.txt")
+    with open(path) as f:
+        return [line.strip().upper() for line in f
+                if line.strip() and not line.startswith("#")]
+
+
+def rank_universe(symbols, views=None, top=None):
+    """
+    Score every symbol across all views (or a subset).
+
+    Returns {view: [(symbol, score, metrics), ...]} sorted by score desc.
+    Symbols that fail screening are skipped (listed in errors).
+    """
+    views = views or VIEWS
+    results = {v: [] for v in views}
+    errors = {}
+
+    for sym in symbols:
+        metrics, err = extract_metrics(sym)
+        if err or metrics is None:
+            errors[sym] = err or "screening failed"
+            continue
+        for view in views:
+            score, _ = _score_for_view(metrics, view)
+            results[view].append((sym, score, metrics))
+
+    for view in views:
+        results[view].sort(key=lambda x: x[1], reverse=True)
+        if top:
+            results[view] = results[view][:top]
+
+    return results, errors
+
+
+def format_leaderboard(results, errors, universe_name, top=None):
+    """Render a multi-view leaderboard as markdown."""
+    lines = []
+    lines.append(f"# {universe_name} — Setup Leaderboard")
+    lines.append("")
+    if errors:
+        lines.append(f"⚠️ Skipped {len(errors)}: {', '.join(sorted(errors))}")
+        lines.append("")
+
+    for view in VIEWS:
+        if view not in results:
+            continue
+        ranked = results[view]
+        lines.append(f"## {view.capitalize()} (top {len(ranked)})")
+        lines.append("")
+        lines.append("| Rank | Symbol | Score | Price | 30d | Trend | Verdict |")
+        lines.append("|---|---|---|---|---|---|---|")
+        for i, (sym, score, m) in enumerate(ranked, 1):
+            price = f"${m['price']:,.2f}" if m.get("price") else "—"
+            ret30 = f"{m['ret_30d_pct']:+.1f}%" if m.get("ret_30d_pct") is not None else "—"
+            trend = m.get("trend") or "—"
+            verdict = m.get("verdict") or "—"
+            lines.append(f"| {i} | {sym} | {score} | {price} | {ret30} | {trend} | {verdict} |")
+        lines.append("")
+
+    lines.append(f"*{DISCLAIMER}*")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -344,14 +429,52 @@ def main(argv):
     parser = argparse.ArgumentParser(
         description="Compare two symbols for a directional view (#114)"
     )
-    parser.add_argument("--a", required=True, help="First symbol")
-    parser.add_argument("--b", required=True, help="Second symbol")
+    # Pairwise mode
+    parser.add_argument("--a", help="First symbol (pairwise mode)")
+    parser.add_argument("--b", help="Second symbol (pairwise mode)")
+    # Universe mode
+    parser.add_argument("--universe",
+                        help="Universe name (e.g. lev_etf) for leaderboard mode")
+    parser.add_argument("--top", type=int, default=None,
+                        help="Top N per view in leaderboard mode")
     parser.add_argument("--view", default="bullish", choices=VIEWS,
                         help="Directional view (default: bullish)")
     parser.add_argument("--json", action="store_true",
-                        help="Output raw JSON instead of markdown table")
+                        help="Output raw JSON instead of markdown")
     args = parser.parse_args(argv)
 
+    # Universe leaderboard mode
+    if args.universe:
+        symbols = load_universe(args.universe)
+        if args.view != "bullish" or "--view" not in " ".join(argv):
+            # Single view requested
+            views = [args.view]
+        else:
+            # Default: all views
+            views = list(VIEWS)
+        results, errors = rank_universe(symbols, views=views, top=args.top)
+        if args.json:
+            out = {
+                "universe": args.universe,
+                "views": {
+                    v: [{"symbol": s, "score": sc,
+                         "price": m.get("price"),
+                         "trend": m.get("trend"),
+                         "verdict": m.get("verdict")}
+                        for s, sc, m in ranked]
+                    for v, ranked in results.items()
+                },
+                "errors": errors,
+            }
+            print(json.dumps(out, indent=2, default=str))
+        else:
+            print(format_leaderboard(results, errors, args.universe,
+                                     top=args.top))
+        return 0
+
+    # Pairwise mode (requires --a and --b)
+    if not args.a or not args.b:
+        parser.error("--a and --b required (or use --universe)")
     result = compare(args.a.upper(), args.b.upper(), args.view)
     if args.json:
         print(json.dumps(result, indent=2, default=str))
