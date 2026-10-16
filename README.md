@@ -210,6 +210,9 @@ in the Trading Playbook (Sections 19–20).
 | `render_report.py` | Renders dated report pages (plus `.meta.json` sidecars) from screener JSONs. | all three |
 | `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. | all three |
 | `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. | manual only |
+| `compare.py` | Side-by-side setup comparison for two symbols, or ranked leaderboard across a universe for bullish/bearish/neutral/directional views. Answers "which has the better setup?" from screener data. | manual only (wire into `daily-watch` to publish) |
+| `render_compare.py` | Renders `docs/compare.html` — tabbed leaderboard with decision-logic explainer — from `compare.py` output. Linked from index.html. | manual only (wire into `daily-watch` to publish) |
+| `tastytrade_backtest.py` | Submits options backtests to Tastytrade's API for strategy validation (#111). Compares predicted Win% vs actual hit rates. | manual only |
 | `semis.py` | Semiconductor momentum screen (early study, superseded). | retired |
 | `pmcc.py`, `pmcc_value.py`, `pmcc_etf.py` | Early one-off PMCC pricers and studies (superseded by `pmcc_quality.py`). | retired |
 
@@ -226,6 +229,63 @@ calls. `semis.py` is kept for reference only.
 | **Data** | Daily bars, a year of history | Intraday bars, today's session | Option chains + Greeks |
 | **Signals** | RSI, SMA50/200, Bollinger %B, anchored VWAP, pivots/Fibs, trend | Gap %, rel volume, developing VWAP, ATR range | Delta gates, liquidity, friction, capital, earnings |
 | **Output** | Ranked 0–40 + readout narrative | Ranked by gap × volume, gap-and-go / fade bias | Pairs ranked by 30-day premium-to-debit |
+
+### What question each screener answers (and how)
+
+**`stock_screener.py` — "Where is it safe to sell premium for the coming weeks?"**
+Computes a 0–40 composite from RSI(14), SMA50/200 positioning, ATR%,
+Bollinger %B/bandwidth, session VWAP, anchored VWAP from 52-week low,
+fractal pivots, Fibonacci retracements, and HH/HL trend structure.
+Outputs a Verdict (Go for it / Watch / Pass) per name. The score is a
+regime-and-timing rank, not a buy signal — it tells you *where* conditions
+favor premium selling, not *what* to sell.
+
+**`spread_screener.py` — "What exactly should I sell, at what strikes, for what credit?"**
+Prices 21 defined-risk strategies (bull/bear verticals, iron condors/butterflies,
+calendars, long butterflies, covered calls, cash-secured puts, straddles/strangles,
+naked puts/calls with warnings, ratio spreads) across 21–60 DTE.
+Uses conservative short-bid-minus-long-ask fills, 0.10–0.20Δ short strikes,
+and delta-based Win% with EV = P(win)×credit − P(loss)×max loss − friction.
+Outputs ranked structures with Lucrative/Solid/Negative EV verdicts.
+Answers *what* to sell — the concrete strikes, credits, and expected value.
+
+**`compare.py` — "Which name has the better setup for my view?"**
+Takes two symbols (pairwise) or a universe (leaderboard) and scores each
+against four views using screener outputs:
+- **Bullish:** UP trend (+10), bullish bias (+5), pullback bonus 5%+ off high (+3), overbought RSI>70 penalty (−5)
+- **Bearish:** DN trend (+10), bearish bias (+5), oversold RSI<30 penalty (−5)
+- **Neutral:** RNG trend (+10), liquidity bonus (score × 0.3 extra)
+- **Directional:** max(bullish, bearish) — best trending setup regardless of side
+Base score × 0.5 for all views. Outputs ranked tables with per-leader
+reason breakdowns. Answers *which* — the relative setup quality between names.
+
+**`premarket_screen.py` — "What's gapping and might continue at the open?"**
+Measures gap %, time-prorated relative volume, developing VWAP distance,
+and ATR range position in the pre-market session (~9 AM ET).
+Outputs gap-and-go vs fade-risk bias. Never a prediction — a momentum
+read on abnormal overnight movement.
+
+**`intraday_screen.py` — "What's breaking out right now?"**
+Tracks 15-minute opening-range breakouts, session-VWAP reclaim/loss,
+and time-prorated relative volume during market hours (11 AM / 2 PM ET).
+Outputs conviction-ranked breakout candidates with near-miss diagnostics.
+
+**`pmcc_quality.py` — "Which LEAPS + short-call pairs earn income for months?"**
+Evaluates poor-man's covered calls as pairs: 0.80–0.95Δ LEAPS (270–800 DTE)
+× 0.15–0.35Δ short calls (21–60 DTE), gated on liquidity, friction,
+capital efficiency, and earnings. Ranks by 30-day premium-to-debit.
+Monthly cadence — answers the long-horizon income question.
+
+**`tastytrade_backtest.py` — "Did this strategy actually make money historically?"**
+Submits backtests to Tastytrade's API (bull puts, bear calls, iron condors;
+45 DTE, 16Δ, 50% profit target, 21 DTE exit) and compares predicted Win%
+against realized hit rates. The calibration loop — answers whether the
+screener's EV estimates correspond to reality. (Issue #111.)
+
+**How they combine.** Stock screen → *where* (regime). Spread screen → *what*
+(structures). Compare → *which* (relative setup). Backtest → *did it work*
+(validation). Premarket/intraday → *when today* (timing). PMCC → *for months*
+(horizon).
 
 ### When to run each screener
 
