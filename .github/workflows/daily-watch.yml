@@ -270,6 +270,9 @@ jobs:
           if [ -s reports/portfolio-risk.json ]; then
             REPORT_ARGS+=(--portfolio-risk reports/portfolio-risk.json)
           fi
+          if [ -s reports/pmcc-daily.json ]; then
+            REPORT_ARGS+=(--pmcc reports/pmcc-daily.json)
+          fi          
           python3 src/render_report.py --stock reports/stock-screen.json \
             --spreads reports/spread-screen.json \
             --news reports/news.json \
