@@ -3,15 +3,15 @@
 High-IV premium selling screener.
 
 Finds put-selling opportunities where:
-- Short strike >= 60% of current price (not too far OTM — captures real premium)
+- Short strike <= 60% of current price (deep OTM — high probability)
 - Expirations in 1-2-3 month windows (30, 60, 90 DTE)
 - Ranked by implied volatility (highest first) for richest premium
 
-This answers: "where can I sell puts with good premium at reasonable strikes?"
+This answers: "where can I sell deep OTM puts with good premium?"
 
 Usage:
     python3 src/iv_premium_screener.py --universe lev_etf
-    python3 src/iv_premium_screener.py --names TQQQ,SOXL --min-strike-pct 0.6
+    python3 src/iv_premium_screener.py --names TQQQ,SOXL --max-strike-pct 0.6
     python3 src/iv_premium_screener.py --universe nasdaq100 --json
 
 Stdlib-only. Requires PUBLIC_ACCOUNT_ID.
@@ -95,7 +95,7 @@ def get_expirations(sym):
     return []
 
 
-def screen_symbol(sym, min_strike_pct=0.60, min_liquidity=10,
+def screen_symbol(sym, max_strike_pct=0.60, min_liquidity=10,
                   max_spread_pct=0.25):
     """
     Screen one symbol for high-IV put selling opportunities.
@@ -112,7 +112,7 @@ def screen_symbol(sym, min_strike_pct=0.60, min_liquidity=10,
     except Exception as e:
         return [], f"quote error for {sym}: {e}"
 
-    min_strike = spot * min_strike_pct
+    max_strike = spot * max_strike_pct
     expirations = get_expirations(sym)
     if not expirations:
         return [], f"no expirations for {sym}"
@@ -140,11 +140,11 @@ def screen_symbol(sym, min_strike_pct=0.60, min_liquidity=10,
             except (ValueError, TypeError):
                 continue
 
-            # Strike must be >= 60% of spot (not too far OTM)
-            if strike < min_strike:
+            # Strike must be <= 60% of spot (deep OTM — high probability)
+            if strike > max_strike:
                 continue
-            # Strike should be OTM or slightly ITM (not deep ITM)
-            if strike > spot * 1.05:
+            # Strike should still have some premium (not absurdly far)
+            if strike < spot * 0.20:
                 continue
 
             bid = contract.get("bid", 0) or 0
@@ -202,8 +202,8 @@ def main(argv):
                         help="Universe name (e.g. lev_etf)")
     parser.add_argument("--names", default=None,
                         help="Comma-separated symbols (overrides --universe)")
-    parser.add_argument("--min-strike-pct", type=float, default=0.60,
-                        help="Min strike as fraction of spot (default: 0.60)")
+    parser.add_argument("--max-strike-pct", type=float, default=0.60,
+                        help="Max strike as fraction of spot (default: 0.60)")
     parser.add_argument("--top", type=int, default=20,
                         help="Top N candidates to show (default: 20)")
     parser.add_argument("--json", action="store_true",
@@ -225,7 +225,7 @@ def main(argv):
     all_candidates = []
     errors = {}
     for sym in symbols:
-        cands, err = screen_symbol(sym, min_strike_pct=args.min_strike_pct)
+        cands, err = screen_symbol(sym, max_strike_pct=args.max_strike_pct)
         if err:
             errors[sym] = err
         all_candidates.extend(cands)
@@ -241,11 +241,11 @@ def main(argv):
             "total_found": len(all_candidates),
             "symbols_screened": len(symbols),
             "errors": errors,
-            "min_strike_pct": args.min_strike_pct,
+            "max_strike_pct": args.max_strike_pct,
         }, indent=2, default=str))
     else:
         print(f"\nHigh-IV Put Selling — Top {len(top)} "
-              f"(strike >= {args.min_strike_pct:.0%} of spot)")
+              f"(strike <= {args.max_strike_pct:.0%} of spot)")
         print("=" * 100)
         print(f"{'Sym':<6} {'Win':<4} {'Exp':<12} {'DTE':<4} "
               f"{'Strike':<8} {'%Spot':<6} {'Bid':<6} "
