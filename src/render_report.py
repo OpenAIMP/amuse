@@ -1151,7 +1151,13 @@ def pmcc_section(data):
                 + f"<td>{qualification_badge(status)}</td>"
                 + f"<td class='wrap-cell'>{esc('; '.join(str(x) for x in reasons) or 'Passed all pair gates')}</td></tr>")
     pair_audit = (
-        '<h3>Evaluated PMCC pairs</h3><div class="tbl-wrap"><table><thead><tr>'
+        '<h3>Evaluated PMCC pairs</h3>'
+        f'<p class="sub">{len(eval_rows)} combinations evaluated, '
+        f'{len([r for r in eval_rows if "qualified" in r.lower()])} qualified. '
+        f'Ranked by P/D 30d (premium-to-debit). '
+        f'Gates: LEAPS 0.80-0.95Δ / 270-800 DTE, short 0.15-0.35Δ / 21-60 DTE, '
+        f'P/D >= 4.0%, breach <= 8%, no earnings in window.</p>'
+        '<div class="tbl-wrap"><table><thead><tr>'
         '<th>Underlying</th><th>Long / short expiry</th><th>Long / short strike</th>'
         '<th>P/D 30d</th><th>Qualification</th><th>Reasons</th></tr></thead><tbody>'
         + ("".join(eval_rows) or '<tr><td colspan="6" class="empty">No pair combinations evaluated.</td></tr>')
