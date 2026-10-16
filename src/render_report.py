@@ -1156,11 +1156,15 @@ def _pmcc_analysis_html(pmcc_data, stock_data):
             f'{t["pullback_risk_detail"]}</p>'
         )
         if fund.get("available"):
+            def _fmt(v):
+                if v is None:
+                    return "N/A"
+                return f"{v:.2f}" if isinstance(v, float) else str(v)
             parts.append(
                 f'<p><strong>Fundamental ({fund["source"]}):</strong> '
-                f'P/E {fund.get("pe_ttm", "N/A")}, '
-                f'PEG {fund.get("peg", "N/A")}, '
-                f'EPS ${fund.get("eps_ttm", "N/A")}</p>'
+                f'P/E {_fmt(fund.get("pe_ttm"))}, '
+                f'PEG {_fmt(fund.get("peg"))}, '
+                f'EPS ${_fmt(fund.get("eps_ttm"))}</p>'
             )
         elif fund.get("reason"):
             parts.append(
