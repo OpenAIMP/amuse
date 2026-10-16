@@ -1,7 +1,8 @@
 name: Daily screen watch
 
 # Exception-based daily run over the shared watchlist (watchlist.txt):
-# technical stock screen, bull-put/iron-condor opportunities, PMCC watch.
+# technical stock screen, bull-put/iron-condor opportunities, PMCC watch,
+# high-IV premium selling, universe setup leaderboard.
 # Reports only material changes. Artifacts keep 90 days of run history.
 on:
   schedule:
@@ -78,6 +79,10 @@ jobs:
           chmod +x bin/public-mcp
           mkdir -p state reports
 
+      - name: Update earnings calendar
+        run: |
+          python3 src/update_earnings.py || true
+
       - name: Stock screener
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
@@ -112,6 +117,22 @@ jobs:
               --json-out reports/spread-screen.json | tee reports/spread-screen.txt
           fi
 
+      - name: High-IV premium screener
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
+          if [ -n "$UNIVERSE" ]; then
+            python3 src/iv_premium_screener.py --universe "$UNIVERSE" \
+              --top 20 | tee reports/iv-premium.txt || true
+          else
+            python3 src/iv_premium_screener.py --names "$WATCHLIST" \
+              --top 20 | tee reports/iv-premium.txt || true
+          fi
+
       - name: Lev-ETF stock screener
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
@@ -122,7 +143,7 @@ jobs:
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           python3 src/stock_screener.py --universe lev_etf \
             --json-out reports/stock-levetf.json | tee reports/stock-levetf.txt
-      
+
       - name: Lev-ETF spread screener
         env:
           PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
@@ -171,6 +192,23 @@ jobs:
           set -o pipefail
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           python3 src/pmcc_watch.py --names "$WATCHLIST" | tee reports/pmcc-watch.txt
+
+      - name: PMCC quality screen (daily)
+        if: always()
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_MCP_CLI: ${{ github.workspace }}/bin/public-mcp
+          PUBLIC_ACCOUNT_ID: ${{ secrets.PUBLIC_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
+          if [ -n "$UNIVERSE" ]; then
+            python3 src/pmcc_quality.py --universe "$UNIVERSE" \
+              --json-out reports/pmcc-daily.json | tee reports/pmcc-daily.txt || true
+          else
+            python3 src/pmcc_quality.py --names "$WATCHLIST" \
+              --json-out reports/pmcc-daily.json | tee reports/pmcc-daily.txt || true
+          fi
 
       - name: Fetch market news
         run: |
@@ -253,7 +291,7 @@ jobs:
           # conflicts, keep the remote copy — it is re-rendered from all
           # reports right below, so nothing is lost.
           git pull --rebase --strategy-option=theirs
-          python3 src/render_compare.py --universe lev_etf --top 15
+          python3 src/render_compare.py --universe lev_etf --top 15 || true
           python3 src/render_hub.py
           git add docs/
           git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
