@@ -1140,14 +1140,32 @@ def _pmcc_analysis_html(pmcc_data, stock_data):
         t = rec["technical"]
         sr = rec["strategy_risk"]
         sc = rec["screening"]
+        fund = rec.get("fundamental", {})
         parts.append(
             f'<div class="card" style="margin:12px 0;padding:12px">'
             f'<h4>{rec["symbol"]} {rec["long_strike"]}C / {rec["short_strike"]}C '
             f'— P/D {rec["premium_to_debit_30d"]}%</h4>'
             f'<p><strong>Technical:</strong> {t["rsi_description"]}; {t["trend"]}</p>'
+            f'<p><strong>Bollinger:</strong> {t.get("bollinger", "N/A")}</p>'
+        )
+        sr_levels = t.get("support_resistance", {})
+        if sr_levels.get("summary") and "No " not in sr_levels["summary"]:
+            parts.append(f'<p><strong>S/R:</strong> {sr_levels["summary"]}</p>')
+        parts.append(
             f'<p><strong>Pullback risk:</strong> {t["pullback_risk_level"]} — '
             f'{t["pullback_risk_detail"]}</p>'
         )
+        if fund.get("available"):
+            parts.append(
+                f'<p><strong>Fundamental ({fund["source"]}):</strong> '
+                f'P/E {fund.get("pe_ttm", "N/A")}, '
+                f'PEG {fund.get("peg", "N/A")}, '
+                f'EPS ${fund.get("eps_ttm", "N/A")}</p>'
+            )
+        elif fund.get("reason"):
+            parts.append(
+                f'<p class="sub"><strong>Fundamental:</strong> {fund["reason"]}</p>'
+            )
         exp = sr["expected_move"]
         if "expected_30d_pct" in exp:
             parts.append(
