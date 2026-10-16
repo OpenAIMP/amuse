@@ -30,15 +30,19 @@ def _metrics(**overrides):
 def _results():
     return {
         "bullish": [
-            ("AAA", 30.0, _metrics(symbol="AAA", price=100.0)),
-            ("BBB", 25.0, _metrics(symbol="BBB", price=200.0, trend="RNG")),
+            ("AAA", 30.0, _metrics(symbol="AAA", price=100.0),
+             ["UP trend (+10)", "screener score 25.0"]),
+            ("BBB", 25.0, _metrics(symbol="BBB", price=200.0, trend="RNG"),
+             ["RNG trend (+3)"]),
         ],
         "bearish": [
-            ("CCC", 28.0, _metrics(symbol="CCC", price=50.0, trend="DN")),
+            ("CCC", 28.0, _metrics(symbol="CCC", price=50.0, trend="DN"),
+             ["DN trend (+10)"]),
         ],
         "neutral": [],
         "directional": [
-            ("AAA", 30.0, _metrics(symbol="AAA", price=100.0)),
+            ("AAA", 30.0, _metrics(symbol="AAA", price=100.0),
+             ["directional→bullish (30.0)"]),
         ],
     }
 
@@ -97,6 +101,11 @@ class TestRenderPage(unittest.TestCase):
         html = render_compare.render_page("test_uni", _results(), {})
         self.assertIn("view-tab", html)
         self.assertIn("addEventListener", html)
+
+    def test_leader_breakdown_shown(self):
+        html = render_compare.render_page("test_uni", _results(), {})
+        self.assertIn("Why AAA leads", html)
+        self.assertIn("UP trend (+10)", html)
 
 
 class TestRenderHubLink(unittest.TestCase):
