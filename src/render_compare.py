@@ -18,6 +18,29 @@ import json
 import os
 import sys
 
+# Column tooltips
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    from column_tooltips import TOOLTIPS
+    import json as _json
+    _TIP_DICT = _json.dumps(TOOLTIPS)
+    TOOLTIP_JS = (
+        "<script>\n"
+        "const COLUMN_TIPS = " + _TIP_DICT + ";\n"
+        "document.addEventListener('DOMContentLoaded', () => {\n"
+        "  document.querySelectorAll('th').forEach(th => {\n"
+        "    const text = th.textContent.trim();\n"
+        "    if (COLUMN_TIPS[text] && !th.hasAttribute('title')) {\n"
+        "      th.setAttribute('title', COLUMN_TIPS[text]);\n"
+        "      th.style.cursor = 'help';\n"
+        "    }\n"
+        "  });\n"
+        "});\n"
+        "</script>\n"
+    )
+except ImportError:
+    TOOLTIP_JS = ""
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from compare import VIEWS, load_universe, rank_universe
@@ -178,68 +201,44 @@ document.querySelectorAll('.view-tab').forEach(btn => {
         'Not investment advice. All metrics from the screener pipeline; '
         'model estimates labeled as such.</div>'
     )
-    parts.append("</div></body></html>")
+    parts.append("</div>" + TOOLTIP_JS + "</body></html>")
     return "\n".join(parts)
 
 
-def resolve_docs_dir():
-    """Find the docs/ directory."""
-    for cand in ("docs", "./docs", "../docs"):
-        if os.path.isdir(cand):
-            return cand
-    # Fallback: repo/docs relative to src/
-    repo_docs = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                             "..", "docs")
-    if os.path.isdir(repo_docs):
-        return repo_docs
-    raise SystemExit("docs/ directory not found")
-
-
 def main(argv):
-    parser = argparse.ArgumentParser(
-        description="Render universe comparison leaderboard (#114)"
-    )
-    parser.add_argument("--universe", default="lev_etf",
-                        help="Universe name (default: lev_etf)")
-    parser.add_argument("--top", type=int, default=15,
-                        help="Top N per view (default: 15)")
-    parser.add_argument("--out", default=None,
-                        help="Output path (default: docs/compare.html)")
+    parser = argparse.ArgumentParser(description="Render setup leaderboard")
+    parser.add_argument("--universe", required=True)
+    parser.add_argument("--top", type=int, default=15)
+    parser.add_argument("--out", default=None)
     args = parser.parse_args(argv)
 
-    docs_dir = resolve_docs_dir()
-    out_path = args.out or os.path.join(docs_dir, "compare.html")
-
-    print(f"Loading universe '{args.universe}'...", file=sys.stderr)
-    symbols = load_universe(args.universe)
-    print(f"  {len(symbols)} symbols", file=sys.stderr)
-
-    print("Scoring across all views...", file=sys.stderr)
-    results, errors = rank_universe(symbols, top=args.top)
-    for view in VIEWS:
-        print(f"  {view}: {len(results.get(view, []))} ranked",
-              file=sys.stderr)
-
-    html = render_page(args.universe, results, errors, top=args.top)
-    with open(out_path, "w") as f:
+    import compare as cmp
+    upath = f"src/universes/{args.universe}.txt"
+    with open(upath) as f:
+        symbols = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+    results, errors = cmp.rank_universe(symbols, top=args.top)
+    html = render_page(args.universe, results, errors)
+    out = args.out or f"docs/compare.html"
+    with open(out, "w") as f:
         f.write(html)
-    print(f"Wrote {out_path} ({len(html)} bytes)", file=sys.stderr)
-
-    # Also write a JSON sidecar for programmatic access
-    sidecar = {
-        "universe": args.universe,
-        "generated_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "views": {
-            v: [{"symbol": s, "score": sc} for s, sc, _ in ranked]
-            for v, ranked in results.items()
-        },
-        "errors": errors,
-    }
-    with open(out_path + ".json", "w") as f:
-        json.dump(sidecar, f, indent=2)
-
+    # JSON sidecar
+    jout = out + ".json"
+    serializable = {}
+    for view, ranked in results.items():
+        serializable[view] = [
+            {"symbol": s, "score": sc,
+             "price": m.get("price"), "trend": m.get("trend"),
+             "verdict": m.get("verdict")}
+            for s, sc, m, _ in ranked
+        ]
+    with open(jout, "w") as f:
+        import json as js
+        js.dump({"universe": args.universe, "results": serializable,
+                 "errors": errors}, f, indent=2)
+    print(f"Wrote {out} and {jout}")
     return 0
 
 
 if __name__ == "__main__":
+    import sys
     sys.exit(main(sys.argv[1:]))
