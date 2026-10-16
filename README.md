@@ -199,6 +199,14 @@ in the Trading Playbook (Sections 19–20).
 
 ## Screeners
 
+**Standing rule:** Every capability built must be wired into the daily workflow.
+A screener that isn't in `daily-watch.yml` is useless. No one-off manual processes.
+When you build something new, add it to the workflow in the same commit.
+
+**Knowledgebase rule:** Every new screener or capability must update this README
+with: (1) what question it answers, (2) how it works, (3) its ranking criteria,
+(4) what it discards and why. The README is the knowledgebase — keep it current.
+
 | File | What it does | In scheduled flows |
 |---|---|---|
 | `stock_screener.py` | Technical screen with the indicator pack (below). Composite score 0–40 = base 0–30 + signals 0–10. Ends with a plain-English `READOUT` — the leader and why, rejections grouped by theme, regime census. | `daily-watch` |
@@ -211,6 +219,7 @@ in the Trading Playbook (Sections 19–20).
 | `render_hub.py` | Rebuilds `docs/index.html` — the report archive homepage — from all sidecars. | all three |
 | `scan_loop.py` | Runs any screener across multiple index universes and merges into one cross-universe leaderboard. | manual only |
 | `compare.py` | Side-by-side setup comparison for two symbols, or ranked leaderboard across a universe for bullish/bearish/neutral/directional views. Answers "which has the better setup?" from screener data. | manual only (wire into `daily-watch` to publish) |
+| `recommendation_analyzer.py` | Automated comprehensive analysis for every recommendation: technical (RSI, trend, pullback risk), strategy risk (expected move vs breach, earnings), screening transparency (evaluated/discarded counts, ranking criteria). Runs with every report render. | automatic (wired into `render_report.py`) |
 | `render_compare.py` | Renders `docs/compare.html` — tabbed leaderboard with decision-logic explainer — from `compare.py` output. Linked from index.html. | manual only (wire into `daily-watch` to publish) |
 | `tastytrade_backtest.py` | Submits options backtests to Tastytrade's API for strategy validation (#111). Compares predicted Win% vs actual hit rates. | manual only |
 | `semis.py` | Semiconductor momentum screen (early study, superseded). | retired |
@@ -289,10 +298,19 @@ Submits backtests to Tastytrade's API (bull puts, bear calls, iron condors;
 against realized hit rates. The calibration loop — answers whether the
 screener's EV estimates correspond to reality. (Issue #111.)
 
+**`recommendation_analyzer.py` — "Why should I take this trade?"**
+Automatically generates a comprehensive analysis for every recommendation:
+- **Technical:** RSI (overbought/oversold/neutral), trend (UP/DN/RNG with SMA distances), pullback risk level
+- **Strategy risk:** Expected 30-day move vs breach distance, earnings proximity, binary event flags
+- **Screening transparency:** How many combinations were evaluated, how many rejected, ranking criteria, gate definitions
+Runs automatically with every report render — not a one-off. The analysis appears
+in the "Recommendation Analysis (automated)" section of PMCC reports.
+
 **How they combine.** Stock screen → *where* (regime). Spread screen → *what*
 (structures). Compare → *which* (relative setup). Backtest → *did it work*
 (validation). Premarket/intraday → *when today* (timing). PMCC → *for months*
-(horizon).
+(horizon). Recommendation analyzer → *why* (automated comprehensive analysis
+with every run: technicals, strategy risk, screening transparency).
 
 ### When to run each screener
 
