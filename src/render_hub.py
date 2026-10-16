@@ -370,6 +370,7 @@ def main():
         "Options Lab — Latest Reports",
         ("The most recent run of each screen. "
          f'<a href="archive.html">Full archive →</a> '
+         f'<a href="compare.html">Setup leaderboard →</a> '
          f"({n} reports, {n_groups} screens)"),
         news_section(docs_dir) + latest_sections,
     )
