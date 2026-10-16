@@ -292,8 +292,8 @@ jobs:
           git checkout -- bin/public-mcp 2>/dev/null || true
           git stash push -m "workflow working tree" || true
           git pull --rebase --strategy-option=theirs
-          git stash pop || true          
-          git add docs/
+          git stash pop || true
+          git add docs/ src/earnings_dates.json
           git diff --cached --quiet || git commit -m "dashboard: update daily screen"
           # Fold in concurrent pushes (doc edits, other jobs). If the hub
           # conflicts, keep the remote copy — it is re-rendered from all
@@ -301,6 +301,7 @@ jobs:
           git pull --rebase --strategy-option=theirs
           python3 src/render_compare.py --universe lev_etf --top 15 || true
           python3 src/render_hub.py
-          git add docs/
+          git add docs/ src/earnings_dates.json
           git diff --cached --quiet || git commit -m "dashboard: rebuild hub after rebase"
           git push
+
