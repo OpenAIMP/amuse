@@ -7,6 +7,7 @@ on:
         description: 'Symbol to backtest'
         required: false
         default: 'SPY'
+
       strategy:
         description: 'Strategy'
         required: false
@@ -16,10 +17,12 @@ on:
           - bull_put
           - bear_call
           - iron_condor
+
       start:
         description: 'Start date (YYYY-MM-DD)'
         required: false
         default: '2026-07-17'
+
       end:
         description: 'End date (YYYY-MM-DD)'
         required: false
@@ -28,20 +31,80 @@ on:
 jobs:
   backtest:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Run Tastytrade backtest
         env:
           TASTYTRADE_CLIENT_ID: ${{ secrets.TASTYTRADE_CLIENT_ID }}
           TASTYTRADE_CLIENT_SECRET: ${{ secrets.TASTYTRADE_CLIENT_SECRET }}
           TASTYTRADE_REFRESH_TOKEN: ${{ secrets.TASTYTRADE_REFRESH_TOKEN }}
         run: |
+          SYMBOL=${{ github.event.inputs.symbol || 'SPY' }}
+          STRATEGY=${{ github.event.inputs.strategy || 'bull_put' }}
+          START=${{ github.event.inputs.start || '2026-07-17' }}
+          END=${{ github.event.inputs.end || '2026-10-17' }}
+          STAMP=$(date -u +%F-%H%M)
+
+          mkdir -p reports docs/reports
+
+          # Run backtest and save JSON (script outputs JSON to stdout)
           python3 src/tastytrade_backtest.py \
-            --symbol ${{ github.event.inputs.symbol || 'SPY' }} \
-            --strategy ${{ github.event.inputs.strategy || 'bull_put' }} \
-            --start ${{ github.event.inputs.start || '2026-07-17' }} \
-            --end ${{ github.event.inputs.end || '2026-10-17' }} \
+            --symbol "$SYMBOL" \
+            --strategy "$STRATEGY" \
+            --start "$START" \
+            --end "$END" \
             --dte 45 \
             --profit-target 0.50 \
-            --exit-dte 21
+            --exit-dte 21 \
+            | tee "reports/backtest-${SYMBOL}-${STRATEGY}-${STAMP}.json"
+
+          # Render HTML report
+          python3 src/render_backtest.py \
+            --input "reports/backtest-${SYMBOL}-${STRATEGY}-${STAMP}.json" \
+            --out "docs/reports/backtest-${SYMBOL}-${STRATEGY}-${STAMP}.html" \
+            --title "Backtest: $SYMBOL $STRATEGY ($START to $END)"
+
+          # Generate meta.json sidecar for hub discovery
+          python3 -c "
+          import json, datetime
+
+          meta = {
+              'id': 'backtest-${SYMBOL}-${STRATEGY}-${STAMP}',
+              'type': 'backtest',
+              'source': '${SYMBOL}',
+              'title': 'Backtest: ${SYMBOL} ${STRATEGY}',
+              'date': datetime.datetime.utcnow().isoformat() + 'Z',
+              'symbol': '${SYMBOL}',
+              'strategy': '${STRATEGY}',
+          }
+
+          with open('docs/reports/backtest-${SYMBOL}-${STRATEGY}-${STAMP}.meta.json', 'w') as f:
+              json.dump(meta, f, indent=1)
+          "
+
+          # Update hub to link the new report
+          python3 src/render_hub.py
+
+          echo "BACKTEST_HTML=docs/reports/backtest-${SYMBOL}-${STRATEGY}-${STAMP}.html" >> $GITHUB_ENV
+
+      - name: Upload backtest results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backtest-${{ github.run_id }}
+          path: reports/backtest-*
+          retention-days: 90
+
+      - name: Publish backtest report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add docs/reports/backtest-*.html docs/index.html docs/archive.html
+          git diff --cached --quiet || git commit -m "backtest: add $SYMBOL $STRATEGY results"
+
+          git pull --rebase --strategy-option=theirs
+          git push
