@@ -246,7 +246,12 @@ def _make_leg(side, direction, delta, dte):
 
 def _strategy_legs(strategy, dte):
     """Build legs for a strategy with per-leg DTE."""
-    if strategy == "bull_put":
+    if strategy == "single_put":
+        # Single short put (diagnostic: isolates spread vs single-leg issues)
+        return [
+            _make_leg("put", "short", 16, dte),
+        ]
+    elif strategy == "bull_put":
         return [
             _make_leg("put", "short", 16, dte),
             _make_leg("put", "long", 10, dte),
@@ -269,6 +274,10 @@ def _strategy_legs(strategy, dte):
 
 # Legacy constant for backwards compat (tests may reference)
 STRATEGY_LEGS = {
+    "single_put": [
+        {"type": "equity-option", "side": "put", "direction": "short",
+         "strikeSelection": "delta", "delta": 16, "quantity": 1},
+    ],
     "bull_put": [
         {"type": "equity-option", "side": "put", "direction": "short",
          "strikeSelection": "delta", "delta": 16, "quantity": 1},
