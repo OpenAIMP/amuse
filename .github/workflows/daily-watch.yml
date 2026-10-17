@@ -129,11 +129,14 @@ jobs:
           : "${PUBLIC_ACCOUNT_ID:?Set repository secret PUBLIC_ACCOUNT_ID}"
           if [ -n "$UNIVERSE" ]; then
             python3 src/iv_premium_screener.py --universe "$UNIVERSE" \
-              --top 20 | tee reports/iv-premium.txt || true
+              --top 20 --json > reports/iv-premium.json || true
           else
             python3 src/iv_premium_screener.py --names "$WATCHLIST" \
-              --top 20 | tee reports/iv-premium.txt || true
+              --top 20 --json > reports/iv-premium.json || true
           fi
+          python3 src/render_iv_premium.py \
+            --input reports/iv-premium.json \
+            --out docs/reports/iv-premium.html || true
 
       - name: Lev-ETF stock screener
         env:
