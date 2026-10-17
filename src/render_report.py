@@ -1116,6 +1116,86 @@ def spread_tables(data):
     universe_html = screened_universe_table(data.get("screened"), "accepted_structures")
     if universe_html:
         out.insert(0, universe_html)
+
+    # #107 exotics tables — generic renderer for all exotic strategies
+    def _exotic_table(key, title, subtitle=""):
+        items = res.get(key) or {}
+        # Handle both dict {sym: r} and list formats
+        if isinstance(items, dict):
+            pairs = sorted(items.items(), key=lambda kv: -((kv[1].get("return_on_risk") or 0) if isinstance(kv[1], dict) else 0))
+        else:
+            # List format: group by symbol, take first per symbol
+            seen = {}
+            for r in items:
+                sym = r.get("stock") or r.get("symbol")
+                if sym and sym not in seen:
+                    seen[sym] = r
+            pairs = sorted(seen.items(), key=lambda kv: -((kv[1].get("return_on_risk") or 0) if isinstance(kv[1], dict) else 0))
+        rows = []
+        for sym, r in pairs:
+            if not isinstance(r, dict):
+                continue
+            dte = dte_between(asof, r.get("expiration"))
+            why = why_for(sym, readout)
+            # Risk warning badge for undefined-risk strategies
+            risk_badge = ""
+            if r.get("risk_warning"):
+                risk_badge = ' <span style="color:var(--red);font-weight:700">⚠️ UNDEFINED RISK</span>'
+            # Credit/debit display
+            net = r.get("credit_total")
+            net_label = "Credit"
+            if net is None:
+                net = r.get("debit_total")
+                net_label = "Debit"
+            rows.append(
+                "<tr>"
+                f"{sym_cell(sym)}"
+                f"<td class='num'>{esc(r.get('expiration'))}</td>"
+                f"<td class='num'>{dte if dte is not None else '—'}</td>"
+                f"<td class='num'>{money(net)} ({net_label})</td>"
+                f"<td class='num'>{money(r.get('max_loss_total'))}</td>"
+                f"<td class='num'>{pct((r.get('win_prob_est') or 0) * 100)}</td>"
+                f"<td class='num'>{money(r.get('expected_value'))}</td>"
+                f"<td>{esc(r.get('kind', ''))}{risk_badge}</td>"
+                f"<td>{events_cell(r.get('events'))}</td>"
+                "</tr>"
+                + (f"<tr class='whyrow'><td colspan='8'>{esc(why)}</td></tr>" if why else "")
+            )
+        if not rows and not pairs:
+            return  # Skip empty tables
+        out.append(f"<h3>{esc(title)} <span class='dim'>({esc(subtitle)})</span></h3>" if subtitle else f"<h3>{esc(title)}</h3>")
+        out.append(
+            '<div class="tbl-wrap"><table><thead><tr>'
+            "<th>Sym</th><th>Exp</th><th>DTE</th><th>Net</th>"
+            "<th>Max Loss</th><th>Win%</th><th>EV$</th><th>Kind</th><th>Events</th>"
+            "</tr></thead><tbody>"
+            + ("".join(rows) if rows else '<tr><td colspan="9" class="empty">No qualifying structures.</td></tr>')
+            + "</tbody></table></div>"
+        )
+
+    # Phase G: Backspreads and broken wings
+    _exotic_table("call_backspreads", "Call Backspreads", "1x2, undefined upside")
+    _exotic_table("put_backspreads", "Put Backspreads", "1x2, undefined downside")
+    _exotic_table("bwb_calls", "Broken Wing Butterflies (Call)", "asymmetric")
+    _exotic_table("bwb_puts", "Broken Wing Butterflies (Put)", "asymmetric")
+    _exotic_table("ibwbs", "Inverse Broken Wings", "undefined risk")
+    # Phase H: Ladders and Jade Lizards
+    _exotic_table("call_ladder_bulls", "Call Ladders (Bull)", "undefined risk")
+    _exotic_table("call_ladder_bears", "Call Ladders (Bear)", "defined risk")
+    _exotic_table("put_ladders", "Put Ladders", "undefined risk")
+    _exotic_table("jade_lizards", "Jade Lizards", "no upside risk if credit covers width")
+    _exotic_table("rev_jade_lizards", "Reverse Jade Lizards", "undefined risk")
+    # Phase I: Synthetics, combos, guts, diagonals
+    _exotic_table("synth_longs", "Synthetic Longs", "undefined risk")
+    _exotic_table("synth_shorts", "Synthetic Shorts", "undefined risk")
+    _exotic_table("combo_longs", "Combos / Risk Reversals (Long)", "undefined risk")
+    _exotic_table("combo_shorts", "Combos / Risk Reversals (Short)", "undefined risk")
+    _exotic_table("strips", "Strips", "2:1 bearish")
+    _exotic_table("straps", "Straps", "2:1 bullish")
+    _exotic_table("guts_longs", "Guts (Long)", "ITM strangle")
+    _exotic_table("guts_shorts", "Guts (Short)", "undefined risk")
+    _exotic_table("double_diagonals", "Double Diagonals", "4 legs, 2 expirations")
+
     return section("Spread opportunities", "".join(out))
 
 
