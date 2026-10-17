@@ -1,0 +1,47 @@
+name: Tastytrade Backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: 'Symbol to backtest'
+        required: false
+        default: 'SPY'
+      strategy:
+        description: 'Strategy'
+        required: false
+        default: 'bull_put'
+        type: choice
+        options:
+          - bull_put
+          - bear_call
+          - iron_condor
+      start:
+        description: 'Start date (YYYY-MM-DD)'
+        required: false
+        default: '2026-07-17'
+      end:
+        description: 'End date (YYYY-MM-DD)'
+        required: false
+        default: '2026-10-17'
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Tastytrade backtest
+        env:
+          TASTYTRADE_CLIENT_ID: ${{ secrets.TASTYTRADE_CLIENT_ID }}
+          TASTYTRADE_CLIENT_SECRET: ${{ secrets.TASTYTRADE_CLIENT_SECRET }}
+          TASTYTRADE_REFRESH_TOKEN: ${{ secrets.TASTYTRADE_REFRESH_TOKEN }}
+        run: |
+          python3 src/tastytrade_backtest.py \
+            --symbol ${{ github.event.inputs.symbol || 'SPY' }} \
+            --strategy ${{ github.event.inputs.strategy || 'bull_put' }} \
+            --start ${{ github.event.inputs.start || '2026-07-17' }} \
+            --end ${{ github.event.inputs.end || '2026-10-17' }} \
+            --dte 45 \
+            --profit-target 0.50 \
+            --exit-dte 21
