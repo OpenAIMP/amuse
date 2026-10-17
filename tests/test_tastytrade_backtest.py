@@ -85,9 +85,10 @@ class TestBuildBacktest(unittest.TestCase):
 
 class TestSummarizeResults(unittest.TestCase):
     def _make_result(self, pnls):
+        # Real API structure: trials have totals.profitLoss (per 2026-10-17 diagnostic)
         return {
             "statistics": {"profitFactor": 1.5, "maxDrawdown": -200},
-            "trials": [{"pnl": p} for p in pnls],
+            "_trials": [{"totals": {"profitLoss": str(p)}} for p in pnls],
         }
 
     def test_basic_summary(self):
