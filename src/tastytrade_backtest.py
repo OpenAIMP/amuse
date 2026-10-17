@@ -375,10 +375,6 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
                 print(f"  Could not fetch logs: {e}", file=sys.stderr)
                 trials = []
             print(f"  Trials returned: {len(trials)}", file=sys.stderr)
-            if trials:
-                sample = trials[0]
-                print(f"  Sample trial keys: {list(sample.keys()) if isinstance(sample, dict) else type(sample)}", file=sys.stderr)
-                print(f"  Sample trial: {json.dumps(sample)[:500]}", file=sys.stderr)
             status["_trials"] = trials  # Attach for summarize_results
             return status
         if state in ("failed", "error", "cancelled"):
@@ -410,8 +406,18 @@ def summarize_results(result):
     trials = result.get("_trials", result.get("trials", []))
 
     def _pnl(t):
-        # API uses profitLoss; be tolerant of pnl for backwards compat
-        return t.get("profitLoss", t.get("pnl", 0)) or 0
+        # Trial P&L lives in t["totals"]["profitLoss"] per API structure
+        # Trial keys: orders, totals, closeReason, openDateTime, transactions,
+        #   closeDateTime, equitiesPositions, underlyingPriceAtOpen,
+        #   equityOptionsPositions, underlyingPriceAtClose
+        totals = t.get("totals", {}) if isinstance(t, dict) else {}
+        val = totals.get("profitLoss")
+        if val is None:
+            val = t.get("profitLoss", t.get("pnl", 0)) if isinstance(t, dict) else 0
+        try:
+            return float(val or 0)
+        except (TypeError, ValueError):
+            return 0
 
     wins = [t for t in trials if _pnl(t) > 0]
     losses = [t for t in trials if _pnl(t) <= 0]
