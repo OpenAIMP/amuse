@@ -364,19 +364,18 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
             notices = status.get("notices", [])
             if notices:
                 print(f"  Notices: {notices}", file=sys.stderr)
-            trials = status.get("trials", [])
+            # Trials live in the logs endpoint, not the main response (#11)
+            # Main response keys: createdAt, endDate, entryConditions, exitConditions,
+            #   id, legs, results, startDate, status, symbol
+            # Logs keys: snapshots, trials
+            try:
+                logs = get_backtest_logs(token, backtest_id)
+                trials = logs.get("trials", []) if isinstance(logs, dict) else []
+            except Exception as e:
+                print(f"  Could not fetch logs: {e}", file=sys.stderr)
+                trials = []
             print(f"  Trials returned: {len(trials)}", file=sys.stderr)
-            # Debug: show all top-level keys to find where trade data lives
-            print(f"  Response keys: {list(status.keys())}", file=sys.stderr)
-            # Fetch detailed logs when 0 trials — they explain why
-            if len(trials) == 0:
-                try:
-                    logs = get_backtest_logs(token, backtest_id)
-                    log_keys = list(logs.keys()) if isinstance(logs, dict) else type(logs).__name__
-                    print(f"  Log keys: {log_keys}", file=sys.stderr)
-                    print(f"  Backtest logs: {json.dumps(logs)[:2000]}", file=sys.stderr)
-                except Exception as e:
-                    print(f"  Could not fetch logs: {e}", file=sys.stderr)
+            status["_trials"] = trials  # Attach for summarize_results
             return status
         if state in ("failed", "error", "cancelled"):
             raise RuntimeError(f"Backtest {state}: {status}")
@@ -403,7 +402,8 @@ def summarize_results(result):
     profit_factor, max_drawdown (when available).
     """
     stats = result.get("statistics", {})
-    trials = result.get("trials", [])
+    # Trials are attached as _trials by run_backtest (from logs endpoint)
+    trials = result.get("_trials", result.get("trials", []))
 
     def _pnl(t):
         # API uses profitLoss; be tolerant of pnl for backwards compat
