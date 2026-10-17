@@ -121,7 +121,9 @@ class TestSummarizeResults(unittest.TestCase):
 class TestStrategyLegs(unittest.TestCase):
     def test_all_strategies_have_legs(self):
         for name, legs in tt.STRATEGY_LEGS.items():
-            self.assertTrue(len(legs) >= 2, f"{name} has no legs")
+            # single_put is a diagnostic single-leg strategy
+            min_legs = 1 if name == "single_put" else 2
+            self.assertTrue(len(legs) >= min_legs, f"{name} has no legs")
             for leg in legs:
                 self.assertIn("type", leg)
                 self.assertIn("side", leg)
