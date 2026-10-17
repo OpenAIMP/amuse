@@ -1,0 +1,41 @@
+name: Report Retention
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'  # Weekly Sunday 6am UTC
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Delete reports older than N days'
+        required: false
+        default: '180'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete old reports
+        run: |
+          DAYS=${{ github.event.inputs.days || '180' }}
+          echo "Deleting reports older than $DAYS days..."
+
+          # Find and delete old report files (HTML, JSON, chain.json)
+          # Keep the hub index.html and archive.html
+          find docs/reports -name "*.html" -mtime +$DAYS -delete
+          find docs/reports -name "*.json" -mtime +$DAYS -delete
+
+          # Rebuild hub to remove dead links
+          python3 src/render_hub.py
+
+          echo "Cleanup complete"
+
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/reports/ docs/index.html docs/archive.html
+          git diff --cached --quiet || git commit -m "retention: remove reports older than ${{ github.event.inputs.days || '180' }} days"
+          git pull --rebase --strategy-option=theirs
+          git push
