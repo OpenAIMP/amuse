@@ -351,6 +351,12 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
         status = get_backtest(token, backtest_id)
         state = status.get("status", "").lower()
         if state in ("completed", "complete", "done", "finished"):
+            # Log notices which may explain 0 trades
+            notices = status.get("notices", [])
+            if notices:
+                print(f"  Notices: {notices}", file=sys.stderr)
+            trials = status.get("trials", [])
+            print(f"  Trials returned: {len(trials)}", file=sys.stderr)
             return status
         if state in ("failed", "error", "cancelled"):
             raise RuntimeError(f"Backtest {state}: {status}")
@@ -371,23 +377,29 @@ def summarize_results(result):
     """
     Extract key metrics from a completed backtest result.
 
+    Per API docs, trials have `profitLoss` (not `pnl`).
+
     Returns dict with win_rate, total_pnl, avg_win, avg_loss, trade_count,
     profit_factor, max_drawdown (when available).
     """
     stats = result.get("statistics", {})
     trials = result.get("trials", [])
 
-    wins = [t for t in trials if (t.get("pnl") or 0) > 0]
-    losses = [t for t in trials if (t.get("pnl") or 0) <= 0]
+    def _pnl(t):
+        # API uses profitLoss; be tolerant of pnl for backwards compat
+        return t.get("profitLoss", t.get("pnl", 0)) or 0
+
+    wins = [t for t in trials if _pnl(t) > 0]
+    losses = [t for t in trials if _pnl(t) <= 0]
 
     summary = {
         "trade_count": len(trials),
         "win_count": len(wins),
         "loss_count": len(losses),
         "win_rate": len(wins) / len(trials) if trials else 0,
-        "total_pnl": sum(t.get("pnl", 0) for t in trials),
-        "avg_win": sum(t.get("pnl", 0) for t in wins) / len(wins) if wins else 0,
-        "avg_loss": sum(t.get("pnl", 0) for t in losses) / len(losses) if losses else 0,
+        "total_pnl": sum(_pnl(t) for t in trials),
+        "avg_win": sum(_pnl(t) for t in wins) / len(wins) if wins else 0,
+        "avg_loss": sum(_pnl(t) for t in losses) / len(losses) if losses else 0,
     }
     # Merge any server-computed stats
     for key in ("profitFactor", "maxDrawdown", "sharpeRatio"):
