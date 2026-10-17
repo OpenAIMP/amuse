@@ -54,9 +54,11 @@ class TestBuildBacktest(unittest.TestCase):
             dte_target=45, profit_target=0.50, exit_dte=21,
         )
         exits = payload["exitConditions"]
-        self.assertEqual(exits["profitTarget"], 0.50)
-        self.assertEqual(exits["atDaysToExpiration"], 21)
-        self.assertEqual(payload["entryConditions"]["daysToExpiration"], 45)
+        # API uses takeProfitPercentage (50 = 50%)
+        self.assertEqual(exits["takeProfitPercentage"], 50)
+        # DTE is per-leg per API spec
+        self.assertEqual(payload["legs"][0]["daysUntilExpiration"], 45)
+        self.assertEqual(payload["entryConditions"]["frequency"], "every day")
 
     def test_stop_loss_optional(self):
         payload = tt.build_backtest(
@@ -64,7 +66,8 @@ class TestBuildBacktest(unittest.TestCase):
             start_date="2022-01-01", end_date="2026-01-01",
             stop_loss=2.0,
         )
-        self.assertEqual(payload["exitConditions"]["stopLoss"], 2.0)
+        # API uses stopLossPercentage (200 = 2x credit)
+        self.assertEqual(payload["exitConditions"]["stopLossPercentage"], 200)
 
         payload_no_sl = tt.build_backtest(
             symbol="SPY", strategy="bull_put",
