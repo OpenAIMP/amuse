@@ -1,0 +1,23 @@
+name: Tastytrade Backtest Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: 'Symbol to check dates for'
+        required: false
+        default: 'SPY'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify Tastytrade credentials
+        env:
+          TASTYTRADE_CLIENT_ID: ${{ secrets.TASTYTRADE_CLIENT_ID }}
+          TASTYTRADE_CLIENT_SECRET: ${{ secrets.TASTYTRADE_CLIENT_SECRET }}
+          TASTYTRADE_REFRESH_TOKEN: ${{ secrets.TASTYTRADE_REFRESH_TOKEN }}
+        run: |
+          python3 src/tastytrade_backtest.py --check-dates --symbol ${{ github.event.inputs.symbol || 'SPY' }}
