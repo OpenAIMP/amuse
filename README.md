@@ -250,9 +250,12 @@ regime-and-timing rank, not a buy signal — it tells you *where* conditions
 favor premium selling, not *what* to sell.
 
 **`spread_screener.py` — "What exactly should I sell, at what strikes, for what credit?"**
-Prices 21 defined-risk strategies (bull/bear verticals, iron condors/butterflies,
-calendars, long butterflies, covered calls, cash-secured puts, straddles/strangles,
-naked puts/calls with warnings, ratio spreads) across 21–60 DTE.
+Prices 34 strategies (21 defined-risk from #106 plus 13 exotics from #107:
+bull/bear verticals, iron condors/butterflies, calendars, long butterflies,
+covered calls, cash-secured puts, straddles/strangles, naked puts/calls with
+warnings, ratio spreads, call/put backspreads, broken-wing butterflies,
+call/put ladders, Jade Lizards, synthetic futures, combos/risk-reversals,
+strips/straps, guts, double diagonals) across 21–60 DTE.
 Uses conservative short-bid-minus-long-ask fills, 0.10–0.20Δ short strikes,
 and delta-based Win% with EV = P(win)×credit − P(loss)×max loss − friction.
 Outputs ranked structures with Lucrative/Solid/Negative EV verdicts.
