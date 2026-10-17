@@ -375,6 +375,10 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
                 print(f"  Could not fetch logs: {e}", file=sys.stderr)
                 trials = []
             print(f"  Trials returned: {len(trials)}", file=sys.stderr)
+            if trials:
+                sample = trials[0]
+                print(f"  Sample trial keys: {list(sample.keys()) if isinstance(sample, dict) else type(sample)}", file=sys.stderr)
+                print(f"  Sample trial: {json.dumps(sample)[:500]}", file=sys.stderr)
             status["_trials"] = trials  # Attach for summarize_results
             return status
         if state in ("failed", "error", "cancelled"):
