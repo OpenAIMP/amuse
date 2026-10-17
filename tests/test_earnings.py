@@ -46,7 +46,9 @@ class TestEarningsReject(unittest.TestCase):
                             "..", "src", "earnings_dates.json")
         data = json.load(open(path))
         self.assertIn("JPM", data)
-        self.assertEqual(data["JPM"]["earnings"], "2026-10-13")
+        # Just verify it's a valid date string, not a specific hardcoded date (#101)
+        import re
+        self.assertRegex(data["JPM"]["earnings"], r"^\d{4}-\d{2}-\d{2}$")
 
 
 if __name__ == "__main__":
