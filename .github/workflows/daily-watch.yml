@@ -83,7 +83,7 @@ jobs:
 
       - name: Update earnings calendar
         run: |
-          python3 src/update_earnings.py || true
+          python3 src/update_earnings.py --days 70 || true
 
       - name: Stock screener
         env:
