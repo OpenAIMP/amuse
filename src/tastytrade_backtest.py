@@ -366,10 +366,14 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
                 print(f"  Notices: {notices}", file=sys.stderr)
             trials = status.get("trials", [])
             print(f"  Trials returned: {len(trials)}", file=sys.stderr)
+            # Debug: show all top-level keys to find where trade data lives
+            print(f"  Response keys: {list(status.keys())}", file=sys.stderr)
             # Fetch detailed logs when 0 trials — they explain why
             if len(trials) == 0:
                 try:
                     logs = get_backtest_logs(token, backtest_id)
+                    log_keys = list(logs.keys()) if isinstance(logs, dict) else type(logs).__name__
+                    print(f"  Log keys: {log_keys}", file=sys.stderr)
                     print(f"  Backtest logs: {json.dumps(logs)[:2000]}", file=sys.stderr)
                 except Exception as e:
                     print(f"  Could not fetch logs: {e}", file=sys.stderr)
