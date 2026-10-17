@@ -366,6 +366,13 @@ def run_backtest(token, payload, poll_interval=5, max_wait=600):
                 print(f"  Notices: {notices}", file=sys.stderr)
             trials = status.get("trials", [])
             print(f"  Trials returned: {len(trials)}", file=sys.stderr)
+            # Fetch detailed logs when 0 trials — they explain why
+            if len(trials) == 0:
+                try:
+                    logs = get_backtest_logs(token, backtest_id)
+                    print(f"  Backtest logs: {json.dumps(logs)[:2000]}", file=sys.stderr)
+                except Exception as e:
+                    print(f"  Could not fetch logs: {e}", file=sys.stderr)
             return status
         if state in ("failed", "error", "cancelled"):
             raise RuntimeError(f"Backtest {state}: {status}")
