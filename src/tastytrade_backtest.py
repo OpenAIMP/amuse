@@ -226,28 +226,70 @@ def simulate_trade(token, underlying, legs, start_time, end_time):
 # strikeSelection options (per API docs):
 #   delta, delta_abs, strike, strike_offset, percent_otm, etc.
 
+def _make_leg(side, direction, delta, dte):
+    """Build a single option leg per Tastytrade backtest API spec.
+    
+    Per https://developer.tastytrade.com/docs/guides/backtesting:
+    - strikeSelection "delta" takes a "delta" field (e.g. 16 for 16-delta)
+    - daysUntilExpiration is a per-leg field (not in entryConditions)
+    """
+    return {
+        "type": "equity-option",
+        "side": side,
+        "direction": direction,
+        "quantity": 1,
+        "strikeSelection": "delta",
+        "delta": delta,
+        "daysUntilExpiration": dte,
+    }
+
+
+def _strategy_legs(strategy, dte):
+    """Build legs for a strategy with per-leg DTE."""
+    if strategy == "bull_put":
+        return [
+            _make_leg("put", "short", 16, dte),
+            _make_leg("put", "long", 10, dte),
+        ]
+    elif strategy == "bear_call":
+        return [
+            _make_leg("call", "short", 16, dte),
+            _make_leg("call", "long", 10, dte),
+        ]
+    elif strategy == "iron_condor":
+        return [
+            _make_leg("put", "short", 16, dte),
+            _make_leg("put", "long", 10, dte),
+            _make_leg("call", "short", 16, dte),
+            _make_leg("call", "long", 10, dte),
+        ]
+    else:
+        raise ValueError(f"Unknown strategy '{strategy}'")
+
+
+# Legacy constant for backwards compat (tests may reference)
 STRATEGY_LEGS = {
     "bull_put": [
         {"type": "equity-option", "side": "put", "direction": "short",
-         "strikeSelection": "delta", "strikeValue": 0.16, "quantity": 1},
+         "strikeSelection": "delta", "delta": 16, "quantity": 1},
         {"type": "equity-option", "side": "put", "direction": "long",
-         "strikeSelection": "delta", "strikeValue": 0.10, "quantity": 1},
+         "strikeSelection": "delta", "delta": 10, "quantity": 1},
     ],
     "bear_call": [
         {"type": "equity-option", "side": "call", "direction": "short",
-         "strikeSelection": "delta", "strikeValue": 0.16, "quantity": 1},
+         "strikeSelection": "delta", "delta": 16, "quantity": 1},
         {"type": "equity-option", "side": "call", "direction": "long",
-         "strikeSelection": "delta", "strikeValue": 0.10, "quantity": 1},
+         "strikeSelection": "delta", "delta": 10, "quantity": 1},
     ],
     "iron_condor": [
         {"type": "equity-option", "side": "put", "direction": "short",
-         "strikeSelection": "delta", "strikeValue": 0.16, "quantity": 1},
+         "strikeSelection": "delta", "delta": 16, "quantity": 1},
         {"type": "equity-option", "side": "put", "direction": "long",
-         "strikeSelection": "delta", "strikeValue": 0.10, "quantity": 1},
+         "strikeSelection": "delta", "delta": 10, "quantity": 1},
         {"type": "equity-option", "side": "call", "direction": "short",
-         "strikeSelection": "delta", "strikeValue": 0.16, "quantity": 1},
+         "strikeSelection": "delta", "delta": 16, "quantity": 1},
         {"type": "equity-option", "side": "call", "direction": "long",
-         "strikeSelection": "delta", "strikeValue": 0.10, "quantity": 1},
+         "strikeSelection": "delta", "delta": 10, "quantity": 1},
     ],
 }
 
@@ -258,34 +300,35 @@ def build_backtest(symbol, strategy, start_date, end_date,
     """
     Build a backtest request payload for one of our strategies.
 
+    Per https://developer.tastytrade.com/docs/guides/backtesting:
+    - Each leg has "delta" (e.g. 16) and "daysUntilExpiration" (per-leg)
+    - entryConditions uses "frequency": "every day"
+    - exitConditions uses "takeProfitPercentage" (e.g. 50 for 50%)
+
     Entry: <dte_target> DTE, delta-based strike selection.
-    Exits: profit_target (fraction of credit), optional stop_loss,
-           exit at <exit_dte> DTE.
+    Exits: profit_target (fraction of credit), optional stop_loss.
 
     Returns the payload dict ready for POST /backtests.
     """
-    if strategy not in STRATEGY_LEGS:
-        raise ValueError(
-            f"Unknown strategy '{strategy}'. "
-            f"Available: {sorted(STRATEGY_LEGS)}"
-        )
+    legs = _strategy_legs(strategy, dte_target)
 
     entry_conditions = {
-        "daysToExpiration": dte_target,
+        "frequency": "every day",
     }
 
+    # API expects takeProfitPercentage as a percentage (50 = 50%)
     exit_conditions = {
-        "profitTarget": profit_target,
-        "atDaysToExpiration": exit_dte,
+        "takeProfitPercentage": int(profit_target * 100),
     }
     if stop_loss is not None:
-        exit_conditions["stopLoss"] = stop_loss
+        # stopLoss as percentage of credit (e.g. 200 = 2x credit)
+        exit_conditions["stopLossPercentage"] = int(stop_loss * 100)
 
     return {
         "symbol": symbol,
         "startDate": start_date,
         "endDate": end_date,
-        "legs": STRATEGY_LEGS[strategy],
+        "legs": legs,
         "entryConditions": entry_conditions,
         "exitConditions": exit_conditions,
     }
