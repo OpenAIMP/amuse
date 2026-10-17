@@ -1,0 +1,59 @@
+name: Tastytrade Backtest Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_case:
+        description: 'Test case'
+        required: false
+        default: 'single-put-2024'
+        type: choice
+        options:
+          - single-put-2024
+          - single-put-30dte
+          - bull-put-2024
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run diagnostic backtest
+        env:
+          TASTYTRADE_CLIENT_ID: ${{ secrets.TASTYTRADE_CLIENT_ID }}
+          TASTYTRADE_CLIENT_SECRET: ${{ secrets.TASTYTRADE_CLIENT_SECRET }}
+          TASTYTRADE_REFRESH_TOKEN: ${{ secrets.TASTYTRADE_REFRESH_TOKEN }}
+        run: |
+          TEST_CASE="${{ github.event.inputs.test_case || 'single-put-2024' }}"
+          
+          case "$TEST_CASE" in
+            "single-put-2024")
+              python3 src/tastytrade_backtest.py \
+                --symbol SPY \
+                --strategy single_put \
+                --start 2024-01-01 \
+                --end 2024-06-30 \
+                --dte 45 \
+                --profit-target 0.50
+              ;;
+            "single-put-30dte")
+              python3 src/tastytrade_backtest.py \
+                --symbol SPY \
+                --strategy single_put \
+                --start 2024-01-01 \
+                --end 2024-06-30 \
+                --dte 30 \
+                --profit-target 0.50
+              ;;
+            "bull-put-2024")
+              python3 src/tastytrade_backtest.py \
+                --symbol SPY \
+                --strategy bull_put \
+                --start 2024-01-01 \
+                --end 2024-06-30 \
+                --dte 45 \
+                --profit-target 0.50 \
+                --exit-dte 21
+              ;;
+          esac
