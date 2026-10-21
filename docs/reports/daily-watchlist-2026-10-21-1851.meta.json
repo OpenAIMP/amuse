@@ -1,0 +1,24 @@
+{
+ "id": "daily-watchlist-2026-10-21-1851",
+ "type": "daily",
+ "date": "2026-10-21-1851",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-21-1851",
+ "blurb": "ADSK 27.2 leads; 10 bull puts, 9 condors, 8 asym condors; Decision: NO TRADE: no candidate cleared the decision gates; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 6,
+  "stock_qualified": 6,
+  "stock_rejected": 93,
+  "stock_incomplete_data": 2,
+  "stock_errors": 0,
+  "bull_puts": 10,
+  "iron_condors": 9,
+  "asym_condors": 8,
+  "pmcc_pairs": 58,
+  "decision_candidates": 18,
+  "recommendation": "NO TRADE",
+  "Kelly": "UNSIZED",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "watchlist",
+ "source_detail": "101 names"
+}
