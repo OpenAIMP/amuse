@@ -45,10 +45,10 @@ class TestEarningsReject(unittest.TestCase):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "..", "src", "earnings_dates.json")
         data = json.load(open(path))
-        self.assertIn("JPM", data)
+        self.assertIn("AAPL", data)
         # Just verify it's a valid date string, not a specific hardcoded date (#101)
         import re
-        self.assertRegex(data["JPM"]["earnings"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertRegex(data["AAPL"]["earnings"], r"^\d{4}-\d{2}-\d{2}$")
 
 
 if __name__ == "__main__":
