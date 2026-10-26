@@ -1,0 +1,17 @@
+{
+ "id": "intraday-nasdaq100-2026-10-26-2016",
+ "type": "intraday",
+ "date": "2026-10-26-2016",
+ "title": "Options Lab \u2014 Intraday Momentum Screen \u00b7 2026-10-26-2016",
+ "blurb": "1 momentum candidate, 1 bullish",
+ "stats": {
+  "candidates": 1,
+  "qualified": 1,
+  "rejected": 100,
+  "incomplete_data": 0,
+  "errors": 0,
+  "screened": 101
+ },
+ "source": "nasdaq100",
+ "source_detail": "101 names"
+}
