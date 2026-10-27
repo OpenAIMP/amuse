@@ -1,0 +1,24 @@
+{
+ "id": "daily-watchlist-2026-10-27-1940",
+ "type": "daily",
+ "date": "2026-10-27-1940",
+ "title": "Options Lab \u2014 Daily Screen \u00b7 2026-10-27-1940",
+ "blurb": "FAST 31.1 leads; 14 bull puts, 8 condors, 8 asym condors; Decision: NO TRADE: no candidate cleared the decision gates; Portfolio risk not supplied",
+ "stats": {
+  "stocks": 11,
+  "stock_qualified": 11,
+  "stock_rejected": 88,
+  "stock_incomplete_data": 2,
+  "stock_errors": 0,
+  "bull_puts": 14,
+  "iron_condors": 8,
+  "asym_condors": 8,
+  "pmcc_pairs": 57,
+  "decision_candidates": 35,
+  "recommendation": "NO TRADE",
+  "Kelly": "UNSIZED",
+  "portfolio_risk": "not supplied"
+ },
+ "source": "watchlist",
+ "source_detail": "101 names"
+}
