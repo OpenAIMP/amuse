@@ -1,0 +1,18 @@
+{
+ "id": "premarket-watchlist-2026-10-28-1836",
+ "type": "premarket",
+ "date": "2026-10-28-1836",
+ "title": "Options Lab \u2014 Opening-range Gap Confirmation \u00b7 2026-10-28-1836",
+ "blurb": "2 gap candidates, 2 with gap-and-go bias",
+ "stats": {
+  "candidates": 2,
+  "gap_and_go": 2,
+  "qualified": 2,
+  "rejected": 99,
+  "incomplete_data": 0,
+  "errors": 0,
+  "screened": 101
+ },
+ "source": "watchlist",
+ "source_detail": "101 names"
+}
